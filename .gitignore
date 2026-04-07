@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+.aib_brain/tools/__pycache__/
+# AIB execution logs (transient)
+logs/aib-action-*.log

@@ -1,0 +1,124 @@
+name: AIB SemVer PATCH bump and log
+
+on:
+  pull_request:
+    branches:
+      - main
+    types:
+      - opened
+      - reopened
+      - synchronize
+
+permissions:
+  contents: write
+  pull-requests: read
+
+concurrency:
+  group: aib-semver-bump-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  bump_and_log:
+    name: Bump SemVer marker + create version log
+    runs-on: ubuntu-latest
+
+    if: |
+      github.actor != 'github-actions[bot]' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+
+    steps:
+      - name: Checkout PR branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+
+      - name: Fetch base branch
+        run: git fetch origin ${{ github.base_ref }} --depth=1
+
+      - name: Collect PR commit subjects
+        shell: bash
+        run: |
+          set -euo pipefail
+          subjects_file="${RUNNER_TEMP}/aib_pr_commit_subjects_${{ github.event.pull_request.number }}.txt"
+          git log --pretty=format:%s origin/${{ github.base_ref }}..HEAD > "$subjects_file"
+          echo "AIB_COMMIT_SUBJECTS_FILE=$subjects_file" >> "$GITHUB_ENV"
+
+      - name: Derive linked issue number (optional)
+        id: derive_issue
+        shell: bash
+        run: |
+          set -euo pipefail
+          title="$(jq -r '.pull_request.title // ""' "$GITHUB_EVENT_PATH")"
+          body="$(jq -r '.pull_request.body // ""' "$GITHUB_EVENT_PATH")"
+          text="$title"$'\n'$body
+
+          issue=""
+          if [[ "$text" =~ ([Ff]ixes|[Cc]loses|[Rr]esolves)[[:space:]]*#([0-9]+) ]]; then
+            issue="${BASH_REMATCH[2]}"
+          fi
+
+          echo "issue=$issue" >> "$GITHUB_OUTPUT"
+
+      - name: Run release bookkeeping
+        id: bookkeeping
+        shell: bash
+        run: |
+          set -euo pipefail
+          : "${AIB_COMMIT_SUBJECTS_FILE:?AIB_COMMIT_SUBJECTS_FILE not set (Collect PR commit subjects step failed)}"
+          args=(
+            --base-ref "origin/${{ github.base_ref }}"
+            --pr-number "${{ github.event.pull_request.number }}"
+            --commit-subjects-file "$AIB_COMMIT_SUBJECTS_FILE"
+            --github-output "$GITHUB_OUTPUT"
+          )
+
+          if [ -n "${{ steps.derive_issue.outputs.issue }}" ]; then
+            args+=(--issue "${{ steps.derive_issue.outputs.issue }}")
+          fi
+
+          python3 scripts/release_bookkeeping.py "${args[@]}"
+
+      - name: Cleanup transient artifacts
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -n "${AIB_COMMIT_SUBJECTS_FILE:-}" ]; then
+            rm -f "$AIB_COMMIT_SUBJECTS_FILE"
+          fi
+
+      - name: Show planned changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          git status --porcelain
+          git diff --stat
+
+      - name: Commit and push (if changed)
+        if: steps.bookkeeping.outputs.changed == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add .aib_brain logs
+
+          if [ -z "$(git status --porcelain)" ]; then
+            echo "Nothing to commit."
+            exit 0
+          fi
+
+          git commit -m "chore: bump to ${{ steps.bookkeeping.outputs.new_version }} (PR #${{ github.event.pull_request.number }})"
+          git push origin HEAD:${{ github.head_ref }}
+
+      - name: Ensure clean working tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "Working tree is not clean after workflow run:" >&2
+            git status --porcelain >&2
+            exit 1
+          fi

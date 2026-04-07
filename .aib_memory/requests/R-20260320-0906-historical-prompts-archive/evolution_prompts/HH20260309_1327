@@ -1,0 +1,15 @@
+## Goal
+
+The scripts `run.bat` and `run.sh` should be located in the only folder which will be installed - `.aib_brain`
+
+## Context
+
+- If exists, consult the questionnaire file which is same name as the current one with difference - ending with ".questionnaire.md"
+
+## Objectives
+- Move the script files and edit the dependent files `.aib_brain\tools\menu.py` and `.aib_brain\tools\menu_config.json` to reflect the change
+
+## Rules
+
+## Format (optional)
+
