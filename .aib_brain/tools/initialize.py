@@ -52,6 +52,21 @@ def main() -> None:
         else:
             write_text(context_file, "# Context\n\nThis file is managed by the `aib-context.md` prompt. Run it to populate workspace context.\n")
 
+        # Seed input.md as the primary ephemeral user-agent communication channel.
+        input_file = workspace / ".aib_memory" / "input.md"
+        if input_file.exists():
+            print("input.md already exists — skipping overwrite.")
+        else:
+            input_seed = (
+                "## Active request\n"
+                "No active request\n\n"
+                "## Options\n"
+                "- [ ] No changes — provide answer only\n"
+                "- [ ] Skip analysis document generation\n\n"
+                "## Input\n\n"
+            )
+            write_text(input_file, input_seed)
+
         print("Initialized .aib_memory structure successfully.")
         if requirements is not None:
             print(f"Seeded references rows: {len(requirements)}")

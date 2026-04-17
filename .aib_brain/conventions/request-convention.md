@@ -22,13 +22,12 @@ Request Identity (normative)
 - Creation of `request.md` MUST occur via the `create-request` action.  
 - On creation:
   - The new request MUST be registered in `.aib_memory/requests_register.md`.  
-  - The request MUST be set to state `Active`.  
-  - Iteration `01` MUST be created automatically.
+  - The request MUST be set to state `Active`.
 
 Document Structure (normative)
 The file MUST contain the following top-level sections in the exact order shown below.  
 All headings MUST be level‑2 (`##`).  
-Each section MUST be present, even if empty.
+All sections (1–14) are mandatory and MUST be present, even if empty. 
 
 1. `## Goal`  
    - A concise description of what the human wants changed/created.  
@@ -42,6 +41,8 @@ Each section MUST be present, even if empty.
    - Clear definition of what is included in the change.  
    - MUST explicitly list impacted functional areas, components, domains, or documents.  
    - Scope MUST be precise enough for AIB to reason deterministically.
+   - Must be written in bullet-list form. Add extra empty line between bullets.
+  
 4. `## Out of scope`  
    - Items intentionally excluded from the request.  
    - MUST NOT be empty; include at least one entry (“No exclusions” is allowed).
@@ -54,6 +55,78 @@ Each section MUST be present, even if empty.
 6. `## Success criteria`  
    - MUST define measurable outcomes that indicate completion.  
    - SHOULD link criteria to testability or user acceptance conditions.
+
+7. `## Assumptions`  
+   - AI-generated list of implementation-affecting assumptions.  
+   - Each entry: `- A<n>: <text>` with optional sub-bullet `  - Risk if false: <text>`.  
+   - Fully replaced on every analysis re-run.
+
+8. `## Plan`  
+   - AI-generated Work Breakdown Structure (WBS) for the active iteration.  
+   - Each task uses the following schema:
+     ```
+     ### Task <N>: <Task Name>
+     **Intent:** <single-sentence goal>
+     **Inputs:** <files, configs, parameters, data preconditions>
+     **Outputs:** <artifacts produced or changed; file paths or product components>
+     **External Interfaces:** <systems, data sources, modules consumed or produced>
+     **Environment & Configuration:** <environments, config keys, secrets handling notes>
+     **Procedure:** <ordered, concise steps>
+     **Done Criteria:** <objective pass/fail checks>
+     **Dependencies:** <Task IDs or external>
+     **Risk Notes:** <if any>
+     ```
+   - Fully replaced on every analysis re-run.
+
+9. `## Testing`  
+   - AI-generated intent-level test cases defining what tests to create and perform.  
+   - Each entry: `- T<n> — <name>: <description>. Expected outcome: <observable result>.`  
+   - Fully replaced on every analysis re-run.
+
+10. `## Documentation`  
+    - AI-generated list of documentation files that must be revised because of this request.  
+    - Each entry: `- <path> (ref_id: <REF-ID>) — <reason for update>.`
+    - If ref_id is unknown: `- <path> (ref_id: N/A) — <reason>`.  
+    - Fully replaced on every analysis re-run.
+
+11. `## Questions & Decisions`  
+    - AI-generated question blocks requiring user input.  
+    - Present only when the analysis identifies unknowns or decision forks that cannot be resolved by the AI through research.  
+    - Each question block uses the following schema:  
+      ```
+      **Q<nnn>**: <question text>
+      - [ ] Option A: <text>
+      - [ ] Option B: <text>
+      - [ ] Other: ___
+      > Answer: <free-text answer block — leave blank until answered>
+      ```
+    - Re-run preservation rule: A question is "answered" if at least one checkbox is `[x]` OR the `> Answer:` block is non-empty. Answered questions MUST be applied as embedded instructions to the relevant sections of `request.md`, then removed from `## Questions & Decisions`. New unanswered questions are appended.
+    - Conflict flagging: Append `> [!NOTE] DECISION REVIEW NEEDED: <reason>` to any answered question whose answer conflicts with an updated analysis context. Do not alter the answer itself.
+
+12. `## Code and Asset Scan for Impacted Components`  
+    - AI-generated table of workspace files, modules, pipelines, and assets impacted by this request.  
+    - Format: Markdown table with columns `File/Asset`, `Change Type`, `Reason`.  
+    - Change types: `Modified`, `Created`, `Deleted`, `Read-only dependency`.  
+    - Fully replaced on every analysis re-run.
+
+13. `## Internal Review of Request and Product Docs`  
+    - AI-generated factual findings from reading `request.md` and all product docs in `.aib_memory/references.md`.  
+    - Documents ambiguities, contradictions, missing information, and cross-reference issues found.  
+    - Each finding: `- <finding-type>: <file> — <description>`.  
+    - Finding types: `Ambiguity`, `Contradiction`, `Missing info`, `Cross-ref issue`, `OK`.  
+    - Fully replaced on every analysis re-run.
+    - This section records FACTUAL findings only (what is in the documents). Evaluative opinions belong in section 14.
+
+14. `## Multi-Perspective Stakeholder Review`  
+    - AI-generated evaluation of the request from five distinct viewpoints.  
+    - Each perspective MUST be written as a separate sub-section with one paragraph of evaluation and 2–5 bullet findings.  
+    - Required perspectives:
+      - **Senior Solution Architect**: technical feasibility, design integrity, architectural risk.
+      - **Product Owner**: business value, scope clarity, acceptance criteria completeness.
+      - **User**: usability, clarity of expected behavior changes, friction introduced.
+      - **Security Officer**: attack surface, data exposure, authentication/authorization impact.
+      - **Data Governance Officer**: data lineage, retention, classification, and compliance impact.
+    - Fully replaced on every analysis re-run.
 
 Formatting Rules (normative)
 - Only level‑2 headings (`##`) are allowed for the required sections.  
@@ -86,41 +159,17 @@ Lifecycle & Editing Rules (normative)
 
 Validation Rules (normative)
 A valid `request.md` MUST satisfy:
-- All six required sections exist exactly once.  
-- Section order is correct.  
-- No undefined or extra top-level sections.  
-- Content in each section is non-empty except where explicitly allowed.  
+- The six mandatory sections (Goal, Background, Scope, Out of scope, Constraints, Success criteria) exist exactly once and in order.  
+- AI-generated sections (7–14) added by `create-analysis` are allowed after `## Success criteria`; they do not affect mandatory section validation before analysis is run.
+- Content in each mandatory section is non-empty except where explicitly allowed.  
 - File path matches the request folder.  
 - Folder name matches naming convention and `request_id` is parseable.
-
-Example Minimal Valid Structure (informative)
-```
-## Goal
-Text…
-
-## Background
-Text…
-
-## Scope
-- Item 1
-- Item 2
-
-## Out of scope
-- Item not included
-
-## Constraints
-- None
-
-## Success criteria
-- The system performs X
-- Documentation updated
-```
+- `## Amends` section MUST NOT appear in any `request.md`; use `input.md` for amendments.
 
 Operational Workflow (normative)
-- `create-request` initializes `request.md` as an empty template with all mandatory sections.  
-- `create-analysis`, `create-questionnaire`, `create-plan` MUST read `request.md` as their primary input.  
-- `implement` MUST rely on `request.md` + iteration artifacts; it MUST NOT alter `request.md`.  
-- Iterations complement the request; if contradictions arise, higher iteration IDs take precedence. 
+- `create-request` creates the request folder and register entry. 
+- `request.md` is generated by `create-analysis` (or by `aib-analysis.md` auto-request branch) from `input.md` content.  
+- `implement` MUST rely on `request.md`; it MUST NOT alter `request.md`.  
 
 Change Control (normative)
 - Any updates to this convention MUST be made before generating new `request.md` files.  

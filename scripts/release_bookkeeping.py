@@ -7,6 +7,7 @@ import datetime as dt
 import re
 import subprocess
 import sys
+import zipfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
@@ -169,11 +170,38 @@ def _rotate_marker(brain_path: Path, old_marker: str, new_marker: str) -> None:
     new_path.write_text("", encoding="utf-8")
 
 
+def _create_brain_zip(brain_path: Path, versions_dir: Path, version_marker: str) -> Path:
+    """Create a versioned zip archive of brain_path in versions_dir.
+
+    The archive is named ``aib_brain_<version_marker>.zip`` and is placed in
+    ``versions_dir``.  If the target zip already exists, creation is skipped
+    (idempotent).
+
+    Returns the path to the zip file (whether created or pre-existing).
+    """
+    versions_dir.mkdir(parents=True, exist_ok=True)
+    zip_path = versions_dir / f"aib_brain_{version_marker}.zip"
+
+    # Idempotency: skip if already created for this version.
+    if zip_path.exists():
+        return zip_path
+
+    with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+        for file_path in sorted(brain_path.rglob("*")):
+            if file_path.is_file():
+                # Archive relative to the parent of brain_path so the zip
+                # contains a .aib_brain/ top-level folder.
+                arcname = file_path.relative_to(brain_path.parent)
+                zf.write(file_path, arcname)
+
+    return zip_path
+
+
 def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(
         description=(
             "Automated release bookkeeping: validates SemVer marker, bumps PATCH, rotates marker file, "
-            "and creates a per-version log file under logs/."
+            "creates a per-version log file under logs/, and archives .aib_brain/ to versions/."
         )
     )
     parser.add_argument(
@@ -274,9 +302,11 @@ def main(argv: list[str]) -> int:
             commit_subjects=commit_subjects,
         )
         _rotate_marker(brain_path, base_marker, target_marker)
+        zip_path = _create_brain_zip(brain_path, log_dir.parent / "versions", target_marker)
+        print(f"Created brain archive: {zip_path.as_posix()}")
         changed = True
     else:
-        # Marker already bumped to target_marker; ensure log exists.
+        # Marker already bumped to target_marker; ensure log and zip exist.
         _write_version_log(
             log_path=log_path,
             version_heading=target_version.to_heading(),
@@ -284,6 +314,8 @@ def main(argv: list[str]) -> int:
             pr_number=str(args.pr_number) if args.pr_number else None,
             commit_subjects=commit_subjects,
         )
+        zip_path = _create_brain_zip(brain_path, log_dir.parent / "versions", target_marker)
+        print(f"Created brain archive: {zip_path.as_posix()}")
         changed = True
 
     print(f"Computed new version: {target_marker}")

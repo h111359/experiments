@@ -4,4 +4,4 @@ __pycache__/
 venv/
 .aib_brain/tools/__pycache__/
 # AIB execution logs (transient)
-logs/aib-action-*.log
+.aib_memory/logs/aib-action-*.log

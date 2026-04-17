@@ -1,7 +1,7 @@
 # Prompt: context
 
 Goal:
-Produce or fully replace `.aib_memory/context.md` — a unified, structured synthesis of all workspace-specific product knowledge, structured according to `.aib_brain/conventions/context-convention.md`.
+Produce or fully replace `.aib_memory/context.md` — a unified, structured synthesis of all workspace-specific product knowledge, structured according to `.aib_brain/conventions/context-convention.md`. This prompt also serves the reverse-engineering use case: when no product-doc content exists in `.aib_memory/references.md`, Phase 3 workspace scan becomes the primary synthesis source.
 
 Non-goals:
 - Do not modify any existing file in the workspace other than `.aib_memory/context.md`.
@@ -22,19 +22,23 @@ Core requirements (normative):
 1. Read `.aib_brain/conventions/context-convention.md`. This is the authoritative source for the required section structure, content guidance, formatting rules, and quality gates for `context.md`.
 2. Read `.aib_memory/references.md`.
 3. Build the product-doc read set: every `path` where `type = product-doc`.
-4. Verify the read set is non-empty. If empty, STOP and report an error.
+4. If the read set is empty, skip Phase 2 and proceed directly to Phase 3.
 
 ---
 
 ## Phase 2 — Primary read (product documentation)
 
-1. Read every file in the product-doc read set from `.aib_memory/docs/`.
+> **Note:** This phase is skipped when the product-doc read set is empty (proceed directly to Phase 3).
+
+1. Read every file in the product-doc read set.
 2. For each file, determine whether it contains real content or is a stub (seeded placeholder text only with no substantive information beyond template headings).
 3. Record per-file status: `populated` or `stub`.
 
 ---
 
 ## Phase 3 — Supplementary read (workspace sources)
+
+When the product-doc read set is empty, this phase is the **primary synthesis source** (reverse-engineering mode). Apply the traceability and evidence-collection rules from the Reverse-Engineering Evidence Collection section below.
 
 1. Build a deterministic file inventory of the workspace root.
    - Include all files and directories.
@@ -53,6 +57,44 @@ Core requirements (normative):
 3. Read files under `scripts/` (purpose, inputs, outputs per script).
 4. Read files under `tests/` (test coverage areas, key test targets).
 5. Read root configuration files (e.g., `.gitignore`, `pyproject.toml`, `setup.cfg`, `requirements.txt`, `package.json`) if they exist.
+
+---
+
+## Reverse-Engineering Evidence Collection
+
+When operating in reverse-engineering mode (product-doc read set is empty), apply the following additional evidence-collection rules during Phase 3.
+
+### A. Deterministic file inventory
+
+MUST produce (internally, for reasoning) a deterministic inventory of workspace files:
+- Inventory includes all files under workspace root.
+- Exclude typical noise directories unless explicitly needed:
+  - `.git/`, `node_modules/`, `.venv/`, `venv/`, `__pycache__/`, `.pytest_cache/`, `.mypy_cache/`
+- Sort by workspace-relative path ascending.
+
+Notes for large repos:
+- Prefer a two-pass approach:
+  1. Fast inventory from metadata only.
+  2. Deep reads only for a small set of relevant files per section.
+- If context is limited, summarize and defer deep reads; never invent content.
+
+Optional helper tool:
+- You MAY use `.aib_brain/tools/reverse-engineer.py` to emit a JSONL inventory.
+- The prompt must still work without that tool.
+
+### B. Traceability requirement
+
+For each mandatory section of `context.md` synthesized from workspace sources:
+- Provide explicit traceability references (source path and brief note of what was found).
+- Mark claims that cannot be directly supported from workspace evidence as assumptions with a confidence level.
+- Prefer leaving a stub notice over guessing.
+
+### C. Evidence-backed synthesis rules
+
+- Keep content consistent with workspace evidence.
+- Prefer concise, deterministic wording.
+- Do NOT reproduce verbatim content from source files. Summarize and synthesize.
+- If a section has no workspace evidence, write the stub notice exactly as specified in `context-convention.md`.
 
 ---
 
@@ -81,7 +123,13 @@ When mapping product documentation to sections:
 
 ### 4.3 Workspace file inventory
 
-Write the final mandatory section (`## Workspace File Inventory`) listing all non-excluded files discovered in Phase 3. Follow the format defined in `context-convention.md` Section 12.
+Write the final mandatory section (`## Workspace File Inventory`) listing all non-excluded files and directories discovered in Phase 3. Follow the format defined in `context-convention.md` Section 12.
+
+For each entry:
+- **File entries:** Write `- \`path\` — description.` where description is one sentence derived from knowledge synthesized in earlier sections (Sections 1–11) or from direct file content read in Phase 3.
+- **Directory entries:** Write `- \`dir/\` — description.` for every directory and subdirectory present in the workspace (using a trailing slash). Derive the description from the folder's evident role (e.g., contents and purpose inferred from earlier synthesis). Add a directory entry for every folder and subfolder; do not omit any directory that contains listed files.
+- **Repetitive request artifact files** (`request.md`, `implementation.md`, `analysis.md` within `.aib_memory/requests/<request-folder>/`): use a formulaic description based on the request folder slug (e.g., "Request definition for <human-readable-slug>.", "Implementation log for <human-readable-slug>.", "Analysis artifact for <human-readable-slug>.").
+- Sort all entries (files and directories together) ascending by path.
 
 ---
 

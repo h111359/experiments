@@ -17,3 +17,21 @@
 | R-20260404-0823 | unified requirements and tech specs | .aib_memory/requests/R-20260404-0823-unified-requirements-and-tech-specs | Closed | 2026-04-04 08:23:01 +0300 | 2026-04-04 17:30:25 +0300 |
 | R-20260404-1826 | Improve aib-context.md | .aib_memory/requests/R-20260404-1826-improve-aib-context-md | Closed | 2026-04-04 18:26:11 +0300 | 2026-04-04 23:26:20 +0300 |
 | R-20260404-2326 | Remove github cli integration | .aib_memory/requests/R-20260404-2326-remove-github-cli-integration | Closed | 2026-04-04 23:26:49 +0300 | 2026-04-05 00:12:25 +0300 |
+| R-20260408-1046 | add user instructions in readme and update | .aib_memory/requests/R-20260408-1046-add-user-instructions-in-readme-and-update | Closed | 2026-04-08 10:46:15 +0300 | 2026-04-09 11:51:02 +0300 |
+| R-20260409-1152 | Add comments in the code | .aib_memory/requests/R-20260409-1152-add-comments-in-the-code | Closed | 2026-04-09 11:52:00 +0300 | 2026-04-09 12:58:43 +0300 |
+| R-20260409-1322 | 39-decision-points-vs-questionaire | .aib_memory/requests/R-20260409-1322-39-decision-points-vs-questionaire | Closed | 2026-04-09 13:22:42 +0300 | 2026-04-14 14:20:25 +0300 |
+| R-20260414-1421 | Analys rework and remove iterations | .aib_memory/requests/R-20260414-1421-analys-rework-and-remove-iterations | Closed | 2026-04-14 14:21:11 +0300 | 2026-04-15 12:34:30 +0300 |
+| R-20260415-1407 | Remove docs | .aib_memory/requests/R-20260415-1407-remove-docs | Closed | 2026-04-15 14:07:06 +0300 | 2026-04-15 22:47:21 +0300 |
+| R-20260415-2247 | move log in aib_memory | .aib_memory/requests/R-20260415-2247-move-log-in-aib-memory | Closed | 2026-04-15 22:47:42 +0300 | 2026-04-16 10:46:50 +0300 |
+| R-20260416-1047 | README improvement | .aib_memory/requests/R-20260416-1047-readme-improvement | Closed | 2026-04-16 10:47:01 +0300 | 2026-04-16 10:53:26 +0300 |
+| R-20260416-1053 | README - improve | .aib_memory/requests/R-20260416-1053-readme-improve | Closed | 2026-04-16 10:53:47 +0300 | 2026-04-16 12:54:55 +0300 |
+| R-20260416-1322 | README in root | .aib_memory/requests/R-20260416-1322-readme-in-root | Closed | 2026-04-16 13:22:36 +0300 | 2026-04-16 18:50:48 +0300 |
+| R-20260416-1851 | analysis executed despite all requests closed | .aib_memory/requests/R-20260416-1851-analysis-executed-despite-all-requests-closed | Closed | 2026-04-16 18:51:51 +0300 | 2026-04-16 19:44:36 +0300 |
+| R-20260416-2124 | file description in context | .aib_memory/requests/R-20260416-2124-file-description-in-context | Closed | 2026-04-16 21:24:20 +0300 | 2026-04-17 06:44:09 +0300 |
+| R-20260417-0903 | request improvement | .aib_memory/requests/R-20260417-0903-request-improvement | Closed | 2026-04-17 09:03:36 +0300 | 2026-04-17 12:20:50 +0300 |
+| R-20260417-1235 | bugfixing | .aib_memory/requests/R-20260417-1235-bugfixing | Closed | 2026-04-17 12:35:16 +0300 | 2026-04-17 12:50:17 +0300 |
+| R-20260417-1254 | Remove reverse engineer option from menu | .aib_memory/requests/R-20260417-1254-remove-reverse-engineer-option-from-menu | Closed | 2026-04-17 12:54:10 +0300 | 2026-04-17 13:06:24 +0300 |
+| R-20260417-1440 | Menu refresh without blinking | .aib_memory/requests/R-20260417-1440-menu-refresh-without-blinking | Closed | 2026-04-17 14:40:53 +0300 | 2026-04-17 15:29:38 +0300 |
+| R-20260417-1534 | Add quit option to menu | .aib_memory/requests/R-20260417-1534-add-quit-option-to-menu | Closed | 2026-04-17 15:34:29 +0300 | 2026-04-17 15:42:32 +0300 |
+| R-20260417-1554 | AIB prompt and workflow improvements | .aib_memory/requests/R-20260417-1554-aib-prompt-and-workflow-improvements | Closed | 2026-04-17 15:54:18 +0300 | 2026-04-17 16:52:11 +0300 |
+| R-20260417-1709 | Revise aib_brain README and restrict script invocation | .aib_memory/requests/R-20260417-1709-revise-aib-brain-readme-and-restrict-script-invocation | Closed | 2026-04-17 17:09:48 +0300 | 2026-04-17 17:18:42 +0300 |

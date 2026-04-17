@@ -115,7 +115,7 @@ On any validation failure, tools **must** return a human-readable error and **mu
   - Fails if an `Active` row exists.
   - Generates `request_id`, `folder`, `created_at`, sets `state=Active`.
   - Creates the request folder with the seed files:
-    - `request.md`, `iterations.md`, `01-analysis.md`, `01-questionnaire.md`, `01-plan.md`, `implementation.md`
+    - `request.md`, `implementation.md`
 - **Closure (`close-request`)**
   - Resolves the target row (explicit `request_id` or the current `Active`).
   - Sets `state=Closed`, sets `closed_at`, preserves other fields.

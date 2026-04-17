@@ -1,0 +1,5 @@
+[START] 2026-04-04T08:23:01.543168 — Create request
+[CMD] C:\Hristo\projects\AI_Builder\.venv\Scripts\python.exe C:\Hristo\projects\AI_Builder\.aib_brain\tools\create-request.py --workspace C:\Hristo\projects\AI_Builder --title unified requirements and tech specs
+[OUT] Created request: R-20260404-0823
+[OUT] Folder: .aib_memory/requests/R-20260404-0823-unified-requirements-and-tech-specs
+[EXIT] 0

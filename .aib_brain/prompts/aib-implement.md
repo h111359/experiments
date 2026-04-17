@@ -1,13 +1,17 @@
 # Prompt: implement
 
 Goal:
-Execute active request scope, update the documentation and update request-scoped `implementation.md`.
+Execute active request scope, update the documentation and create request-scoped `implementation.md` from scratch.
 
 Input resolution:
+- Read `.aib_memory/requests_register.md` and check for exactly one row with `state = Active`.
+  - If zero Active rows are found: **Auto-Analysis Branch** — trigger the `aib-analysis.md` flow (read and execute `.aib_brain/prompts/aib-analysis.md`), then continue with implementation once analysis completes and a new Active request exists. Do NOT ask the user for permission or confirmation before creating the request or running analysis; proceed autonomously.
+  - If more than one Active row is found: output the message **"ERROR: Register inconsistency — multiple Active requests found. Execution halted. Fix requests_register.md before running implement."** Do NOT proceed to any subsequent step. Do NOT write any output files.
+  - If exactly one Active row is found: continue with input resolution below.
 - Resolve active request from `.aib_memory/requests_register.md` unless explicit ID is provided.
-- Resolve active iteration from request `iterations.md`.
-- Use newest iteration artifacts as truth when conflicts exist.
+- Use `request.md` as the authoritative source of truth for implementation scope, plan, and all context. Analysis, questionnaire, and plan iteration artifacts are NOT read during implementation.
 - Read `.aib_brain/Concepts.md` for normative lifecycle and safety rules.
+- MUST NOT read `inputs/input-archive-*.md` files from any request folder.
 
 Execution requirements:
 - Apply code/documentation changes required by request scope.
@@ -15,28 +19,52 @@ Execution requirements:
 - Run validation/tests and capture results.
 - Resolve any test failures
 - Continue until done criteria are met or blockers are explicitly recorded.
-- Execute `.aib_brain\prompts\aib-documentation.md`
-- Confirm at the very end of the conversation with the text "--- I am done with the implementation ---" that all your activities are finished
+- Execute `.aib_brain\prompts\aib-context.md`
+- After completing all implementation work and the context update, auto-close the request by invoking:
+  ```
+  python .aib_brain/tools/close-request.py --workspace .
+  ```
+  This MUST be the final step before confirming completion. Only invoke close-request.py after the implementation is confirmed successful (no unresolved test failures or blockers).
+- MUST confirm at the very end of the conversation with the text "--- I am done with the implementation ---" that all your activities are finished
 
 Documentation reading requirements:
 - Read `.aib_memory/references.md`.
 - Build a required-read set containing every `path` from references where:
    - `type = product-doc`
 - Read every file in the required-read set before implementation.
-- Read `.aib_brain/conventions/product-documentation-convention.md` (authoritative mapping) before editing any `product-doc`.
+- Read `.aib_brain/conventions/context-convention.md` (authoritative convention for `.aib_memory/context.md`) before editing any `product-doc`.
 - Convention enforcement preflight (fail-closed for product-doc edits):
    - For every `product-doc` in the required-read set:
-      - Derive requirement ID from the document filename (e.g., `ARCH-01.md` -> `ARCH-01`).
-      - Resolve the per-document convention file path deterministically as:
-         `.aib_brain/conventions/<requirement-id-lower>-convention.md`.
-      - Verify the mapping row exists in `.aib_brain/conventions/product-documentation-convention.md` for the doc title and resolved convention path.
-      - Read the resolved convention file.
-   - If any mapping row is missing or any convention file cannot be read, DO NOT edit any product-docs; record the blocker and required remediation in `implementation.md`.
+      - Read `.aib_brain/conventions/context-convention.md` as the authoritative convention.
+   - If any convention file cannot be read, DO NOT edit any product-docs; record the blocker and required remediation in `implementation.md`.
 - You MAY edit only files listed in `.aib_memory/references.md` with `edit_allowed=Y`.
 - Do not edit files listed with `edit_allowed=N` unless explicitly instructed otherwise.
 
+Coding convention requirements:
+- UNCONDITIONALLY read `.aib_brain/conventions/coding-general-convention.md` before generating or editing any source-code file.
+- CONDITIONALLY read the language-specific convention file based on the file extensions being created or edited, according to the table below. Read the convention file before generating code for that language.
+
+| File extension(s)            | Convention file to read                                        |
+| ---------------------------- | -------------------------------------------------------------- |
+| `.py` (non-framework)        | `.aib_brain/conventions/coding-python-convention.md`          |
+| `.py` (Flask app)            | `.aib_brain/conventions/coding-python-convention.md` AND `.aib_brain/conventions/coding-flask-convention.md` |
+| `.py` (Django app)           | `.aib_brain/conventions/coding-python-convention.md` AND `.aib_brain/conventions/coding-django-convention.md` |
+| `.dax`                       | `.aib_brain/conventions/coding-dax-convention.md`             |
+| `.sql`                       | `.aib_brain/conventions/coding-sql-convention.md`             |
+| `.html`, `.htm`              | `.aib_brain/conventions/coding-html-convention.md`            |
+| `.js`, `.mjs`, `.cjs`        | `.aib_brain/conventions/coding-javascript-convention.md`      |
+| `.jsx`                       | `.aib_brain/conventions/coding-javascript-convention.md` AND `.aib_brain/conventions/coding-react-convention.md` |
+| `.tsx`                       | `.aib_brain/conventions/coding-javascript-convention.md` AND `.aib_brain/conventions/coding-react-convention.md` |
+| `.css`, `.scss`, `.sass`, `.less` | `.aib_brain/conventions/coding-css-convention.md`        |
+| `.cs`                        | `.aib_brain/conventions/coding-csharp-convention.md`          |
+| `.scala`                     | `.aib_brain/conventions/coding-scala-convention.md`           |
+| UI/UX design files (`.html`, `.css`, `.jsx`, `.tsx` with design intent) | `.aib_brain/conventions/coding-uiux-convention.md` (in addition to the language convention) |
+
+- Apply all rules from the loaded convention file(s) to every file created or edited in the current implement run.
+
 Logging requirements:
-- Append a new Entry to `implementation.md` following the exact Entry Block Format defined in `.aib_brain/conventions/implementation-convention.md`. Do not reproduce the field schema here.
+- Generate `implementation.md` from scratch in the active request folder if it does not exist; append a new Entry if it already exists.
+- Follow the exact Entry Block Format defined in `.aib_brain/conventions/implementation-convention.md`. Do not reproduce the field schema here.
 
 Safety:
 - Do not modify `.aib_brain/` assets during implementation work.

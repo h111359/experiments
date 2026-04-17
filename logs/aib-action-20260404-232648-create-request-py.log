@@ -1,0 +1,5 @@
+[START] 2026-04-04T23:26:48.803754 — Create request
+[CMD] C:\Hristo\projects\AI_Builder\.venv\Scripts\python.exe C:\Hristo\projects\AI_Builder\.aib_brain\tools\create-request.py --workspace C:\Hristo\projects\AI_Builder --title Remove github cli integration
+[OUT] Created request: R-20260404-2326
+[OUT] Folder: .aib_memory/requests/R-20260404-2326-remove-github-cli-integration
+[EXIT] 0

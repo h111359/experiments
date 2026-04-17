@@ -34,9 +34,8 @@ from menu import (
 def _make_state(
     req_id: str | None = None,
     req_folder: str | None = None,
-    iter_id: str | None = None,
 ) -> MenuState:
-    return MenuState(req_id, req_folder, iter_id)
+    return MenuState(req_id, req_folder)
 
 
 REGISTER_HEADER = "| request_id | title | folder | state | created_at | closed_at |"
@@ -85,9 +84,9 @@ class TestResolveMenuState:
         state = resolve_menu_state(tmp_path)
         assert state.active_request_id == "R-20260101-1000"
         assert state.active_request_folder == folder
-        assert state.active_iteration_id is None  # no iterations.md
+        assert state.has_active_request
 
-    def test_active_request_with_active_iteration(self, tmp_path: Path):
+    def test_active_request_no_iterations_file(self, tmp_path: Path):
         mem = tmp_path / ".aib_memory"
         mem.mkdir(parents=True)
         folder_rel = ".aib_memory/requests/R-20260101-1000-test"
@@ -95,11 +94,9 @@ class TestResolveMenuState:
         reg.write_text(_register_with_row("R-20260101-1000", folder_rel, "Active"), encoding="utf-8")
         req_folder = tmp_path / folder_rel
         req_folder.mkdir(parents=True)
-        (req_folder / "iterations.md").write_text(
-            _iterations_with_row("01", "Active"), encoding="utf-8"
-        )
         state = resolve_menu_state(tmp_path)
-        assert state.active_iteration_id == "01"
+        assert state.active_request_id == "R-20260101-1000"
+        assert state.has_active_request
 
     def test_closed_request_returns_empty_state(self, tmp_path: Path):
         mem = tmp_path / ".aib_memory"
@@ -115,37 +112,28 @@ class TestResolveMenuState:
 # ---------------------------------------------------------------------------
 
 class TestFilterVisibleActions:
-    def _make_actions(self) -> list[dict[str, Any]]:
-        from menu import build_script_actions, TOOLS_DIR  # type: ignore[attr-defined]
-        return build_script_actions(Path(__file__).resolve().parent.parent / ".aib_brain" / "tools")
-
-    def test_no_active_request_shows_create_request_only_lifecycle_script(self):
+    def test_returns_all_actions_unchanged(self):
+        """filter_visible_actions is now a pass-through; lifecycle exclusion happens in EXCLUDE_SCRIPTS."""
         actions = build_script_actions(Path(__file__).resolve().parent.parent / ".aib_brain" / "tools")
         state = _make_state()
         visible = filter_visible_actions(actions, state)
-        scripts = [a["script"] for a in visible]
-        assert "create-request.py" in scripts
+        assert visible == actions
+
+    def test_lifecycle_scripts_not_in_actions(self):
+        """create-request.py and close-request.py must not appear regardless of active request state."""
+        actions = build_script_actions(Path(__file__).resolve().parent.parent / ".aib_brain" / "tools")
+        scripts = [a["script"] for a in actions]
+        assert "create-request.py" not in scripts
         assert "close-request.py" not in scripts
         assert "create-iteration.py" not in scripts
         assert "close-iteration.py" not in scripts
 
-    def test_active_request_no_iter_shows_close_request_create_iteration(self):
+    def test_active_request_does_not_change_visible_actions(self):
+        """Presence of an active request no longer affects which actions are shown."""
         actions = build_script_actions(Path(__file__).resolve().parent.parent / ".aib_brain" / "tools")
-        state = _make_state("R-001", ".aib_memory/requests/R-001", None)
-        visible = filter_visible_actions(actions, state)
-        scripts = [a["script"] for a in visible]
-        assert "close-request.py" in scripts
-        assert "create-iteration.py" in scripts
-        assert "create-request.py" not in scripts
-        assert "close-iteration.py" not in scripts
-
-    def test_active_request_with_iter_shows_close_iteration(self):
-        actions = build_script_actions(Path(__file__).resolve().parent.parent / ".aib_brain" / "tools")
-        state = _make_state("R-001", ".aib_memory/requests/R-001", "01")
-        visible = filter_visible_actions(actions, state)
-        scripts = [a["script"] for a in visible]
-        assert "close-iteration.py" in scripts
-        assert "create-iteration.py" not in scripts
+        state_no_req = _make_state()
+        state_with_req = _make_state("R-001", ".aib_memory/requests/R-001")
+        assert filter_visible_actions(actions, state_no_req) == filter_visible_actions(actions, state_with_req)
 
 
 # ---------------------------------------------------------------------------
@@ -156,18 +144,18 @@ class TestBuildScriptActions:
     def test_returns_list_of_actions(self, tools_dir: Path):
         actions = build_script_actions(tools_dir)
         assert isinstance(actions, list)
-        assert len(actions) >= 4
 
     def test_ids_are_sequential_strings(self, tools_dir: Path):
         actions = build_script_actions(tools_dir)
         for i, action in enumerate(actions, start=1):
             assert action["id"] == str(i)
 
-    def test_core_scripts_present(self, tools_dir: Path):
+    def test_lifecycle_scripts_absent(self, tools_dir: Path):
+        """create-request.py and close-request.py must not appear in the menu actions."""
         actions = build_script_actions(tools_dir)
         scripts = [a["script"] for a in actions]
-        for expected in ["create-request.py", "close-request.py", "create-iteration.py", "close-iteration.py"]:
-            assert expected in scripts
+        for absent in ["create-request.py", "close-request.py"]:
+            assert absent not in scripts
 
     def test_excluded_scripts_absent(self, tools_dir: Path):
         actions = build_script_actions(tools_dir)
@@ -303,14 +291,14 @@ class TestSanitizeActionId:
 class TestMakeLogPath:
     def test_creates_log_in_logs_dir(self, tmp_path: Path):
         log = _make_log_path("test-action", tmp_path)
-        assert log.parent == tmp_path / "logs"
+        assert log.parent == tmp_path / ".aib_memory" / "logs"
         assert log.name.startswith("aib-action-")
         assert "test-action" in log.name
         assert log.suffix == ".log"
 
     def test_creates_logs_directory(self, tmp_path: Path):
         log = _make_log_path("test-action", tmp_path)
-        assert (tmp_path / "logs").is_dir()
+        assert (tmp_path / ".aib_memory" / "logs").is_dir()
 
 
 # ---------------------------------------------------------------------------

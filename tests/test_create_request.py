@@ -49,17 +49,20 @@ class TestCreateRequest:
         folder = workspace_dir / ".aib_memory" / "requests" / "R-20260101-1000-my-new-request"
         assert folder.is_dir()
 
-    def test_successful_creation_writes_request_md(self, workspace_dir: Path):
+    def test_successful_creation_does_not_create_request_md(self, workspace_dir: Path):
         _run_create_request(workspace_dir, "Another request", "R-20260101-1001")
         folder = workspace_dir / ".aib_memory" / "requests" / "R-20260101-1001-another-request"
-        assert (folder / "request.md").is_file()
+        assert not (folder / "request.md").exists()
 
-    def test_successful_creation_writes_iterations_md(self, workspace_dir: Path):
-        _run_create_request(workspace_dir, "Request With Iter", "R-20260101-1002")
-        folder = workspace_dir / ".aib_memory" / "requests" / "R-20260101-1002-request-with-iter"
-        content = (folder / "iterations.md").read_text(encoding="utf-8")
-        assert "01" in content
-        assert "Active" in content
+    def test_successful_creation_does_not_create_implementation_md(self, workspace_dir: Path):
+        _run_create_request(workspace_dir, "Request No Impl", "R-20260101-1007")
+        folder = workspace_dir / ".aib_memory" / "requests" / "R-20260101-1007-request-no-impl"
+        assert not (folder / "implementation.md").exists()
+
+    def test_successful_creation_does_not_create_iterations_md(self, workspace_dir: Path):
+        _run_create_request(workspace_dir, "Request No Iter", "R-20260101-1002")
+        folder = workspace_dir / ".aib_memory" / "requests" / "R-20260101-1002-request-no-iter"
+        assert not (folder / "iterations.md").exists()
 
     def test_successful_creation_updates_register(self, workspace_dir: Path):
         _run_create_request(workspace_dir, "Register Check", "R-20260101-1003")

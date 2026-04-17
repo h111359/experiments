@@ -78,6 +78,29 @@ class TestInitialize:
             _run_initialize(root)
             assert (root / ".aib_memory" / "references.md").is_file()
 
+    def test_creates_input_md(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _make_brain_only_workspace(root)
+            _run_initialize(root)
+            input_path = root / ".aib_memory" / "input.md"
+            assert input_path.is_file()
+            content = input_path.read_text(encoding="utf-8")
+            assert "## Active request" in content
+            assert "## Options" in content
+            assert "## Input" in content
+
+    def test_input_md_idempotent(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _make_brain_only_workspace(root)
+            _run_initialize(root)
+            input_path = root / ".aib_memory" / "input.md"
+            # Modify to verify it is NOT overwritten on second run.
+            input_path.write_text("# MODIFIED\n", encoding="utf-8")
+            _run_initialize(root)
+            assert input_path.read_text(encoding="utf-8") == "# MODIFIED\n"
+
     def test_idempotent_rerun_skips_existing_files(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

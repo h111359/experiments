@@ -12,14 +12,14 @@ This convention applies to every request folder under `.aib_memory/requests/<req
 ## Relationship to AIB Actions (Normative)
 - The `implement` action MUST write to this file (create if missing, append otherwise).
 - The action MUST respect the append‑only rule and MUST NOT rewrite or delete previous entries.
-- The action MAY synthesize entry content using other iteration artifacts for the same request (analysis, questionnaire, plan) but MUST attribute the iteration.
+- The action MAY synthesize entry content using analysis artifacts for the same request.
 
 ## Authoring Model
 - Primary author: automation (AIB tools/prompts).
 - Human edits are allowed only for typo fixes or to add clarifying notes in the designated field; structure MUST remain intact.
 
 ## File Structure (Top‑Level)
-The file is a Markdown document composed of an ordered sequence of **Entries**. Each Entry documents one implementation increment associated to a specific iteration.
+The file is a Markdown document composed of an ordered sequence of **Entries**. Each Entry documents one implementation increment for the request.
 
 Top‑level layout:
 1. Optional short introduction paragraph (plain text, no headings).
@@ -30,7 +30,7 @@ Top‑level layout:
 ### Entry Block Format (Strict)
 Each Entry is a Markdown block with the following exact structure and headings in this exact order:
 
-- `### Entry <YYYY-MM-DD HH:MM> — Iteration <ID>`
+- `### Entry <YYYY-MM-DD HH:MM>`
 - `#### Scope`
 - `#### Changes`
 - `#### Tests`
@@ -40,7 +40,6 @@ Each Entry is a Markdown block with the following exact structure and headings i
 
 **Formatting rules:**
 - Times are local project time in 24h format (`YYYY-MM-DD HH:MM`).
-- `<ID>` is the two‑digit iteration identifier (`01`, `02`, …).
 - Headings MUST be level‑3 for the entry title and level‑4 for all sub‑sections.
 - Lists under `Changes`, `Tests`, and `Evidence` MUST be Markdown bullet lists (`- `).
 - Code, commands, or logs in any section MUST be fenced with triple backticks and a language hint when applicable (e.g., ` ```bash `). Do NOT break the outer document fence.
@@ -61,15 +60,13 @@ Each Entry is a Markdown block with the following exact structure and headings i
 - If an `implement` action spans multiple commits or steps, consolidate into one Entry for that action and summarize under `Changes` and `Tests`.
 
 ## Cross‑Artifact Consistency
-- The `Iteration <ID>` used in the Entry title MUST correspond to an existing iteration in `iterations.md` for the same request.
-- When available, the Entry SHOULD cross‑reference sections from `<ID>-analysis.md` and `<ID>-plan.md` using plain text (do not use links). Example: “Aligned with 02‑plan ‘Task 3’”.
+- When available, the Entry SHOULD cross‑reference sections from `analysis.md` using plain text (do not use links). Example: "Aligned with analysis section 4.5".
 
 ## Validation Rules (Automation MUST Enforce)
 - File exists and is UTF‑8 encoded text.
 - Starts with any optional prose, then contains exactly one `## Implementation Log` header.
-- Every Entry title matches regex: `^### Entry \d{4}-\d{2}-\d{2} \d{2}:\d{2} — Iteration \d{2}$`
+- Every Entry title matches regex: `^### Entry \d{4}-\d{2}-\d{2} \d{2}:\d{2}$`
 - Sub‑sections exist exactly once per Entry and in the mandated order.
-- Iteration IDs found in Entries are valid and present in `iterations.md`.
 - Timestamps strictly increase across Entries.
 - No Markdown tables are used inside `Changes`, `Tests`, or `Evidence` (lists only).
 - No external hyperlinks are present anywhere in the file (plain text references only).
@@ -81,7 +78,7 @@ Each Entry is a Markdown block with the following exact structure and headings i
 ## Example (Illustrative)
 > The example below is illustrative; do not pre‑seed real files with it.
 
-### Entry 2026-03-08 19:05 — Iteration 01
+### Entry 2026-03-08 19:05
 #### Scope
 Implement initial seeding tool for `.aib_memory` and generate register files.
 

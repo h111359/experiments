@@ -1,0 +1,4 @@
+[START] 2026-04-09T20:56:23.853843 — Create iteration
+[CMD] C:\Hristo\projects\AI_Builder\.venv\Scripts\python.exe C:\Hristo\projects\AI_Builder\.aib_brain\tools\create-iteration.py --workspace C:\Hristo\projects\AI_Builder --summary remove questionnaire and plan prompts
+[OUT] Created iteration 02 for request folder: .aib_memory/requests/R-20260409-1322-39-decision-points-vs-questionaire
+[EXIT] 0

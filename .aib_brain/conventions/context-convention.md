@@ -284,13 +284,22 @@ After section 11 (`## Glossary`) and before section 12 (`## Workspace File Inven
 
 **MUST include:**
 - All workspace-relative file paths discovered during supplementary read, sorted ascending.
-- Exclusions applied: `.aib_brain/`, `.aib_memory/`, `.venv/`, `venv/`, `node_modules/`, `__pycache__/`, `.pytest_cache/`, `.mypy_cache/`, `.git/`.
+- An entry for every directory and subdirectory present in the workspace (using a trailing slash, e.g., `scripts/`), sorted ascending alongside file entries.
+- Exclusions applied: `.venv/`, `venv/`, `node_modules/`, `__pycache__/`, `.pytest_cache/`, `.mypy_cache/`, `.git/`.
 
 **Format:**
-- Present file paths in a fenced code block, one path per line, sorted ascending.
+- Present each entry as a Markdown bullet list item: `- \`path\` — description.`
+- File entries: `- \`path/to/file.ext\` — One-sentence description of the file's content or purpose.`
+- Directory entries: `- \`path/to/dir/\` — One-sentence description of the folder's role in the workspace.`
+- All entries (files and directories together) MUST be sorted ascending by path.
+
+**Description quality requirements:**
+- Each description MUST be one sentence, representative of the file's content or purpose.
+- Descriptions MUST NOT contain secrets, credentials, or PII.
+- For repetitive request artifact files (`request.md`, `implementation.md`, `analysis.md` in per-request folders), a formulaic description derived from the request folder slug is acceptable.
 
 **MUST NOT include:**
-- Comments or annotations within the fenced code block.
+- Entries for excluded directories or their contents.
 
 ---
 
