@@ -46,6 +46,19 @@ _REFRESH_ACTION: dict[str, Any] = {
     "destructive": False,
 }
 
+# Conditional action for closing the active request; injected by
+# filter_visible_actions only when state.has_active_request is True.
+_CLOSE_REQUEST_ACTION: dict[str, Any] = {
+    "id": "close",
+    "title": "Close current request",
+    "description": "Close the active request and mark it as Closed in the register.",
+    "script": "close-request.py",
+    "destructive": False,
+    "parameters": [
+        {"name": "workspace", "flag": "--workspace", "type": "path", "required": True, "default": ".", "prompt": "Workspace path", "hint": "Root folder containing .aib_brain"},
+    ],
+}
+
 
 
 def _enable_ansi_windows() -> None:
@@ -278,12 +291,21 @@ def build_script_actions(tools_dir: Path) -> list[dict[str, Any]]:
 
 
 def filter_visible_actions(actions: list[dict[str, Any]], state: MenuState) -> list[dict[str, Any]]:
-    """Return all actions unchanged; lifecycle filtering is no longer needed.
+    """Return visible actions, appending close-request when an active request exists.
 
     Lifecycle scripts are fully excluded via EXCLUDE_SCRIPTS so there is
-    nothing to conditionally hide here.
+    nothing to conditionally hide from the dynamically discovered set.
+    The close-request action is injected at the end of the list when
+    state.has_active_request is True, disappearing automatically after
+    the request is closed on the next menu refresh.
     """
-    return list(actions)
+    visible = list(actions)
+    if state.has_active_request:
+        # Append a copy so the module-level constant is not mutated.
+        close_action = dict(_CLOSE_REQUEST_ACTION)
+        close_action["id"] = str(len(visible) + 1)
+        visible.append(close_action)
+    return visible
 
 
 def ensure_memory_initialized_if_missing(workspace: Path, python_exe: str, tools_dir: Path) -> None:
@@ -523,9 +545,9 @@ def print_prompt_reference() -> None:
     """Print copy-paste-ready prompt invocations for the three core AIB prompts."""
     print("")
     print("  ── AIB Prompts (copy-paste into your AI coding interface) ──")
-    print("  Analysis : Execute `.aib_brain/prompts/aib-analysis.md`")
-    print("  Implement: Execute `.aib_brain/prompts/aib-implement.md`")
-    print("  Context  : Execute `.aib_brain/prompts/aib-context.md`")
+    print("  Execute `.aib_brain/prompts/aib-analysis.md`")
+    print("  Execute `.aib_brain/prompts/aib-implement.md`")
+    print("  Execute `.aib_brain/prompts/aib-context.md`")
     print("")
 
 
@@ -558,9 +580,9 @@ def render_menu(
     # Inline prompt reference block (previously delegated to print_prompt_reference()).
     buf.write("\n")
     buf.write("  ── AIB Prompts (copy-paste into your AI coding interface) ──\n")
-    buf.write("  Analysis : Execute `.aib_brain/prompts/aib-analysis.md`\n")
-    buf.write("  Implement: Execute `.aib_brain/prompts/aib-implement.md`\n")
-    buf.write("  Context  : Execute `.aib_brain/prompts/aib-context.md`\n")
+    buf.write("  Execute `.aib_brain/prompts/aib-analysis.md`\n")
+    buf.write("  Execute `.aib_brain/prompts/aib-implement.md`\n")
+    buf.write("  Execute `.aib_brain/prompts/aib-context.md`\n")
     buf.write("\n")
 
     for idx, action in enumerate(script_actions, start=1):

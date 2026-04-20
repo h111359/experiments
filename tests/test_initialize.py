@@ -90,6 +90,16 @@ class TestInitialize:
             assert "## Options" in content
             assert "## Input" in content
 
+    def test_input_md_has_threshold_scale_labels(self):
+        """Seeded input.md must include scale-direction labels on threshold values 1 and 5."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _make_brain_only_workspace(root)
+            _run_initialize(root)
+            content = (root / ".aib_memory" / "input.md").read_text(encoding="utf-8")
+            assert "1 (all)" in content
+            assert "5 (mandatory only)" in content
+
     def test_input_md_idempotent(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -129,3 +139,28 @@ class TestInitialize:
             # Do NOT create .aib_brain
             rc = _run_initialize(root)
             assert rc != 0
+
+    def test_does_not_create_docs_folder(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _make_brain_only_workspace(root)
+            _run_initialize(root)
+            # Since v1.2.0, docs/ is no longer a seeded artifact.
+            assert not (root / ".aib_memory" / "docs").exists()
+
+    def test_creates_logs_folder(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _make_brain_only_workspace(root)
+            _run_initialize(root)
+            assert (root / ".aib_memory" / "logs").is_dir()
+
+    def test_creates_logs_folder_idempotent(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _make_brain_only_workspace(root)
+            _run_initialize(root)
+            # Second run must not error even when logs/ already exists.
+            rc = _run_initialize(root)
+            assert rc == 0
+            assert (root / ".aib_memory" / "logs").is_dir()

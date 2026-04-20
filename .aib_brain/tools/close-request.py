@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""Close an active request."""
+"""
+close-request.py: Close an active request and reset input.md to the seed template.
+Part of the AIB tool scripts.
+Responsibilities: mark the active request as Closed in requests_register.md,
+auto-close any open iterations, and reset input.md to 'No active request'.
+"""
 
 from __future__ import annotations
 
@@ -73,6 +78,23 @@ def main() -> None:
         target[col["closed_at"]] = now_iso()
 
         update_requests_register(workspace, rows)
+
+        # Reset input.md to the seed template so the Active request line reads
+        # "No active request" after the request is closed. Skip silently if the
+        # file does not exist (e.g. workspace not yet initialized).
+        input_file = workspace / ".aib_memory" / "input.md"
+        if input_file.exists():
+            input_seed = (
+                "## Active request\n"
+                "No active request\n\n"
+                "## Options\n"
+                "- [ ] No changes — provide answer only\n"
+                "- [ ] Skip analysis document generation\n"
+                "- Question threshold: [ ] 1 (all)  [ ] 2  [x] 3  [ ] 4  [ ] 5 (mandatory only)\n\n"
+                "## Input\n\n"
+            )
+            write_text(input_file, input_seed)
+
         print(f"Closed request: {target[col['request_id']]}")
 
     except ValidationError as exc:

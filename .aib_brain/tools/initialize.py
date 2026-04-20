@@ -7,7 +7,6 @@ from pathlib import Path
 
 from common import (
     ValidationError,
-    ensure_doc_seed_files,
     ensure_workspace,
     load_template,
     print_error_and_exit,
@@ -26,7 +25,7 @@ def main() -> None:
 
         memory_root = workspace / ".aib_memory"
         (memory_root / "requests").mkdir(parents=True, exist_ok=True)
-        (memory_root / "docs").mkdir(parents=True, exist_ok=True)
+        (memory_root / "logs").mkdir(parents=True, exist_ok=True)
 
         brain_dir = workspace / ".aib_brain"
 
@@ -40,11 +39,9 @@ def main() -> None:
         references_file = workspace / ".aib_memory" / "references.md"
         if references_file.exists() and not args.force:
             print("references.md already exists — skipping overwrite.")
-            requirements = None
         else:
-            references_md, requirements = seed_references_from_product_doc(workspace)
+            references_md, _ = seed_references_from_product_doc(workspace)
             write_text(references_file, references_md)
-            ensure_doc_seed_files(workspace, requirements)
 
         context_file = workspace / ".aib_memory" / "context.md"
         if context_file.exists():
@@ -62,14 +59,13 @@ def main() -> None:
                 "No active request\n\n"
                 "## Options\n"
                 "- [ ] No changes — provide answer only\n"
-                "- [ ] Skip analysis document generation\n\n"
+                "- [ ] Skip analysis document generation\n"
+                "- Question threshold: [ ] 1 (all)  [ ] 2  [x] 3  [ ] 4  [ ] 5 (mandatory only)\n\n"
                 "## Input\n\n"
             )
             write_text(input_file, input_seed)
 
         print("Initialized .aib_memory structure successfully.")
-        if requirements is not None:
-            print(f"Seeded references rows: {len(requirements)}")
 
     except ValidationError as exc:
         print_error_and_exit(str(exc))

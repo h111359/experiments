@@ -132,3 +132,42 @@ You have an existing codebase with no AIB product context and want to populate `
 
 - This README is updated on explicit request.
 - Paths are repository-relative for portability.
+
+## Question Threshold
+
+The `Question threshold` setting controls when `aib-analysis.md` surfaces a decision point as a user-facing Q-block versus resolving it autonomously. The threshold value is stored in `.aib_memory/input.md ## Options` (checkbox row, reset to default `[x] 3` after each analysis run) and can be changed by the developer before running analysis.
+
+**Format in `input.md`:**
+```
+- Question threshold: [ ] 1  [ ] 2  [x] 3  [ ] 4  [ ] 5
+```
+
+**5-Level Severity Scale:**
+
+| Level | Name | Definition | AI Behavior | Concrete Example |
+| --- | --- | --- | --- | --- |
+| 1 | Trivial | No meaningful impact on outcome, cost, or risk; best practice is universally established and unambiguous. | Resolve autonomously; document reasoning inline in the relevant `request.md` section. | Choosing a variable name convention when one is already defined in a convention file. |
+| 2 | Minor | Preference-level fork where either option satisfies the success criteria; impact is cosmetic or reversible within a single task. | Resolve autonomously; document reasoning inline in the relevant `request.md` section. | Deciding whether to use a bullet list or a numbered list for a non-schema documentation section. |
+| 3 | Moderate | Fork with meaningful impact on implementation scope, test coverage, or documentation approach; multiple valid options exist and none is clearly dominant without product-owner input. | Raise Q-block if threshold ≤ 3 (default behavior). | Deciding whether a new optional artifact should be committed to VCS or excluded via `.gitignore`. |
+| 4 | Significant | Architectural or business decision with cross-component impact; the wrong choice may require rework across multiple files or workflows. | Raise Q-block if threshold ≤ 4. | Deciding whether a new configuration value should live in `input.md`, a new config file, or a tool script constant. |
+| 5 | Critical | Irreversible or high-risk decision that affects product safety, security, data integrity, or compliance; wrong choice cannot be safely undone. | Always raise Q-block regardless of threshold setting. | Deciding whether to drop a column from the requests register that is referenced by existing closed requests. |
+
+**Boundary rules:**
+- A decision rated below the configured threshold MUST be resolved autonomously by the AI with inline reasoning documented in the relevant `request.md` section.
+- A decision rated at or above the configured threshold MUST be surfaced as a Q-block.
+- Level 5 decisions MUST always raise a Q-block regardless of threshold.
+- The threshold row is reset to `[x] 3` each time `aib-analysis.md` resets `input.md` at the end of a run.
+- Before raising any Q-block, the AI MUST verify the answer is not already present in `context.md`, convention files, or the required-read set from `references.md`. If found, it applies the answer directly and MUST NOT create a Q-block.
+
+## Request Folder Artifacts
+
+Each request folder under `.aib_memory/requests/<request-folder>/` may contain the following artifacts:
+
+| Artifact | Created by | Required | Description |
+| --- | --- | --- | --- |
+| `request.md` | `aib-analysis.md` (auto-request branch) | Yes | AI-generated request specification with 12 mandatory sections. |
+| `analysis.md` | `aib-analysis.md` | Optional | Reasoning artifact (not read by `implement`). Contains Executive Summary, Domain Knowledge, Technical Context, Research, External Benchmarking, Minimal Spikes, AI Copilot Suggestions, Testing, and Multi-Perspective Stakeholder Review. |
+| `implementation.md` | `aib-implement.md` | Yes (after first implement run) | Append-only implementation log. |
+| `inputs/input-archive-*.md` | `aib-analysis.md` | Yes (one per analysis run) | Archived copy of `input.md` content at analysis time. MUST NOT be read by any prompt beyond archiving. |
+| `UAT_scenarios.md` | `aib-analysis.md` | Optional | Created when the request requires manual testing scenarios that cannot be expressed as automated assertions. Documents UAT test cases for human execution. |
+| `answer-<timestamp>.md` | `aib-analysis.md` | Optional | Written when the "No changes — provide answer only" toggle is set; contains the timestamped answer. |

@@ -112,28 +112,43 @@ class TestResolveMenuState:
 # ---------------------------------------------------------------------------
 
 class TestFilterVisibleActions:
-    def test_returns_all_actions_unchanged(self):
-        """filter_visible_actions is now a pass-through; lifecycle exclusion happens in EXCLUDE_SCRIPTS."""
+    def test_returns_all_actions_when_no_active_request(self):
+        """Without an active request, filter_visible_actions is a pass-through."""
         actions = build_script_actions(Path(__file__).resolve().parent.parent / ".aib_brain" / "tools")
         state = _make_state()
         visible = filter_visible_actions(actions, state)
         assert visible == actions
 
-    def test_lifecycle_scripts_not_in_actions(self):
-        """create-request.py and close-request.py must not appear regardless of active request state."""
+    def test_close_request_not_visible_without_active_request(self):
+        """close-request.py must not appear in the visible actions when no active request exists."""
         actions = build_script_actions(Path(__file__).resolve().parent.parent / ".aib_brain" / "tools")
-        scripts = [a["script"] for a in actions]
-        assert "create-request.py" not in scripts
+        state = _make_state()
+        visible = filter_visible_actions(actions, state)
+        scripts = [a["script"] for a in visible]
         assert "close-request.py" not in scripts
-        assert "create-iteration.py" not in scripts
-        assert "close-iteration.py" not in scripts
 
-    def test_active_request_does_not_change_visible_actions(self):
-        """Presence of an active request no longer affects which actions are shown."""
+    def test_close_request_visible_with_active_request(self):
+        """close-request.py must appear in the visible actions when an active request exists."""
         actions = build_script_actions(Path(__file__).resolve().parent.parent / ".aib_brain" / "tools")
-        state_no_req = _make_state()
-        state_with_req = _make_state("R-001", ".aib_memory/requests/R-001")
-        assert filter_visible_actions(actions, state_no_req) == filter_visible_actions(actions, state_with_req)
+        state = _make_state("R-001", ".aib_memory/requests/R-001")
+        visible = filter_visible_actions(actions, state)
+        scripts = [a["script"] for a in visible]
+        assert "close-request.py" in scripts
+
+    def test_create_request_never_visible(self):
+        """create-request.py must not appear regardless of active request state."""
+        actions = build_script_actions(Path(__file__).resolve().parent.parent / ".aib_brain" / "tools")
+        for state in [_make_state(), _make_state("R-001", ".aib_memory/requests/R-001")]:
+            visible = filter_visible_actions(actions, state)
+            scripts = [a["script"] for a in visible]
+            assert "create-request.py" not in scripts
+
+    def test_active_request_adds_one_action(self):
+        """filter_visible_actions returns one more action when an active request exists."""
+        actions = build_script_actions(Path(__file__).resolve().parent.parent / ".aib_brain" / "tools")
+        visible_no_req = filter_visible_actions(actions, _make_state())
+        visible_with_req = filter_visible_actions(actions, _make_state("R-001", ".aib_memory/requests/R-001"))
+        assert len(visible_with_req) == len(visible_no_req) + 1
 
 
 # ---------------------------------------------------------------------------

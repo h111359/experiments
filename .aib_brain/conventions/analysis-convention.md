@@ -51,6 +51,9 @@ Each analysis file **must** contain the following sections in the exact order:
 4.  **Research Results** **[REQ]**
 5.  **External Benchmarking** **[REQ]**
 6.  **Minimal Spikes and Experiments** **[REQ]**
+7.  **AI Copilot Suggestions** **[REQ]**
+8.  **Testing** **[REQ]**
+9.  **Multi-Perspective Stakeholder Review** **[REQ]**
 
 ***
 
@@ -167,13 +170,75 @@ This section documents the outcome of brief feasibility experiments or uncertain
 - Each spike MUST be independently reproducible from the described approach.
 
 
-## 7. Maintenance Rules (Normative)
+## 7. AI Copilot Suggestions **[REQ]**
+
+This section is a **reasoning-only artifact**. It provides a sincere, pragmatic, senior-expert-level review of the request from the AI's perspective.
+
+**Purpose:** Surface improvement opportunities, potential pitfalls, and expert observations that a senior developer or solution architect would raise — covering aspects not necessarily visible from the formal request sections alone.
+
+**Mandatory content:**
+
+- At least three distinct observations covering different dimensions (e.g., design quality, implementation risk, missed simplification opportunities, maintainability, testability, or scope creep risk).
+- For each observation: a concise statement of the finding and a concrete actionable suggestion.
+- An explicit note if the scope appears larger or smaller than necessary to achieve the stated goal.
+
+**Tone and format:**
+
+- Written as a senior expert speaking directly to the developer — direct, honest, and constructive.
+- Organized as a bulleted list; one sub-bullet per actionable suggestion.
+- MUST NOT contain implementation steps, code snippets, or prescriptive instructions that could serve as a specification for `implement`.
+- MUST NOT be empty.
+
+**Restriction:** This section is a reasoning artifact only. `implement` MUST NOT read or act on this section. It is for human review and auditability only.
+
+
+## 8. Testing **[REQ]**
+
+This section defines the intent-level test cases for the request scope, covering what to test and what the expected observable outcome is.
+
+**Mandatory content:**
+
+- A numbered list of test cases using the format: `- T<n> — <name>: <description>. Expected outcome: <observable pass/fail result>.`
+- Coverage MUST include: file existence checks, content checks, tool/script execution, test suite runs, and re-run idempotency where applicable.
+- At least one test case for each Success Criterion defined in `request.md`.
+
+**UAT scenarios rule:**
+
+- If any test case cannot be expressed as an automated script assertion (e.g., it requires visual inspection, user interaction, or end-to-end user-workflow validation), `aib-analysis.md` MUST create a `UAT_scenarios.md` file in the request folder documenting those manual test scenarios. The automated test case list in this section still references those scenarios by ID (e.g., `See UAT_scenarios.md — UAT-01`).
+
+**Rules:**
+
+- MUST NOT be empty.
+- Fully replaced on every analysis re-run.
+
+
+## 9. Multi-Perspective Stakeholder Review **[REQ]**
+
+This section evaluates the request from five distinct stakeholder viewpoints.
+
+**Mandatory content:**
+
+- Each perspective MUST be written as a separate sub-section with one paragraph of evaluation and 2–5 bullet findings.
+- Required perspectives:
+  - **Senior Solution Architect**: technical feasibility, design integrity, architectural risk.
+  - **Product Owner**: business value, scope clarity, acceptance criteria completeness.
+  - **User**: usability, clarity of expected behavior changes, friction introduced.
+  - **Security Officer**: attack surface, data exposure, authentication/authorization impact.
+  - **Data Governance Officer**: data lineage, retention, classification, and compliance impact.
+
+**Rules:**
+
+- MUST NOT be empty.
+- Fully replaced on every analysis re-run.
+
+
+## 10. Maintenance Rules (Normative)
 
 *   Idempotence: same memory state and same request should converge to same analysis intent.
 *   Change drivers: update analysis when scope changes, new evidence appears, or risk state changes.
 *   Closure: once a request is closed in `requests_register.md`, analysis remains unchanged except factual corrections.
 
-## 8. Formatting Requirements
+## 11. Formatting Requirements
 
 *   All headings must use `##` or `###` consistent with this convention.
 *   Bullet lists must use `- `.
@@ -185,7 +250,7 @@ This section documents the outcome of brief feasibility experiments or uncertain
 
 ***
 
-## 9. Determinism Rules (Normative)
+## 12. Determinism Rules (Normative)
 
 *   Given the same memory state and request input, analysis output intent must be identical.
 *   AI must not guess beyond request scope.
@@ -193,7 +258,7 @@ This section documents the outcome of brief feasibility experiments or uncertain
 
 ***
 
-## 10. Prohibited Content
+## 13. Prohibited Content
 
 *   Secrets, private keys, credentials, tokens, or sensitive PII.
 *   External hyperlinks.

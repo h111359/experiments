@@ -25,7 +25,7 @@ Mandatory preflight (MUST):
    - If the **"No changes — provide answer only"** option is checked (`[x]`):
      - This branch produces **exactly two file writes** and MUST NOT produce any other file writes:
        1. Write the timestamped answer to `<request-folder>/answer-<YYYY-MM-DD_HH-MI-SS>.md` using the content of the `## Input` section of `input.md`.
-       2. Reset `input.md` to the seed template (`## Active request\nNo active request\n\n## Options\n- [ ] No changes — provide answer only\n- [ ] Skip analysis document generation\n\n## Input\n\n`), then replace `No active request` in the `## Active request` line with the current active request ID and title (resolved from the preflight step), in the format `<request_id> — <title>`.
+       2. Reset `input.md` to the seed template (`## Active request\nNo active request\n\n## Options\n- [ ] No changes — provide answer only\n- [ ] Skip analysis document generation\n- Question threshold: [ ] 1 (all)  [ ] 2  [x] 3  [ ] 4  [ ] 5 (mandatory only)\n\n## Input\n\n`), then replace `No active request` in the `## Active request` line with the current active request ID and title (resolved from the preflight step), in the format `<request_id> — <title>`.
      - MUST NOT modify `request.md`, `analysis.md`, or any other file.
      - **Stop here. Do NOT proceed to any further steps.**
    - If the **"Skip analysis document generation"** option is checked (`[x]`): proceed normally but skip writing `analysis.md` (Part 1 output). Update `request.md` optional sections only.
@@ -52,11 +52,11 @@ Mandatory preflight (MUST):
    python .aib_brain/tools/create-request.py --workspace . --title "<derived-title>"
    ```
 4. Read `.aib_memory/requests_register.md` to resolve the newly created request folder.
-5. Generate `request.md` in `<request-folder>/` following `.aib_brain/conventions/request-convention.md` and based on the content of `input.md`'s `## Input` section. All 14 mandatory sections MUST be present in this exact order: `## Goal`, `## Background`, `## Scope`, `## Out of scope`, `## Constraints`, `## Success criteria`, `## Assumptions`, `## Plan`, `## Testing`, `## Documentation`, `## Questions & Decisions`, `## Code and Asset Scan for Impacted Components`, `## Internal Review of Request and Product Docs`, `## Multi-Perspective Stakeholder Review`. Sections 1–6 (`## Goal` through `## Success criteria`) MUST be non-empty with content derived from `input.md`'s `## Input` section. Sections 7–14 may be empty (they are populated during step 8). Before writing `request.md`, confirm all 14 headings are present and sections 1–6 are non-empty.
+5. Generate `request.md` in `<request-folder>/` following `.aib_brain/conventions/request-convention.md` and based on the content of `input.md`'s `## Input` section. All 12 mandatory sections MUST be present in this exact order: `## Goal`, `## Background`, `## Scope`, `## Out of scope`, `## Constraints`, `## Success criteria`, `## Assumptions`, `## Plan`, `## Documentation`, `## Questions & Decisions`, `## Code and Asset Scan for Impacted Components`, `## Internal Review of Request and Product Docs`. Sections 1–6 (`## Goal` through `## Success criteria`) MUST be non-empty with content derived from `input.md`'s `## Input` section. Sections 7–12 may be empty (they are populated during step 8). Before writing `request.md`, confirm all 12 headings are present and sections 1–6 are non-empty.
 6. Archive the current `input.md` content to `<request-folder>/inputs/input-archive-<YYYY-MM-DD_HH-MI-SS>.md`.
    - Use python to create the `inputs/` subfolder and write the archive file.
 7. Proceed with the standard analysis flow (steps 4 onward, reading the newly created `request.md`). MUST NOT reset `input.md` during this triggered standard flow — the reset is performed in step 8 below.
-8. Reset `input.md` to the seed template (`## Active request\nNo active request\n\n## Options\n- [ ] No changes — provide answer only\n- [ ] Skip analysis document generation\n\n## Input\n\n`). Then read `.aib_memory/requests_register.md`, find the Active request row, and replace `No active request` in the `## Active request` line with `<request_id> — <title>` (the newly created request).
+8. Reset `input.md` to the seed template (`## Active request\nNo active request\n\n## Options\n- [ ] No changes — provide answer only\n- [ ] Skip analysis document generation\n- Question threshold: [ ] 1 (all)  [ ] 2  [x] 3  [ ] 4  [ ] 5 (mandatory only)\n\n## Input\n\n`). Then read `.aib_memory/requests_register.md`, find the Active request row, and replace `No active request` in the `## Active request` line with `<request_id> — <title>` (the newly created request).
 
 ---
 
@@ -75,6 +75,13 @@ Output — Part 1: Analysis file
 - Full content replacement of `.aib_memory/requests/<request-folder>/analysis.md`.
 - Must follow the section structure defined in `analysis-convention.md`.
 - Skipped if the "Skip analysis document generation" toggle is checked.
+- Generation instructions for mandatory sections (in addition to sections defined in `analysis-convention.md`):
+
+  **`## AI Copilot Suggestions`** — Write a sincere, pragmatic, senior-expert-level review of the request. Include at least three distinct observations covering different dimensions (design quality, implementation risk, simplification opportunities, maintainability, testability, or scope creep risk). For each observation, provide a concise finding and a concrete actionable suggestion. Include an explicit note if the scope appears larger or smaller than necessary to achieve the stated goal. MUST NOT contain implementation steps or prescriptive instructions that could serve as a specification for `implement`. This section is for human review only — `implement` MUST NOT read or act on it.
+
+  **`## Testing`** — Define intent-level test cases for the request scope. Format: `- T<n> — <name>: <description>. Expected outcome: <observable pass/fail result>.` Cover: file existence checks, content checks, tool/script execution, test suite runs, and re-run idempotency. At least one test case per Success Criterion. If any test case cannot be expressed as an automated assertion (requires visual inspection, user interaction, or end-to-end user-workflow validation), MUST create `UAT_scenarios.md` in the request folder with those manual scenarios; reference them in this section (e.g., `See UAT_scenarios.md — UAT-01`). MUST NOT be empty.
+
+  **`## Multi-Perspective Stakeholder Review`** — Evaluate the request from five distinct viewpoints. Each perspective MUST be a separate sub-section with one paragraph of evaluation and 2–5 bullet findings. Required perspectives: Senior Solution Architect (technical feasibility, design integrity, architectural risk); Product Owner (business value, scope clarity, acceptance criteria completeness); User (usability, clarity of behavior changes, friction introduced); Security Officer (attack surface, data exposure, authentication/authorization impact); Data Governance Officer (data lineage, retention, classification, compliance impact). MUST NOT be empty.
 
 Output — Part 2: Update `request.md` with implementation-relevant sections
 
@@ -102,12 +109,7 @@ After generating the analysis, update `request.md` by appending or replacing the
   ```
 - Keep tasks vertically sliceable; each must produce at least one verifiable output.
 - Target ≤ 12 tasks per iteration; keep each procedure to ≤ 6 steps unless strictly necessary.
-- Fully replace this section on every re-run (AI-generated; no user data).
-
-### Section: `## Testing`
-- Define intent-level test cases: what to test and what the expected observable outcome is.
-- Format: `- T<n> — <name>: <description>. Expected outcome: <observable pass/fail result>.`
-- Cover: file existence checks, content checks, tool/script execution, test suite runs, and re-run idempotency.
+- Every plan MUST include: (a) a task defining automated test steps for the request scope (covering all testable Success Criteria defined in `request.md`); (b) a task to update `context.md` and all editable documents listed in `references.md`, reflecting changes made and any discovered discrepancies.
 - Fully replace this section on every re-run (AI-generated; no user data).
 
 ### Section: `## Documentation`
@@ -117,32 +119,60 @@ After generating the analysis, update `request.md` by appending or replacing the
 - Fully replace this section on every re-run (AI-generated; no user data).
 
 ### Section: `## Questions & Decisions`
-- Add only when the analysis identifies unknowns or decision forks that cannot be resolved through research.
+
+**Mandatory pre-check (MUST execute before creating any Q-block):**
+Before raising a Q-block for any decision point, verify that the answer is not already determinable from `context.md`, convention files, or any file in the required-read set derived from `references.md`. If the answer can be found in any of those sources, apply it directly to the relevant `request.md` section. MUST NOT create a Q-block for any question answerable from existing workspace documentation.
+
+**Threshold read:**
+Read the `Question threshold` row from `input.md ## Options`. Extract the checked value (the checkbox marked `[x]`). If the row is absent or unparseable, default to 3.
+
+**5-Level Severity Scale:**
+Every decision point identified during analysis MUST be rated on the following scale before deciding whether to raise a Q-block:
+
+| Level | Name | Definition | AI Behavior | Concrete Example |
+| --- | --- | --- | --- | --- |
+| 1 | Trivial | No meaningful impact on outcome, cost, or risk; best practice is universally established. | Resolve autonomously; document reasoning inline in the relevant `request.md` section. | Choosing a variable name convention when one is already defined in a convention file. |
+| 2 | Minor | Preference-level fork where either option satisfies the success criteria; impact is cosmetic or reversible within a single task. | Resolve autonomously; document reasoning inline in the relevant `request.md` section. | Deciding whether to use a bullet list or a numbered list for a non-schema documentation section. |
+| 3 | Moderate | Fork with meaningful impact on scope, test coverage, or documentation; multiple valid options exist and none is clearly dominant without product-owner input. | Raise Q-block if threshold ≤ 3 (default). | Deciding whether a new optional artifact should be committed to VCS or excluded via `.gitignore`. |
+| 4 | Significant | Architectural or business decision with cross-component impact; wrong choice may require rework across multiple files or workflows. | Raise Q-block if threshold ≤ 4. | Deciding whether a new configuration value should live in `input.md`, a new config file, or a tool script constant. |
+| 5 | Critical | Irreversible or high-risk decision affecting product safety, security, data integrity, or compliance; wrong choice cannot be safely undone. | Always raise Q-block regardless of threshold. | Deciding whether to drop a column from the requests register referenced by existing closed requests. |
+
+**Ambiguity detection (MUST execute before decision rule):**
+Identify ambiguous or underspecified parts of the active request and the input file that have multiple plausible interpretations which would lead to materially different implementation or design outcomes. For each identified ambiguity, generate ONE multiple-choice question with the most probable mutually exclusive, realistic options. Rate each identified ambiguity on the 5-Level Severity Scale above, then apply the threshold decision rule below.
+
+**Decision rule:**
+- If the decision severity ≥ threshold: MUST raise a Q-block.
+- If the decision severity < threshold: MUST resolve autonomously; document the chosen option and reasoning inline in the relevant `request.md` section. MUST NOT create a Q-block.
+- Level 5 decisions MUST always raise a Q-block regardless of threshold.
+
+**Q-block format:**
 - Each question block:
   ```
   **Q<nnn>**: <question text>
   - [ ] Option A: <text>
-  - [ ] Option B: <text>
+  - [ ] Option B: <text> *(recommended)*
   - [ ] Other: ___
   > Answer: 
   ```
 - Use stable QIDs starting from Q001 (or the next available number on re-run).
-- Re-run merging rules (MUST enforce):
-  - Read the existing `## Questions & Decisions` section before writing.
-  - A question is "answered" if at least one checkbox is `[x]` OR the `> Answer:` line has non-empty text after the colon.
-  - Answered questions MUST be applied as embedded instructions to the relevant sections of `request.md` (Goal, Scope, Constraints, etc.) based on what the answer addresses, then removed from `## Questions & Decisions`.
-  - Mapping hint: inspect the question text and answer to determine which mandatory section it addresses; if ambiguous, apply to `## Scope`.
-  - New unanswered questions are appended after any remaining unanswered questions with sequentially higher QIDs.
-  - If an answered question's prior answer appears to conflict with the updated analysis context, append `> [!NOTE] DECISION REVIEW NEEDED: <reason>` immediately after the existing answer block. Do not alter the answer.
+- SHOULD include a `*(recommended)*` suffix on the AI's preferred option where one is clearly identifiable. MAY omit the marker if no option is clearly preferable.
+
+**Re-run merging rules (MUST enforce):**
+- Read the existing `## Questions & Decisions` section before writing.
+- A question is "answered" if at least one checkbox is `[x]` OR the `> Answer:` line has non-empty text after the colon.
+- Answered questions MUST be applied as embedded instructions to the relevant sections of `request.md` (Goal, Scope, Constraints, etc.) based on what the answer addresses, then removed from `## Questions & Decisions`.
+- Mapping hint: inspect the question text and answer to determine which mandatory section it addresses; if ambiguous, apply to `## Scope`.
+- New unanswered questions are appended after any remaining unanswered questions with sequentially higher QIDs.
+- If an answered question's prior answer appears to conflict with the updated analysis context, append `> [!NOTE] DECISION REVIEW NEEDED: <reason>` immediately after the existing answer block. Do not alter the answer.
 
 
 Re-run behaviour summary:
-- `## Assumptions`, `## Plan`, `## Testing`, `## Documentation`: always fully replaced.
+- `## Assumptions`, `## Plan`, `## Documentation`: always fully replaced.
 - `## Questions & Decisions`: answered questions are applied to relevant `request.md` sections and removed; unanswered questions are preserved.
 - Sections with no content: do not add (never create an empty shell section).
 
 Standard flow final step (MUST execute when invoked directly, MUST NOT execute when triggered from `aib-implement.md`):
-- After all Part 1 and Part 2 outputs are fully written and confirmed, reset `input.md` to the seed template (`## Active request\nNo active request\n\n## Options\n- [ ] No changes — provide answer only\n- [ ] Skip analysis document generation\n\n## Input\n\n`). Then replace `No active request` in the `## Active request` line with the current active request ID and title (format: `<request_id> — <title>`). This reset MUST be the last action of the run. MUST NOT perform this reset if the current analysis run was triggered from `aib-implement.md`.
+- After all Part 1 and Part 2 outputs are fully written and confirmed, reset `input.md` to the seed template (`## Active request\nNo active request\n\n## Options\n- [ ] No changes — provide answer only\n- [ ] Skip analysis document generation\n- Question threshold: [ ] 1 (all)  [ ] 2  [x] 3  [ ] 4  [ ] 5 (mandatory only)\n\n## Input\n\n`). Then replace `No active request` in the `## Active request` line with the current active request ID and title (format: `<request_id> — <title>`). This reset MUST be the last action of the run. MUST NOT perform this reset if the current analysis run was triggered from `aib-implement.md`.
 
 Context-window management:
 - If the aggregate size of required-read files exceeds 80% of available context, prioritize files by relevance to request scope, summarize the rest, and note which files were summarized in the output artifact.

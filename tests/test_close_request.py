@@ -137,3 +137,26 @@ class TestCloseRequest:
         col = {n: i for i, n in enumerate(header)}
         matching = [r for r in rows if r[col["request_id"]] == "R-20260101-1004"]
         assert matching[0][col["state"]] == "Closed"
+
+    def test_resets_input_md_when_exists(self, workspace_dir: Path):
+        """After closing, input.md is reset to seed template with 'No active request'."""
+        _make_request(workspace_dir, "R-20260101-1005")
+        input_path = workspace_dir / ".aib_memory" / "input.md"
+        write_text(input_path, "## Active request\nR-20260101-1005 — Test Request\n\n## Options\n\n## Input\nSome old content\n")
+        rc = _run_close_request(workspace_dir)
+        assert rc == 0
+        content = read_text(input_path)
+        assert "No active request" in content
+        assert "1 (all)" in content
+        assert "5 (mandatory only)" in content
+        assert "R-20260101-1005" not in content
+
+    def test_does_not_fail_when_input_md_missing(self, workspace_dir: Path):
+        """Closing a request succeeds silently when input.md does not exist."""
+        _make_request(workspace_dir, "R-20260101-1006")
+        input_path = workspace_dir / ".aib_memory" / "input.md"
+        if input_path.exists():
+            input_path.unlink()
+        rc = _run_close_request(workspace_dir)
+        assert rc == 0
+        assert not input_path.exists()

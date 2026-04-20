@@ -27,7 +27,7 @@ Request Identity (normative)
 Document Structure (normative)
 The file MUST contain the following top-level sections in the exact order shown below.  
 All headings MUST be level‑2 (`##`).  
-All sections (1–14) are mandatory and MUST be present, even if empty. 
+All sections (1–12) are mandatory and MUST be present, even if empty. 
 
 1. `## Goal`  
    - A concise description of what the human wants changed/created.  
@@ -77,56 +77,42 @@ All sections (1–14) are mandatory and MUST be present, even if empty.
      **Risk Notes:** <if any>
      ```
    - Fully replaced on every analysis re-run.
+   - Every plan MUST include: (a) a task defining automated test steps for the request scope (covering all testable Success Criteria); (b) a task to update `context.md` and all editable documents listed in `references.md`, reflecting changes made and any discovered discrepancies.
 
-9. `## Testing`  
-   - AI-generated intent-level test cases defining what tests to create and perform.  
-   - Each entry: `- T<n> — <name>: <description>. Expected outcome: <observable result>.`  
-   - Fully replaced on every analysis re-run.
-
-10. `## Documentation`  
+9. `## Documentation`  
     - AI-generated list of documentation files that must be revised because of this request.  
     - Each entry: `- <path> (ref_id: <REF-ID>) — <reason for update>.`
     - If ref_id is unknown: `- <path> (ref_id: N/A) — <reason>`.  
     - Fully replaced on every analysis re-run.
 
-11. `## Questions & Decisions`  
+10. `## Questions & Decisions`  
     - AI-generated question blocks requiring user input.  
-    - Present only when the analysis identifies unknowns or decision forks that cannot be resolved by the AI through research.  
+    - Present only when the analysis identifies unknowns or decision forks that meet the severity threshold defined in `aib-analysis.md`.  
     - Each question block uses the following schema:  
       ```
       **Q<nnn>**: <question text>
       - [ ] Option A: <text>
-      - [ ] Option B: <text>
+      - [ ] Option B: <text> *(recommended)*
       - [ ] Other: ___
       > Answer: <free-text answer block — leave blank until answered>
       ```
+    - SHOULD include a `*(recommended)*` suffix on the AI's preferred option where one is clearly identifiable. MAY omit the marker if no option is clearly preferable.
     - Re-run preservation rule: A question is "answered" if at least one checkbox is `[x]` OR the `> Answer:` block is non-empty. Answered questions MUST be applied as embedded instructions to the relevant sections of `request.md`, then removed from `## Questions & Decisions`. New unanswered questions are appended.
     - Conflict flagging: Append `> [!NOTE] DECISION REVIEW NEEDED: <reason>` to any answered question whose answer conflicts with an updated analysis context. Do not alter the answer itself.
 
-12. `## Code and Asset Scan for Impacted Components`  
+11. `## Code and Asset Scan for Impacted Components`  
     - AI-generated table of workspace files, modules, pipelines, and assets impacted by this request.  
     - Format: Markdown table with columns `File/Asset`, `Change Type`, `Reason`.  
     - Change types: `Modified`, `Created`, `Deleted`, `Read-only dependency`.  
     - Fully replaced on every analysis re-run.
 
-13. `## Internal Review of Request and Product Docs`  
+12. `## Internal Review of Request and Product Docs`  
     - AI-generated factual findings from reading `request.md` and all product docs in `.aib_memory/references.md`.  
     - Documents ambiguities, contradictions, missing information, and cross-reference issues found.  
     - Each finding: `- <finding-type>: <file> — <description>`.  
     - Finding types: `Ambiguity`, `Contradiction`, `Missing info`, `Cross-ref issue`, `OK`.  
     - Fully replaced on every analysis re-run.
-    - This section records FACTUAL findings only (what is in the documents). Evaluative opinions belong in section 14.
-
-14. `## Multi-Perspective Stakeholder Review`  
-    - AI-generated evaluation of the request from five distinct viewpoints.  
-    - Each perspective MUST be written as a separate sub-section with one paragraph of evaluation and 2–5 bullet findings.  
-    - Required perspectives:
-      - **Senior Solution Architect**: technical feasibility, design integrity, architectural risk.
-      - **Product Owner**: business value, scope clarity, acceptance criteria completeness.
-      - **User**: usability, clarity of expected behavior changes, friction introduced.
-      - **Security Officer**: attack surface, data exposure, authentication/authorization impact.
-      - **Data Governance Officer**: data lineage, retention, classification, and compliance impact.
-    - Fully replaced on every analysis re-run.
+    - This section records FACTUAL findings only (what is in the documents). Evaluative opinions belong in `analysis.md`.
 
 Formatting Rules (normative)
 - Only level‑2 headings (`##`) are allowed for the required sections.  
