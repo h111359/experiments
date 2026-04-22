@@ -3,6 +3,9 @@
 Goal:
 Generate `.aib_memory/requests/<request-folder>/analysis.md` for the resolved request, and update `request.md` with implementation-relevant sections.
 
+Workspace instructions pre-read (MUST):
+- Read `.aib_memory/instructions.md`. If the file exists and is non-empty, treat its content as persistent workspace-level instructions that MUST be observed throughout this prompt's execution. If the file is absent or empty, proceed normally.
+
 Inputs:
 - Active request (`request.md`)
 - Optional existing `request.md` optional sections (Assumptions, Plan, Testing, Documentation, Questions & Decisions)

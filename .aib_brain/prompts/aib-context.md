@@ -3,6 +3,9 @@
 Goal:
 Produce or fully replace `.aib_memory/context.md` — a unified, structured synthesis of all workspace-specific product knowledge, structured according to `.aib_brain/conventions/context-convention.md`. This prompt also serves the reverse-engineering use case: when no product-doc content exists in `.aib_memory/references.md`, Phase 3 workspace scan becomes the primary synthesis source.
 
+Workspace instructions pre-read (MUST):
+- Read `.aib_memory/instructions.md`. If the file exists and is non-empty, treat its content as persistent workspace-level instructions that MUST be observed throughout this prompt's execution. If the file is absent or empty, proceed normally.
+
 Non-goals:
 - Do not modify any existing file in the workspace other than `.aib_memory/context.md`.
 - Do not explore or read `.aib_brain/` folder contents except `.aib_brain/conventions/context-convention.md`.

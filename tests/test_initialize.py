@@ -148,6 +148,27 @@ class TestInitialize:
             # Since v1.2.0, docs/ is no longer a seeded artifact.
             assert not (root / ".aib_memory" / "docs").exists()
 
+    def test_creates_instructions_md_empty(self):
+        """initialize.py must create an empty instructions.md when absent."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _make_brain_only_workspace(root)
+            _run_initialize(root)
+            instructions_path = root / ".aib_memory" / "instructions.md"
+            assert instructions_path.is_file()
+            assert instructions_path.read_text(encoding="utf-8") == ""
+
+    def test_instructions_md_idempotent(self):
+        """Re-running initialize.py must not overwrite an existing instructions.md."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _make_brain_only_workspace(root)
+            _run_initialize(root)
+            instructions_path = root / ".aib_memory" / "instructions.md"
+            instructions_path.write_text("# My directives\n", encoding="utf-8")
+            _run_initialize(root)
+            assert instructions_path.read_text(encoding="utf-8") == "# My directives\n"
+
     def test_creates_logs_folder(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

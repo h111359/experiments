@@ -38,4 +38,5 @@
 | R-20260420-1016 | Fix init docs, add logs folder, update menu | .aib_memory/requests/R-20260420-1016-fix-init-docs-add-logs-folder-update-menu | Closed | 2026-04-20 10:16:27 +0300 | 2026-04-20 10:45:27 +0300 |
 | R-20260420-1144 | Improve analysis question generation rules | .aib_memory/requests/R-20260420-1144-improve-analysis-question-generation-rules | Closed | 2026-04-20 11:44:55 +0300 | 2026-04-20 14:50:14 +0300 |
 | R-20260420-1727 | Analysis prompt and workflow improvements | .aib_memory/requests/R-20260420-1727-analysis-prompt-and-workflow-improvements | Closed | 2026-04-20 17:27:37 +0300 | 2026-04-20 18:00:49 +0300 |
-| R-20260420-1940 | Questions section first and version_next log file | .aib_memory/requests/R-20260420-1940-questions-section-first-and-version-next-log-file | Active | 2026-04-20 19:40:11 +0300 |  |
+| R-20260420-1940 | Questions section first and version_next log file | .aib_memory/requests/R-20260420-1940-questions-section-first-and-version-next-log-file | Closed | 2026-04-20 19:40:11 +0300 | 2026-04-21 16:48:42 +0300 |
+| R-20260421-1705 | Add instructions.md for persistent AIB directives | .aib_memory/requests/R-20260421-1705-add-instructions-md-for-persistent-aib-directives | Closed | 2026-04-21 17:05:16 +0300 | 2026-04-22 11:48:43 +0300 |

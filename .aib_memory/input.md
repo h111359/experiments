@@ -1,5 +1,5 @@
 ## Active request
-R-20260420-1940 — Questions section first and version_next log file
+No active request
 
 ## Options
 - [ ] No changes — provide answer only

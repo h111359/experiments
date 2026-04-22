@@ -1,6 +1,6 @@
 # Product Context
 
-> **Auto-generated** by `aib-context.md` on 2026-04-20 14:00 +0300.
+> **Auto-generated** by `aib-context.md` on 2026-04-22 09:30 +0300.
 > This document is a synthesis of all product documentation and workspace sources, including `.aib_brain/` and `.aib_memory/`. It is fully replaced on each execution.
 
 ## Product Identity
@@ -45,6 +45,7 @@ Functional requirements:
 - FR-007: The `input.md` file supports two opt-in toggles: "No changes — provide answer only" (writes timestamped `answer-<timestamp>.md` in the request folder and resets `input.md` with the active request ID; MUST NOT modify `request.md`, `analysis.md`, or any other file); "Skip analysis document generation" (updates `request.md` but skips `analysis.md` output). A third `input.md` option is the `Question threshold` checkbox row (format: `[ ] 1 (all)  [ ] 2  [x] 3  [ ] 4  [ ] 5 (mandatory only)`, default `[x] 3`, reset to default after each analysis run), which controls when Q-blocks are surfaced to the developer versus resolved autonomously by the AI. The scale labels `1 (all)` and `5 (mandatory only)` indicate direction: 1 surfaces all questions; 5 surfaces only mandatory/critical ones.
 - FR-008: The system reads `references.md` to determine which files may be edited (`edit_allowed = Y`).
 - FR-009: The system reads the `context-convention.md` for the `context.md` product-doc artifact and fails closed if the convention file cannot be read.
+- FR-012: Every AIB prompt (`aib-analysis.md`, `aib-implement.md`, `aib-context.md`) reads `.aib_memory/instructions.md` as the first step before executing its main logic. If the file is absent or empty, the prompt continues normally with no error. If non-empty, its content is treated as persistent workspace-level behavioral directives that MUST be observed throughout the prompt's execution. `initialize.py` seeds an empty `instructions.md` on workspace initialization (idempotent: does not overwrite an existing file).
 - FR-010: The interactive menu displays copy-paste-ready prompt invocations for `aib-analysis.md`, `aib-implement.md`, and `aib-context.md` (without label prefixes — each line starts with `Execute`). The menu conditionally exposes a "Close current request" action when an active request is present; the action disappears automatically after the request is closed. Lifecycle creation commands (`create-request.py`) are excluded from the menu.
 - FR-011: A PR bookkeeping workflow bumps the patch version marker, creates a new per-version log under `logs/`, and produces a versioned zip of `.aib_brain/` in `versions/`.
 
@@ -79,9 +80,10 @@ Acceptance criteria:
 | AIB Conventions | `.aib_brain/conventions/` | Markdown files defining the required structure, formatting rules, and quality gates for each managed document type. |
 | AIB Prompts | `.aib_brain/prompts/` | Markdown prompt files (`aib-*.md`) invoked directly in an AI coding interface to produce AIB artifacts. |
 | AIB Templates | `.aib_brain/templates/` | Seed templates used by `initialize.py` to create initial `.aib_memory/` document stubs (register files; NOT request or implementation artifacts). |
-| AIB Memory Artifacts | `.aib_memory/` | Requests, references register, `context.md`, and `input.md`; persist workspace state. |
+| AIB Memory Artifacts | `.aib_memory/` | Requests, references register, `context.md`, `input.md`, and `instructions.md`; persist workspace state. |
 | Requests Register | `.aib_memory/requests_register.md` | Markdown table tracking all requests with their lifecycle state, folder path, and timestamps. |
 | References Register | `.aib_memory/references.md` | Markdown table listing all referenced files, their types, and whether automation may edit them. |
+| Workspace Instructions | `.aib_memory/instructions.md` | Persistent, free-form Markdown file containing workspace-level behavioral directives. Read by every AIB prompt (`aib-analysis.md`, `aib-implement.md`, `aib-context.md`) before executing its main logic. If absent or empty, prompts continue normally. Seeded as an empty file by `initialize.py` (idempotent); editable directly by users without any tool invocation. Intentionally excluded from `references.md`. |
 | Request Artifacts | `.aib_memory/requests/<request-folder>/` | Per-request folder containing `request.md` (AI-generated, 12 mandatory sections), `implementation.md` (created on-demand), optionally `analysis.md` (9 mandatory sections, reasoning artifact); `inputs/input-archive-*.md` for audit; optionally `UAT_scenarios.md` (created by `aib-analysis.md` when manual testing scenarios are required that cannot be expressed as automated assertions); optionally `answer-<timestamp>.md`. |
 | Release Bookkeeping Script | `scripts/release_bookkeeping.py` | Validates SemVer marker, bumps patch, rotates marker file, writes per-version log, and creates versioned `.aib_brain/` zip in `versions/`. |
 | Versioned Archives | `versions/` | Versioned zip archives of `.aib_brain/` (`aib_brain_vX.Y.Z.zip`); committed to VCS; used for installation. |
@@ -151,7 +153,7 @@ Priorities in order: reliability (deterministic fail-closed) > scalability (chun
 
 **Tool scripts** (`.aib_brain/tools/`):
 
-- `initialize.py` — Seeds `.aib_memory/` structure, writes `references.md`, `requests_register.md`, `context.md`, and `input.md`. Creates `.aib_memory/requests/` and `.aib_memory/logs/` on initialization (idempotent via `exist_ok=True`). Fails without partial writes on invalid workspace state. The seeded `input.md` includes a `Question threshold` checkbox row with scale-direction labels (format: `[ ] 1 (all)  [ ] 2  [x] 3  [ ] 4  [ ] 5 (mandatory only)`, default `[x] 3`) in `## Options`.
+- `initialize.py` — Seeds `.aib_memory/` structure, writes `references.md`, `requests_register.md`, `context.md`, `input.md`, and `instructions.md`. Creates `.aib_memory/requests/` and `.aib_memory/logs/` on initialization (idempotent via `exist_ok=True`). Fails without partial writes on invalid workspace state. The seeded `input.md` includes a `Question threshold` checkbox row with scale-direction labels (format: `[ ] 1 (all)  [ ] 2  [x] 3  [ ] 4  [ ] 5 (mandatory only)`, default `[x] 3`) in `## Options`. Seeds `instructions.md` as an empty file; does not overwrite an existing file.
 - `create-request.py` — Validates no Active request, creates request folder with deterministic naming (`<request_id>-<title-slug>`), appends register row as Active. Does NOT write `request.md` or `implementation.md` (removed in v1.2.0).
 - `close-request.py` — Marks the Active request Closed; auto-closes any open iterations (legacy) and prints a notice per iteration before closing. Resets `input.md` to the seed template with `No active request` after updating the register (skips silently if `input.md` does not exist).
 - `menu.py` — Interactive tool launcher. Lifecycle creation scripts (`create-request.py`) and internal helpers (`reverse-engineer.py`) are in `EXCLUDE_SCRIPTS` and do not appear in the menu. A "Close current request" action (backed by `close-request.py`) is conditionally appended by `filter_visible_actions` when `state.has_active_request` is True; it disappears automatically on the next menu refresh after the request is closed. Displays copy-paste-ready prompt invocations for `aib-analysis.md`, `aib-implement.md`, and `aib-context.md` (without label prefixes). Streams subprocess stdout/stderr via Popen tee pattern. Writes per-action log files to `.aib_memory/logs/`. Press `0`, `q`, or `Q` to quit. Uses ANSI escape sequences (`\033[H\033[J`) for blink-free screen clearing via `_enable_ansi_windows()` (one-time Windows VT enablement via ctypes at startup); buffers the entire menu into an `io.StringIO` and writes to stdout in a single call. Auto-refreshes every 3 seconds via `get_key(timeout=_REFRESH_TIMEOUT_S)` using `msvcrt.kbhit()` polling (Windows) or `select.select()` (Unix) — no background threads; `_REFRESH_TIMEOUT_S: float = 3.0` is the sole tunable constant. Renders a fixed `0) Quit` footer line; `choose_action()` returns `None` on `QUIT`/`DIGIT:0`; `main()` breaks the loop on `None`.
@@ -161,9 +163,9 @@ Priorities in order: reliability (deterministic fail-closed) > scalability (chun
 
 **Prompt actions** (`.aib_brain/prompts/`):
 
-- `aib-context.md` — Synthesizes and fully replaces `.aib_memory/context.md` from workspace sources.
-- `aib-analysis.md` — Two-branch prompt: (1) if Active request exists, generates `analysis.md` and updates `request.md` optional sections; (2) if no Active request exists, reads `input.md`, auto-creates a request via `create-request.py`, generates AI-authored `request.md` with all 12 mandatory sections (sections 1–6 non-empty), archives `input.md`, proceeds with analysis, then resets `input.md` with active request ID as the final step. Supports two opt-in toggles: "No changes" (writes only timestamped `answer-<timestamp>.md` in request folder, resets `input.md` with active request ID, MUST NOT modify `request.md`/`analysis.md`/any other file, then stops) and "Skip analysis" (update `request.md`, skip `analysis.md` output). Standard flow also resets `input.md` as its final step unless triggered from `aib-implement.md`. The `Question threshold` row in `input.md ## Options` (default `[x] 3`, format: `- Question threshold: [ ] 1 (all)  [ ] 2  [x] 3  [ ] 4  [ ] 5 (mandatory only)`) controls when Q-blocks are raised; scale labels `1 (all)` and `5 (mandatory only)` indicate direction. Before creating any Q-block, the prompt MUST identify ambiguous or underspecified parts of the request with multiple plausible interpretations (ambiguity detection), rate each on the 5-Level Severity Scale, then apply the threshold decision rule. The prompt MUST verify the answer is not already present in `context.md`, convention files, or the required-read set. Q-blocks SHOULD include a `*(recommended)*` suffix on the AI's preferred option where one is clearly identifiable. Values below threshold are resolved autonomously; the row is reset to default `[x] 3` after each run. Every plan generated in `request.md` MUST include a mandatory automated-testing task and a mandatory context/docs update task. The `analysis.md` generated contains 9 mandatory sections including AI Copilot Suggestions (reasoning-only, MUST NOT be read by `implement`), Testing (with UAT_scenarios.md creation rule for manual scenarios), and Multi-Perspective Stakeholder Review.
-- `aib-implement.md` — Guides execution of the active request scope. Auto-triggers `aib-analysis.md` without user confirmation if no Active request exists. Generates `implementation.md` from scratch (no pre-seeded template required). Invokes `close-request.py` after confirmed successful implementation; `close-request.py` resets `input.md` to seed template with `No active request` as part of close. Must NOT read `inputs/input-archive-*.md` files.
+- `aib-context.md` — Synthesizes and fully replaces `.aib_memory/context.md` from workspace sources. Reads `.aib_memory/instructions.md` as the first step (graceful: absent or empty = no-op).
+- `aib-analysis.md` — Two-branch prompt: (1) if Active request exists, generates `analysis.md` and updates `request.md` optional sections; (2) if no Active request exists, reads `input.md`, auto-creates a request via `create-request.py`, generates AI-authored `request.md` with all 12 mandatory sections (sections 1–6 non-empty), archives `input.md`, proceeds with analysis, then resets `input.md` with active request ID as the final step. Reads `.aib_memory/instructions.md` as the first step (graceful: absent or empty = no-op). Supports two opt-in toggles: "No changes" (writes only timestamped `answer-<timestamp>.md` in request folder, resets `input.md` with active request ID, MUST NOT modify `request.md`/`analysis.md`/any other file, then stops) and "Skip analysis" (update `request.md`, skip `analysis.md` output). Standard flow also resets `input.md` as its final step unless triggered from `aib-implement.md`. The `Question threshold` row in `input.md ## Options` (default `[x] 3`, format: `- Question threshold: [ ] 1 (all)  [ ] 2  [x] 3  [ ] 4  [ ] 5 (mandatory only)`) controls when Q-blocks are raised; scale labels `1 (all)` and `5 (mandatory only)` indicate direction. Before creating any Q-block, the prompt MUST identify ambiguous or underspecified parts of the request with multiple plausible interpretations (ambiguity detection), rate each on the 5-Level Severity Scale, then apply the threshold decision rule. The prompt MUST verify the answer is not already present in `context.md`, convention files, or the required-read set. Q-blocks SHOULD include a `*(recommended)*` suffix on the AI's preferred option where one is clearly identifiable. Values below threshold are resolved autonomously; the row is reset to default `[x] 3` after each run. Every plan generated in `request.md` MUST include a mandatory automated-testing task and a mandatory context/docs update task. The `analysis.md` generated contains 9 mandatory sections including AI Copilot Suggestions (reasoning-only, MUST NOT be read by `implement`), Testing (with UAT_scenarios.md creation rule for manual scenarios), and Multi-Perspective Stakeholder Review.
+- `aib-implement.md` — Guides execution of the active request scope. Reads `.aib_memory/instructions.md` as the first step (graceful: absent or empty = no-op). Auto-triggers `aib-analysis.md` without user confirmation if no Active request exists. Generates `implementation.md` from scratch (no pre-seeded template required). Invokes `close-request.py` after confirmed successful implementation; `close-request.py` resets `input.md` to seed template with `No active request` as part of close. Must NOT read `inputs/input-archive-*.md` files.
 
 **Conventions** (`.aib_brain/conventions/`):
 
@@ -235,7 +237,7 @@ Developer input (`input.md`) → `aib-analysis.md` → `request.md` + `analysis.
 
 ### Data Storage
 
-- `.aib_memory/` — operational registers, `context.md`, `input.md`, and request artifact folders; backed by Git history.
+- `.aib_memory/` — operational registers, `context.md`, `input.md`, `instructions.md`, and request artifact folders; backed by Git history.
 - `.aib_memory/requests/<request-folder>/` — per-request artifacts: `request.md` (12 mandatory sections), `implementation.md`, optionally `analysis.md` (9 mandatory sections), `inputs/input-archive-*.md` (audit trail), optionally `UAT_scenarios.md` (manual test scenarios when required), and optionally `answer-<timestamp>.md`.
 - `.aib_memory/logs/` — action execution logs; excluded from VCS; no auto-cleanup.
 - `.aib_brain/` — framework assets including the active SemVer marker file (e.g., `v1.2.0`); committed to VCS.
@@ -333,9 +335,10 @@ CI rollback: reset or rebase the PR branch to remove the stale version log, then
 - `test_lifecycle_e2e.py` — End-to-end lifecycle test: initialize → create-request → close-request; verifies `request.md` is NOT created by `create-request.py`.
 - `test_menu.py` — Unit tests for `menu.py`: `MenuState`, `build_command`, `_run_and_tee`, `_make_log_path`, lifecycle script exclusion from menu, and related helpers.
 - `test_reverse_engineer.py` — Unit tests for `reverse-engineer.py`: file inventory and exclusion logic.
+- `test_instructions_md.py` — Tests for the instructions.md feature: asserts `.aib_memory/instructions.md` exists and is empty, all three prompts contain the pre-read step, and `.aib_brain/README.md` documents the feature with a security note.
 - `test_common.py` — Unit tests for `common.py` helpers (located in `.aib_brain/tools/`).
 
-All tests use `tempfile.TemporaryDirectory` for isolation. All 78 tests pass as of R-20260420-1016 (added tests for `initialize.py` docs-not-created and logs-created, updated `test_menu.py` to reflect conditional close-request visibility).
+All tests use `tempfile.TemporaryDirectory` for isolation. All 91 tests pass as of R-20260421-1705 (added tests for `instructions.md` seeding by `initialize.py` and feature assertions).
 
 ### CI/CD Pipeline
 
@@ -416,6 +419,8 @@ All tests use `tempfile.TemporaryDirectory` for isolation. All 78 tests pass as 
 
 **input.md**: Ephemeral primary user-agent communication channel. Seeded by `initialize.py`; written by the developer; read and processed by `aib-analysis.md`; reset to seed template after processing.
 
+**instructions.md**: Persistent workspace-level behavioral directives file located at `.aib_memory/instructions.md`. Read by every AIB prompt as the first step before executing its main logic. Free-form Markdown; no schema enforcement. If absent or empty, prompts proceed normally. Seeded as an empty file by `initialize.py`; editable directly by users.
+
 **Iteration**: (Deprecated) A numbered step within a request. Removed as of R-20260414-1421.
 
 **Memory Folder**: Folder (`.aib_memory/`) containing workspace-specific artifacts: requests, registers, `context.md`, and `input.md`.
@@ -493,6 +498,7 @@ All tests use `tempfile.TemporaryDirectory` for isolation. All 78 tests pass as 
 - `.aib_memory/` — Workspace-specific AIB memory artifacts.
 - `.aib_memory/context.md` — This file; unified workspace product knowledge synthesis.
 - `.aib_memory/input.md` — Ephemeral user-agent communication channel; seeded by `initialize.py`; reset after each analysis run.
+- `.aib_memory/instructions.md` — Persistent workspace-level behavioral directives file; seeded as empty by `initialize.py`; read by all AIB prompts before execution; free-form Markdown; editable directly by users.
 - `.aib_memory/references.md` — References register listing files, types, and edit permissions.
 - `.aib_memory/requests_register.md` — Requests register tracking lifecycle state for all requests.
 - `.aib_memory/requests/` — Per-request artifact folders.
@@ -524,7 +530,8 @@ All tests use `tempfile.TemporaryDirectory` for isolation. All 78 tests pass as 
 - `tests/conftest.py` — Shared pytest fixtures for test isolation.
 - `tests/test_close_request.py` — Integration tests for `close-request.py`.
 - `tests/test_create_request.py` — Integration tests for `create-request.py`; verifies no `request.md`/`implementation.md` seeding.
-- `tests/test_initialize.py` — Integration tests for `initialize.py`; includes `input.md` creation assertion.
+- `tests/test_initialize.py` — Integration tests for `initialize.py`; includes `input.md` creation assertion and `instructions.md` seeding and idempotency assertions.
+- `tests/test_instructions_md.py` — Tests asserting `instructions.md` exists and is empty, all three prompts contain the pre-read step, and `README.md` documents the feature.
 - `tests/test_lifecycle_e2e.py` — End-to-end lifecycle integration tests.
 - `tests/test_menu.py` — Unit tests for `menu.py`.
 - `tests/test_reverse_engineer.py` — Unit tests for `reverse-engineer.py`.

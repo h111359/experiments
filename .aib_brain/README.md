@@ -133,6 +133,25 @@ You have an existing codebase with no AIB product context and want to populate `
 - This README is updated on explicit request.
 - Paths are repository-relative for portability.
 
+## Workspace Instructions
+
+The file `.aib_memory/instructions.md` is a persistent, workspace-level instructions file that is read by every AIB prompt (`aib-analysis.md`, `aib-implement.md`, `aib-context.md`) before executing its main logic.
+
+**Purpose:** Encode workspace-specific behavioral directives that the AI must always observe, regardless of which prompt is being executed. This is analogous to the GitHub Copilot `.github/copilot-instructions.md` pattern but requires no external dependency.
+
+**Location:** `.aib_memory/instructions.md`
+
+**How to populate:** Open the file and write any free-form Markdown directives you want all AIB prompts to respect. No schema enforcement is applied — any content is valid. Examples of useful directive categories:
+
+- Coding conventions not already captured in `.aib_brain/conventions/` (e.g., preferred library choices, naming rules specific to this workspace).
+- Always/never behaviors (e.g., "always use 4-space indentation", "never use `import *`").
+- Domain-specific constraints the AI must respect in every interaction.
+- Preferred output format or verbosity instructions.
+
+**Graceful absence:** If `instructions.md` is absent or empty, all prompts continue executing normally — no error is raised and no execution is halted.
+
+**Security note:** Do NOT store secrets, credentials, API keys, tokens, or any personally identifiable information (PII) in `instructions.md`. The file is plain text and is not encrypted.
+
 ## Question Threshold
 
 The `Question threshold` setting controls when `aib-analysis.md` surfaces a decision point as a user-facing Q-block versus resolving it autonomously. The threshold value is stored in `.aib_memory/input.md ## Options` (checkbox row, reset to default `[x] 3` after each analysis run) and can be changed by the developer before running analysis.

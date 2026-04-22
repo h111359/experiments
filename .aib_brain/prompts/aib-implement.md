@@ -3,6 +3,9 @@
 Goal:
 Execute active request scope, update the documentation and create request-scoped `implementation.md` from scratch.
 
+Workspace instructions pre-read (MUST):
+- Read `.aib_memory/instructions.md`. If the file exists and is non-empty, treat its content as persistent workspace-level instructions that MUST be observed throughout this prompt's execution. If the file is absent or empty, proceed normally.
+
 Input resolution:
 - Read `.aib_memory/requests_register.md` and check for exactly one row with `state = Active`.
   - If zero Active rows are found: **Auto-Analysis Branch** — trigger the `aib-analysis.md` flow (read and execute `.aib_brain/prompts/aib-analysis.md`), then continue with implementation once analysis completes and a new Active request exists. Do NOT ask the user for permission or confirmation before creating the request or running analysis; proceed autonomously.

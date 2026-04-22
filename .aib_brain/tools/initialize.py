@@ -65,6 +65,14 @@ def main() -> None:
             )
             write_text(input_file, input_seed)
 
+        # Seed instructions.md as the workspace-level persistent instructions file.
+        # Idempotent: does not overwrite a file that already exists.
+        instructions_file = workspace / ".aib_memory" / "instructions.md"
+        if instructions_file.exists():
+            print("instructions.md already exists — skipping overwrite.")
+        else:
+            write_text(instructions_file, "")
+
         print("Initialized .aib_memory structure successfully.")
 
     except ValidationError as exc:
