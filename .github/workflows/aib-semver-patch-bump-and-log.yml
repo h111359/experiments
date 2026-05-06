@@ -11,7 +11,7 @@ on:
 
 permissions:
   contents: write
-  pull-requests: read
+  pull-requests: write
 
 concurrency:
   group: aib-semver-bump-${{ github.event.pull_request.number }}
@@ -70,6 +70,7 @@ jobs:
             --base-ref "origin/${{ github.base_ref }}"
             --pr-number "${{ github.event.pull_request.number }}"
             --commit-subjects-file "$AIB_COMMIT_SUBJECTS_FILE"
+            --next-version-changes-file "logs/next_version_changes.md"
             --github-output "$GITHUB_OUTPUT"
           )
 
@@ -97,6 +98,8 @@ jobs:
 
       - name: Commit and push (if changed)
         if: steps.bookkeeping.outputs.changed == 'true'
+        env:
+          CHANGES_BODY: ${{ steps.bookkeeping.outputs.changes_body }}
         shell: bash
         run: |
           set -euo pipefail
@@ -110,7 +113,16 @@ jobs:
             exit 0
           fi
 
-          git commit -m "chore: bump to ${{ steps.bookkeeping.outputs.new_version }} (PR #${{ github.event.pull_request.number }})"
+          commit_subject="chore: bump to ${{ steps.bookkeeping.outputs.new_version }} (PR #${{ github.event.pull_request.number }})"
+
+          if [ -n "${CHANGES_BODY:-}" ]; then
+            msg_file="$(mktemp)"
+            printf '%s\n\n%s\n' "$commit_subject" "$CHANGES_BODY" > "$msg_file"
+            git commit --file "$msg_file"
+            rm -f "$msg_file"
+          else
+            git commit -m "$commit_subject"
+          fi
           git push origin HEAD:${{ github.head_ref }}
 
       - name: Ensure clean working tree
@@ -122,3 +134,14 @@ jobs:
             git status --porcelain >&2
             exit 1
           fi
+
+      - name: Post changelog comment
+        if: steps.bookkeeping.outputs.changes_body != ''
+        continue-on-error: true
+        env:
+          CHANGES_BODY: ${{ steps.bookkeeping.outputs.changes_body }}
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh pr comment "${{ github.event.pull_request.number }}" --body "${CHANGES_BODY}"

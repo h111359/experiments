@@ -15,7 +15,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from common import ACTIVE, parse_markdown_table, read_text
+from common import ACTIVE, get_semver, parse_markdown_table, read_text
 
 # Lifecycle scripts are excluded from dynamic discovery to prevent them from
 # reappearing in the menu; they are managed by the AI prompts directly.
@@ -649,7 +649,87 @@ def choose_action(tools_dir: Path, workspace: Path) -> dict[str, Any] | None:
                 return action
 
 
+def check_version_compatibility(workspace: Path, python_exe: str, tools_dir: Path) -> bool:
+    """Check whether .aib_brain/ and .aib_memory/ semver markers match.
+
+    When a mismatch (or missing memory semver) is detected, an upgrade prompt
+    is shown. The user can choose to upgrade or skip. If the user upgrades,
+    ``initialize.py --upgrade`` is invoked and this function returns True so
+    the caller continues to the normal menu without requiring a relaunch.
+    When the upgrade fails, the function returns False so the caller exits.
+    When the user skips, or when versions are in sync, the function returns True.
+
+    Args:
+        workspace: Resolved workspace root path.
+        python_exe: Path to the Python interpreter.
+        tools_dir: Path to the .aib_brain/tools/ directory.
+
+    Returns:
+        True when the caller should continue to the normal menu; False when
+        the caller should exit (upgrade failed or user chose to exit).
+    """
+    brain_dir = workspace / ".aib_brain"
+    memory_dir = workspace / ".aib_memory"
+
+    brain_semver = get_semver(brain_dir)
+    memory_semver = get_semver(memory_dir)
+
+    # Unknown brain version: cannot compare; warn but do not block.
+    if brain_semver is None:
+        print("WARNING: No semver marker found in .aib_brain/; version check skipped.")
+        return True
+
+    # Versions match — no prompt needed.
+    if brain_semver == memory_semver:
+        return True
+
+    # Display a version mismatch banner.
+    brain_label = brain_semver
+    memory_label = memory_semver or "unknown (no marker)"
+    print("\n" + "=" * 60)
+    print("  AIB VERSION MISMATCH DETECTED")
+    print(f"  .aib_brain/  version : {brain_label}")
+    print(f"  .aib_memory/ version : {memory_label}")
+    print("=" * 60)
+    print(
+        "\n  Your .aib_memory/ was created with a different AIB version.\n"
+        "  Upgrading will archive the current .aib_memory/ and re-seed\n"
+        "  it from the new brain templates while preserving your curated\n"
+        "  files (context.md, instructions.md, and optionally requests/).\n"
+    )
+
+    # Present options and loop until a valid choice is made.
+    while True:
+        print("  [1] Upgrade .aib_memory/ now  (recommended)")
+        print("  [2] Skip for this session")
+        choice = input("\n  Enter choice [1/2]: ").strip()
+        if choice == "1":
+            init_script = (tools_dir / "initialize.py").resolve()
+            result = subprocess.run(
+                [python_exe, str(init_script), "--workspace", str(workspace), "--upgrade"],
+                # Inherit stdin/stdout so the upgrade output is visible.
+                stdin=None,
+                text=True,
+            )
+            if result.returncode != 0:
+                print("\nERROR: Upgrade failed. Re-launch menu to try again.")
+                return False
+            else:
+                print("\nUpgrade complete. Continuing to menu...")
+                return True
+        if choice == "2":
+            print("  Skipping upgrade for this session.\n")
+            return True
+        print("  Invalid choice — please enter 1 or 2.")
+
+
 def main() -> None:
+    """Main entry point: parse arguments, ensure memory is initialized, then run the menu.
+
+    Performs a version-compatibility check before showing the interactive menu.
+    When .aib_brain/ and .aib_memory/ semver markers differ, the user is
+    offered an upgrade option before the menu is shown.
+    """
     args = parse_cli_args()
     workspace = Path(args.workspace).resolve()
 
@@ -657,6 +737,12 @@ def main() -> None:
     python_exe = sys.executable
 
     ensure_memory_initialized_if_missing(workspace, python_exe, tools_dir)
+
+    # Version-compatibility check: prompt for upgrade if semver markers differ.
+    should_continue = check_version_compatibility(workspace, python_exe, tools_dir)
+    if not should_continue:
+        # Upgrade failed; exit so the user can retry after resolving the issue.
+        return
 
     # Enable ANSI VT processing on Windows once before the first render.
     _enable_ansi_windows()

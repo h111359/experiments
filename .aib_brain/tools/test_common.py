@@ -15,9 +15,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from common import (
     ACTIVE,
     CLOSED,
-    LOCATION_PATTERN,
-    REQ_HEADING_PATTERN,
-    RequirementRef,
     ValidationError,
     ensure_workspace,
     format_markdown_table,
@@ -25,12 +22,9 @@ from common import (
     now_compact_request_id,
     now_iso,
     parse_markdown_table,
-    parse_product_documentation_requirements,
     read_text,
     requests_register_path,
     resolve_active_request_or_explicit,
-    resolve_product_documentation_path,
-    sanitize_location_to_path,
     slugify,
     update_requests_register,
     validate_request_md,
@@ -181,77 +175,6 @@ class TestSlugify(unittest.TestCase):
 
 
 # ---------------------------------------------------------------------------
-# Requirement heading regex
-# ---------------------------------------------------------------------------
-
-class TestReqHeadingPattern(unittest.TestCase):
-    def test_valid_heading_hyphen(self):
-        line = "##### ABC-01 - Some Requirement **[C]**"
-        m = REQ_HEADING_PATTERN.match(line)
-        self.assertIsNotNone(m)
-        self.assertEqual(m.group(1), "ABC-01")
-        self.assertEqual(m.group(2), "Some Requirement")
-
-    def test_valid_heading_en_dash(self):
-        line = "##### ABCD-99 \u2013 Another Req **[H]**"
-        m = REQ_HEADING_PATTERN.match(line)
-        self.assertIsNotNone(m)
-        self.assertEqual(m.group(1), "ABCD-99")
-
-    def test_valid_heading_em_dash(self):
-        line = "##### ABC-05 \u2014 Title **[R]**"
-        m = REQ_HEADING_PATTERN.match(line)
-        self.assertIsNotNone(m)
-
-    def test_invalid_heading_wrong_level(self):
-        line = "### ABC-01 - Title **[C]**"
-        self.assertIsNone(REQ_HEADING_PATTERN.match(line))
-
-    def test_invalid_heading_bad_tag(self):
-        line = "##### ABC-01 - Title **[X]**"
-        self.assertIsNone(REQ_HEADING_PATTERN.match(line))
-
-    def test_invalid_heading_no_tag(self):
-        line = "##### ABC-01 - Title"
-        self.assertIsNone(REQ_HEADING_PATTERN.match(line))
-
-    def test_two_letter_prefix_rejected(self):
-        line = "##### AB-01 - Title **[C]**"
-        self.assertIsNone(REQ_HEADING_PATTERN.match(line))
-
-    def test_five_letter_prefix_rejected(self):
-        line = "##### ABCDE-01 - Title **[C]**"
-        self.assertIsNone(REQ_HEADING_PATTERN.match(line))
-
-
-# ---------------------------------------------------------------------------
-# Location pattern
-# ---------------------------------------------------------------------------
-
-class TestLocationPattern(unittest.TestCase):
-    def test_location_keyword(self):
-        line = "Location: **some/path/here**"
-        m = LOCATION_PATTERN.match(line)
-        self.assertIsNotNone(m)
-        self.assertEqual(m.group(1), "some/path/here")
-
-    def test_evidence_location_keyword(self):
-        line = "Evidence location: **evidence/path**"
-        m = LOCATION_PATTERN.match(line)
-        self.assertIsNotNone(m)
-        self.assertEqual(m.group(1), "evidence/path")
-
-    def test_case_insensitive(self):
-        line = "LOCATION: **upper**"
-        m = LOCATION_PATTERN.match(line)
-        self.assertIsNotNone(m)
-
-    def test_no_match_without_bold(self):
-        line = "Location: some/path"
-        self.assertIsNone(LOCATION_PATTERN.match(line))
-
-
-# ---------------------------------------------------------------------------
 # Timestamp formatting
 # ---------------------------------------------------------------------------
 
@@ -345,27 +268,6 @@ class TestLoadTemplate(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             with self.assertRaises(ValidationError):
                 load_template(Path(tmp), "missing.md")
-
-
-# ---------------------------------------------------------------------------
-# Sanitize location to path
-# ---------------------------------------------------------------------------
-
-class TestSanitizeLocationToPath(unittest.TestCase):
-    def test_simple_path(self):
-        self.assertEqual(sanitize_location_to_path("a/b/c"), "a/b/c")
-
-    def test_strips_whitespace(self):
-        self.assertEqual(sanitize_location_to_path(" a / b / c "), "a/b/c")
-
-    def test_removes_empty_segments(self):
-        self.assertEqual(sanitize_location_to_path("a//b///c"), "a/b/c")
-
-    def test_single_segment(self):
-        self.assertEqual(sanitize_location_to_path("only"), "only")
-
-    def test_empty_string(self):
-        self.assertEqual(sanitize_location_to_path(""), "")
 
 
 # ---------------------------------------------------------------------------
@@ -480,127 +382,6 @@ class TestInitializeIdempotency(unittest.TestCase):
 
 
 # ---------------------------------------------------------------------------
-# Parse product documentation requirements
-# ---------------------------------------------------------------------------
-
-class TestParseProductDocumentationRequirements(unittest.TestCase):
-    def test_valid_content(self):
-        doc = (
-            "# Product Documentation\n"
-            "\n"
-            "##### ABC-01 - First Requirement **[C]**\n"
-            "\n"
-            "Location: **core/module**\n"
-            "\n"
-            "Some description.\n"
-            "\n"
-            "##### ABC-02 - Second Requirement **[H]**\n"
-            "\n"
-            "Location: **core/other**\n"
-        )
-        with tempfile.TemporaryDirectory() as tmp:
-            p = Path(tmp) / "Product_Documentation.md"
-            write_text(p, doc)
-            reqs = parse_product_documentation_requirements(p)
-            self.assertEqual(len(reqs), 2)
-            self.assertEqual(reqs[0].req_id, "ABC-01")
-            self.assertEqual(reqs[0].title, "First Requirement")
-            self.assertEqual(reqs[0].location, "core/module")
-            self.assertEqual(reqs[1].req_id, "ABC-02")
-
-    def test_inherits_location_from_same_prefix(self):
-        doc = (
-            "##### ABC-01 - First **[C]**\n"
-            "\n"
-            "Location: **shared/loc**\n"
-            "\n"
-            "##### ABC-02 - Second **[C]**\n"
-            "\n"
-            "No explicit location line here.\n"
-        )
-        with tempfile.TemporaryDirectory() as tmp:
-            p = Path(tmp) / "Product_Documentation.md"
-            write_text(p, doc)
-            reqs = parse_product_documentation_requirements(p)
-            self.assertEqual(reqs[1].location, "shared/loc")
-
-    def test_duplicate_ids_raises(self):
-        doc = (
-            "##### ABC-01 - First **[C]**\n"
-            "Location: **loc1**\n"
-            "##### ABC-01 - Duplicate **[C]**\n"
-            "Location: **loc2**\n"
-        )
-        with tempfile.TemporaryDirectory() as tmp:
-            p = Path(tmp) / "Product_Documentation.md"
-            write_text(p, doc)
-            with self.assertRaises(ValidationError):
-                parse_product_documentation_requirements(p)
-
-    def test_missing_location_raises(self):
-        doc = (
-            "##### XYZ-01 - No Location **[C]**\n"
-            "\n"
-            "No location line at all.\n"
-        )
-        with tempfile.TemporaryDirectory() as tmp:
-            p = Path(tmp) / "Product_Documentation.md"
-            write_text(p, doc)
-            with self.assertRaises(ValidationError):
-                parse_product_documentation_requirements(p)
-
-    def test_missing_file_raises(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            p = Path(tmp) / "Product_Documentation.md"
-            with self.assertRaises(ValidationError):
-                parse_product_documentation_requirements(p)
-
-    def test_no_headings_raises(self):
-        doc = "# Just a title\n\nNo requirement headings here.\n"
-        with tempfile.TemporaryDirectory() as tmp:
-            p = Path(tmp) / "Product_Documentation.md"
-            write_text(p, doc)
-            with self.assertRaises(ValidationError):
-                parse_product_documentation_requirements(p)
-
-    def test_results_sorted_by_req_id(self):
-        doc = (
-            "##### ABC-03 - Third **[C]**\n"
-            "Location: **loc**\n"
-            "##### ABC-01 - First **[C]**\n"
-            "Location: **loc**\n"
-            "##### ABC-02 - Second **[C]**\n"
-            "Location: **loc**\n"
-        )
-        with tempfile.TemporaryDirectory() as tmp:
-            p = Path(tmp) / "Product_Documentation.md"
-            write_text(p, doc)
-            reqs = parse_product_documentation_requirements(p)
-            ids = [r.req_id for r in reqs]
-            self.assertEqual(ids, ["ABC-01", "ABC-02", "ABC-03"])
-
-
-# ---------------------------------------------------------------------------
-# Resolve product documentation path
-# ---------------------------------------------------------------------------
-
-class TestResolveProductDocumentationPath(unittest.TestCase):
-    def test_canonical_path_exists(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            ws = _setup_workspace(tmp)
-            doc = ws / ".aib_brain" / "Product_Documentation.md"
-            write_text(doc, "# Doc\n")
-            result = resolve_product_documentation_path(ws)
-            self.assertEqual(result, doc)
-
-    def test_canonical_path_missing(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            ws = _setup_workspace(tmp)
-            with self.assertRaises(ValidationError):
-                resolve_product_documentation_path(ws)
-
-
-# ---------------------------------------------------------------------------
 # slugify max_length (P30)
 # ---------------------------------------------------------------------------
 
@@ -695,79 +476,6 @@ class TestValidateRequestMd(unittest.TestCase):
             path = Path(tmp) / "nonexistent.md"
             with self.assertRaises(ValidationError):
                 validate_request_md(path)
-
-
-# ---------------------------------------------------------------------------
-# initialize.py references.md skip-if-exists + --force (P28)
-# Integration-level test via direct function calls
-# ---------------------------------------------------------------------------
-
-class TestInitializeReferencesSkip(unittest.TestCase):
-    """Test that seed_references_from_product_doc logic honours skip-if-exists
-    when called through the same guard pattern used in initialize.py."""
-
-    def _run_init_logic(self, workspace: Path, force: bool) -> None:
-        """Replicate the references.md guard from initialize.py."""
-        from common import seed_references_from_product_doc, ensure_doc_seed_files
-
-        references_file = workspace / ".aib_memory" / "references.md"
-        if references_file.exists() and not force:
-            pass  # skip
-        else:
-            references_md, requirements = seed_references_from_product_doc(workspace)
-            write_text(references_file, references_md)
-            ensure_doc_seed_files(workspace, requirements)
-
-    def _setup_with_template(self, workspace: Path) -> None:
-        """Set up a minimal workspace with a references-template.md."""
-        brain_dir = workspace / ".aib_brain"
-        brain_dir.mkdir(parents=True, exist_ok=True)
-        (workspace / ".aib_memory").mkdir(parents=True, exist_ok=True)
-        template_dir = brain_dir / "templates"
-        template_dir.mkdir(parents=True, exist_ok=True)
-        # Minimal references template
-        template_content = (
-            "# References\n\n"
-            "| ref_id | title | path | type | edit_allowed | source | notes |\n"
-            "| --- | --- | --- | --- | --- | --- | --- |\n"
-            "| REF-0001 | REQ-01 - Test | .aib_memory/docs/core/REQ-01.md | product-doc | Y | default | Seeded |\n"
-        )
-        write_text(template_dir / "references-template.md", template_content)
-
-    def test_skip_when_exists_no_force(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            ws = Path(tmp)
-            self._setup_with_template(ws)
-            original = "# References\n\nCustom content.\n"
-            ref_file = ws / ".aib_memory" / "references.md"
-            write_text(ref_file, original)
-
-            self._run_init_logic(ws, force=False)
-
-            self.assertEqual(read_text(ref_file), original)
-
-    def test_overwrite_when_force(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            ws = Path(tmp)
-            self._setup_with_template(ws)
-            original = "# References\n\nCustom content.\n"
-            ref_file = ws / ".aib_memory" / "references.md"
-            write_text(ref_file, original)
-
-            self._run_init_logic(ws, force=True)
-
-            # Content should have been replaced by the template content
-            self.assertNotEqual(read_text(ref_file), original)
-
-    def test_creates_when_missing(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            ws = Path(tmp)
-            self._setup_with_template(ws)
-            ref_file = ws / ".aib_memory" / "references.md"
-
-            self.assertFalse(ref_file.exists())
-            self._run_init_logic(ws, force=False)
-            self.assertTrue(ref_file.exists())
 
 
 # ---------------------------------------------------------------------------

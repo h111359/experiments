@@ -1,17 +1,17 @@
 # Prompt: create-analysis
 
 Goal:
-Generate `.aib_memory/requests/<request-folder>/analysis.md` for the resolved request, and update `request.md` with implementation-relevant sections.
+Generate `.aib_memory/analysis.md` for the resolved request, and update `.aib_memory/request.md` with implementation-relevant sections.
 
 Workspace instructions pre-read (MUST):
 - Read `.aib_memory/instructions.md`. If the file exists and is non-empty, treat its content as persistent workspace-level instructions that MUST be observed throughout this prompt's execution. If the file is absent or empty, proceed normally.
 
 Inputs:
-- Active request (`request.md`)
-- Optional existing `request.md` optional sections (Assumptions, Plan, Testing, Documentation, Questions & Decisions)
-- `.aib_brain/Concepts.md`
-- `.aib_memory/references.md`
-- All product documentation files that are listed in `.aib_memory/references.md`
+- Active request (`.aib_memory/request.md`)
+- Optional existing `.aib_memory/request.md` optional sections (Assumptions, Plan, Testing, Documentation, Questions & Decisions)
+- `.aib_memory/context.md` (workspace product context, when present and non-empty)
+- Any additional files explicitly listed by the developer in `.aib_memory/instructions.md`
+- `.aib_memory/attachments/` (supplementary input files; read text files, acknowledge binary files by name)
 - Conventions:
   - `.aib_brain/conventions/analysis-convention.md`
   - `.aib_brain/conventions/request-convention.md`
@@ -22,8 +22,15 @@ Mandatory preflight (MUST):
    - If zero Active rows are found: switch to the **Auto-Request Creation Branch** (see below).
    - If more than one Active row is found: output the message **"ERROR: Register inconsistency — multiple Active requests found. Execution halted. Fix requests_register.md before running analysis."** Do NOT proceed to any subsequent step. Do NOT write any output files.
 2. Resolve active request (use the single Active row identified in step 1).
-3. Read the active `request.md`.
-4. **Toggle detection (MUST check before any further steps):**
+3. Read the active `request.md` from `.aib_memory/request.md`.
+4. **Read attachments (MUST execute before toggle detection):**
+   - Perform a flat scan of `.aib_memory/attachments/` (ignore subdirectories).
+   - For each file found (excluding `.gitkeep`):
+     - If the file is text-readable: read its full content and treat it as additional input context alongside `input.md`.
+     - If the file is binary (not text-readable): note the filename and acknowledge its presence without reading content.
+   - Files in `attachments/` are considered part of the input even if not referenced in `input.md`.
+   - If the folder is absent or empty, continue normally with no error.
+5. **Toggle detection (MUST check before any further steps):**
    - Read `## Options` section of `input.md` (`.aib_memory/input.md`).
    - If the **"No changes — provide answer only"** option is checked (`[x]`):
      - This branch produces **exactly two file writes** and MUST NOT produce any other file writes:
@@ -32,9 +39,8 @@ Mandatory preflight (MUST):
      - MUST NOT modify `request.md`, `analysis.md`, or any other file.
      - **Stop here. Do NOT proceed to any further steps.**
    - If the **"Skip analysis document generation"** option is checked (`[x]`): proceed normally but skip writing `analysis.md` (Part 1 output). Update `request.md` optional sections only.
-5. Read `.aib_memory/references.md`.
-6. Build a required-read set containing every `path` from references where `type = product-doc`.
-7. Read every file in the required-read set before drafting analysis.
+6. Read `.aib_memory/context.md`. If the file is absent or empty, continue normally with no error; otherwise treat its content as the unified workspace product context for this analysis run.
+7. If `.aib_memory/instructions.md` lists additional file paths the developer has flagged for AIB to read, read each of those files before drafting analysis. Otherwise skip this step.
 8. Read both conventions listed above.
 9. Detect `## Amend Request` section in `request.md`. If present and non-empty:
    a. Apply its free-text instructions to the relevant mandatory sections (Goal, Background, Scope, Out of scope, Constraints, Success criteria) of `request.md`.
@@ -55,10 +61,11 @@ Mandatory preflight (MUST):
    python .aib_brain/tools/create-request.py --workspace . --title "<derived-title>"
    ```
 4. Read `.aib_memory/requests_register.md` to resolve the newly created request folder.
-5. Generate `request.md` in `<request-folder>/` following `.aib_brain/conventions/request-convention.md` and based on the content of `input.md`'s `## Input` section. All 12 mandatory sections MUST be present in this exact order: `## Goal`, `## Background`, `## Scope`, `## Out of scope`, `## Constraints`, `## Success criteria`, `## Assumptions`, `## Plan`, `## Documentation`, `## Questions & Decisions`, `## Code and Asset Scan for Impacted Components`, `## Internal Review of Request and Product Docs`. Sections 1–6 (`## Goal` through `## Success criteria`) MUST be non-empty with content derived from `input.md`'s `## Input` section. Sections 7–12 may be empty (they are populated during step 8). Before writing `request.md`, confirm all 12 headings are present and sections 1–6 are non-empty.
+5. Generate `request.md` at `.aib_memory/request.md` (NOT inside the request subfolder) following `.aib_brain/conventions/request-convention.md` and based on the content of `input.md`'s `## Input` section. All 12 mandatory sections MUST be present in this exact order: `## Goal`, `## Background`, `## Scope`, `## Out of scope`, `## Constraints`, `## Success criteria`, `## Assumptions`, `## Plan`, `## Documentation`, `## Questions & Decisions`, `## Code and Asset Scan for Impacted Components`, `## Internal Review of Request and Product Docs`. Sections 1–6 (`## Goal` through `## Success criteria`) MUST be non-empty with content derived from `input.md`'s `## Input` section. Sections 7–12 may be empty (they are populated during step 8). Before writing `request.md`, confirm all 12 headings are present and sections 1–6 are non-empty.
 6. Archive the current `input.md` content to `<request-folder>/inputs/input-archive-<YYYY-MM-DD_HH-MI-SS>.md`.
    - Use python to create the `inputs/` subfolder and write the archive file.
-7. Proceed with the standard analysis flow (steps 4 onward, reading the newly created `request.md`). MUST NOT reset `input.md` during this triggered standard flow — the reset is performed in step 8 below.
+   - After archiving `input.md`, move all files from `.aib_memory/attachments/` (flat scan, ignore subdirectories, skip `.gitkeep`) to `<request-folder>/inputs/<filename>` using Python's `shutil.move` for cross-filesystem compatibility. After all moves, `.aib_memory/attachments/` MUST contain only `.gitkeep` (i.e., effectively empty of developer-supplied files).
+7. Proceed with the standard analysis flow (steps 5 onward, reading the newly created `request.md`). MUST NOT reset `input.md` during this triggered standard flow — the reset is performed in step 8 below.
 8. Reset `input.md` to the seed template (`## Active request\nNo active request\n\n## Options\n- [ ] No changes — provide answer only\n- [ ] Skip analysis document generation\n- Question threshold: [ ] 1 (all)  [ ] 2  [x] 3  [ ] 4  [ ] 5 (mandatory only)\n\n## Input\n\n`). Then read `.aib_memory/requests_register.md`, find the Active request row, and replace `No active request` in the `## Active request` line with `<request_id> — <title>` (the newly created request).
 
 ---
@@ -75,20 +82,20 @@ Requirements:
 - `inputs/input-archive-*.md` files in request folders MUST NOT be read or referenced by this prompt beyond archiving.
 
 Output — Part 1: Analysis file
-- Full content replacement of `.aib_memory/requests/<request-folder>/analysis.md`.
+- Full content replacement of `.aib_memory/analysis.md` (NOT inside the request subfolder — the active analysis lives at `.aib_memory/` root while the request is active).
 - Must follow the section structure defined in `analysis-convention.md`.
 - Skipped if the "Skip analysis document generation" toggle is checked.
 - Generation instructions for mandatory sections (in addition to sections defined in `analysis-convention.md`):
 
   **`## AI Copilot Suggestions`** — Write a sincere, pragmatic, senior-expert-level review of the request. Include at least three distinct observations covering different dimensions (design quality, implementation risk, simplification opportunities, maintainability, testability, or scope creep risk). For each observation, provide a concise finding and a concrete actionable suggestion. Include an explicit note if the scope appears larger or smaller than necessary to achieve the stated goal. MUST NOT contain implementation steps or prescriptive instructions that could serve as a specification for `implement`. This section is for human review only — `implement` MUST NOT read or act on it.
 
-  **`## Testing`** — Define intent-level test cases for the request scope. Format: `- T<n> — <name>: <description>. Expected outcome: <observable pass/fail result>.` Cover: file existence checks, content checks, tool/script execution, test suite runs, and re-run idempotency. At least one test case per Success Criterion. If any test case cannot be expressed as an automated assertion (requires visual inspection, user interaction, or end-to-end user-workflow validation), MUST create `UAT_scenarios.md` in the request folder with those manual scenarios; reference them in this section (e.g., `See UAT_scenarios.md — UAT-01`). MUST NOT be empty.
+  **`## Testing`** — Define intent-level test cases for the request scope. Format: `- T<n> — <name>: <description>. Expected outcome: <observable pass/fail result>.` Cover: file existence checks, content checks, tool/script execution, test suite runs, and re-run idempotency. At least one test case per Success Criterion. If any test case cannot be expressed as an automated assertion (requires visual inspection, user interaction, or end-to-end user-workflow validation), MUST create `UAT_scenarios.md` at `.aib_memory/UAT_scenarios.md` (NOT inside the request subfolder) with those manual scenarios; reference them in this section (e.g., `See UAT_scenarios.md — UAT-01`). MUST NOT be empty.
 
   **`## Multi-Perspective Stakeholder Review`** — Evaluate the request from five distinct viewpoints. Each perspective MUST be a separate sub-section with one paragraph of evaluation and 2–5 bullet findings. Required perspectives: Senior Solution Architect (technical feasibility, design integrity, architectural risk); Product Owner (business value, scope clarity, acceptance criteria completeness); User (usability, clarity of behavior changes, friction introduced); Security Officer (attack surface, data exposure, authentication/authorization impact); Data Governance Officer (data lineage, retention, classification, compliance impact). MUST NOT be empty.
 
-Output — Part 2: Update `request.md` with implementation-relevant sections
+Output — Part 2: Update `.aib_memory/request.md` with implementation-relevant sections
 
-After generating the analysis, update `request.md` by appending or replacing the following optional sections. Add a section only when it has content; never add an empty shell section.
+After generating the analysis, update `.aib_memory/request.md` by appending or replacing the following optional sections. Add a section only when it has content; never add an empty shell section.
 
 ### Section: `## Assumptions`
 - List all implementation-affecting assumptions derived during analysis.
@@ -112,19 +119,18 @@ After generating the analysis, update `request.md` by appending or replacing the
   ```
 - Keep tasks vertically sliceable; each must produce at least one verifiable output.
 - Target ≤ 12 tasks per iteration; keep each procedure to ≤ 6 steps unless strictly necessary.
-- Every plan MUST include: (a) a task defining automated test steps for the request scope (covering all testable Success Criteria defined in `request.md`); (b) a task to update `context.md` and all editable documents listed in `references.md`, reflecting changes made and any discovered discrepancies.
+- Every plan MUST include: (a) a task defining automated test steps for the request scope (covering all testable Success Criteria defined in `request.md`); (b) a task to update `.aib_memory/context.md` and any other documentation files affected by the request, reflecting changes made and any discovered discrepancies.
 - Fully replace this section on every re-run (AI-generated; no user data).
 
 ### Section: `## Documentation`
 - List all documentation files that must be revised because of this request.
-- Format: `- <relative path> (ref_id: <REF-ID>) — <reason for update>.`
-- If ref_id is not in `references.md`, use `(ref_id: N/A)`.
+- Format: `- <relative path> — <reason for update>.`
 - Fully replace this section on every re-run (AI-generated; no user data).
 
 ### Section: `## Questions & Decisions`
 
 **Mandatory pre-check (MUST execute before creating any Q-block):**
-Before raising a Q-block for any decision point, verify that the answer is not already determinable from `context.md`, convention files, or any file in the required-read set derived from `references.md`. If the answer can be found in any of those sources, apply it directly to the relevant `request.md` section. MUST NOT create a Q-block for any question answerable from existing workspace documentation.
+Before raising a Q-block for any decision point, verify that the answer is not already determinable from `.aib_memory/context.md`, convention files, `.aib_memory/instructions.md`, or any additional files explicitly listed by the developer in `instructions.md`. If the answer can be found in any of those sources, apply it directly to the relevant `request.md` section. MUST NOT create a Q-block for any question answerable from existing workspace documentation.
 
 **Threshold read:**
 Read the `Question threshold` row from `input.md ## Options`. Extract the checked value (the checkbox marked `[x]`). If the row is absent or unparseable, default to 3.

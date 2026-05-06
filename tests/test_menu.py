@@ -300,6 +300,95 @@ class TestSanitizeActionId:
 
 
 # ---------------------------------------------------------------------------
+# check_version_compatibility
+# ---------------------------------------------------------------------------
+
+from menu import check_version_compatibility
+
+WORKSPACE_ROOT = Path(__file__).resolve().parent.parent
+
+
+class TestCheckVersionCompatibility:
+    """Tests for the semver version-compatibility check introduced in request R-20260427-0858."""
+
+    def _make_workspace(self, tmp_path: Path, brain_semver: str | None, memory_semver: str | None) -> Path:
+        """Build a minimal workspace with the specified semver markers."""
+        brain_dir = tmp_path / ".aib_brain"
+        brain_dir.mkdir(parents=True)
+        memory_dir = tmp_path / ".aib_memory"
+        memory_dir.mkdir(parents=True)
+        if brain_semver:
+            (brain_dir / brain_semver).touch()
+        if memory_semver:
+            (memory_dir / memory_semver).touch()
+        return tmp_path
+
+    def test_matching_versions_returns_true(self, tmp_path: Path):
+        """SC-3: Matching semver markers → continue to normal menu (True returned)."""
+        workspace = self._make_workspace(tmp_path, "v1.2.8", "v1.2.8")
+        tools_dir = WORKSPACE_ROOT / ".aib_brain" / "tools"
+        result = check_version_compatibility(workspace, sys.executable, tools_dir)
+        assert result is True
+
+    def test_missing_brain_semver_returns_true_with_warning(self, tmp_path: Path, capsys):
+        """Unknown brain version → warn and return True (do not block startup)."""
+        workspace = self._make_workspace(tmp_path, None, "v1.2.8")
+        tools_dir = WORKSPACE_ROOT / ".aib_brain" / "tools"
+        result = check_version_compatibility(workspace, sys.executable, tools_dir)
+        assert result is True
+        captured = capsys.readouterr()
+        assert "WARNING" in captured.out
+
+    def test_mismatch_shows_prompt_skip_returns_true(self, tmp_path: Path):
+        """SC-4 / SC-7: Version mismatch with skip choice → return True, no files changed."""
+        workspace = self._make_workspace(tmp_path, "v1.2.8", "v1.2.0")
+        tools_dir = WORKSPACE_ROOT / ".aib_brain" / "tools"
+        with patch("builtins.input", return_value="2"):
+            result = check_version_compatibility(workspace, sys.executable, tools_dir)
+        assert result is True
+        # No archive should have been created when user skips.
+        assert not (workspace / ".aib_memory" / "archives").exists()
+
+    def test_mismatch_missing_memory_semver_shows_prompt(self, tmp_path: Path):
+        """SC-4: No memory semver marker → show upgrade prompt."""
+        workspace = self._make_workspace(tmp_path, "v1.2.8", None)
+        tools_dir = WORKSPACE_ROOT / ".aib_brain" / "tools"
+        with patch("builtins.input", return_value="2"):
+            result = check_version_compatibility(workspace, sys.executable, tools_dir)
+        assert result is True
+
+    def test_invalid_then_valid_choice_loops(self, tmp_path: Path):
+        """Invalid input is rejected and the prompt re-displays until valid input."""
+        workspace = self._make_workspace(tmp_path, "v1.2.8", "v1.0.0")
+        tools_dir = WORKSPACE_ROOT / ".aib_brain" / "tools"
+        with patch("builtins.input", side_effect=["x", "2"]):
+            result = check_version_compatibility(workspace, sys.executable, tools_dir)
+        assert result is True
+
+    def test_upgrade_choice_continues_menu(self, tmp_path: Path):
+        """SC-2: After a successful upgrade, check_version_compatibility returns True (menu continues)."""
+        workspace = self._make_workspace(tmp_path, "v1.2.8", "v1.0.0")
+        tools_dir = WORKSPACE_ROOT / ".aib_brain" / "tools"
+        # Mock subprocess.run to simulate a successful upgrade without running initialize.py.
+        with patch("menu.subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(returncode=0)
+            with patch("builtins.input", return_value="1"):
+                result = check_version_compatibility(workspace, sys.executable, tools_dir)
+        assert result is True
+
+    def test_failed_upgrade_returns_false(self, tmp_path: Path):
+        """A failed upgrade causes check_version_compatibility to return False."""
+        workspace = self._make_workspace(tmp_path, "v1.2.8", "v1.0.0")
+        tools_dir = WORKSPACE_ROOT / ".aib_brain" / "tools"
+        with patch("menu.subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(returncode=1)
+            with patch("builtins.input", return_value="1"):
+                result = check_version_compatibility(workspace, sys.executable, tools_dir)
+        assert result is False
+
+
+
+# ---------------------------------------------------------------------------
 # _make_log_path
 # ---------------------------------------------------------------------------
 

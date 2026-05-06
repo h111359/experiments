@@ -1,7 +1,7 @@
 # Prompt: context
 
 Goal:
-Produce or fully replace `.aib_memory/context.md` — a unified, structured synthesis of all workspace-specific product knowledge, structured according to `.aib_brain/conventions/context-convention.md`. This prompt also serves the reverse-engineering use case: when no product-doc content exists in `.aib_memory/references.md`, Phase 3 workspace scan becomes the primary synthesis source.
+Produce or fully replace `.aib_memory/context.md` — a unified, structured synthesis of all workspace-specific product knowledge, structured according to `.aib_brain/conventions/context-convention.md`. This prompt also serves the reverse-engineering use case: when no prior `context.md` content exists, the workspace scan in Phase 3 becomes the primary synthesis source.
 
 Workspace instructions pre-read (MUST):
 - Read `.aib_memory/instructions.md`. If the file exists and is non-empty, treat its content as persistent workspace-level instructions that MUST be observed throughout this prompt's execution. If the file is absent or empty, proceed normally.
@@ -10,7 +10,6 @@ Non-goals:
 - Do not modify any existing file in the workspace other than `.aib_memory/context.md`.
 - Do not explore or read `.aib_brain/` folder contents except `.aib_brain/conventions/context-convention.md`.
 - Do not explore `.venv/`, `venv/`, `node_modules/`, `__pycache__/`, `.pytest_cache/`, `.mypy_cache/`, `.git/`.
-- Do not add entries to `.aib_memory/references.md`.
 
 Core requirements (normative):
 - MUST be workspace/tool/model/vendor agnostic.
@@ -23,25 +22,24 @@ Core requirements (normative):
 ## Phase 1 — Preflight
 
 1. Read `.aib_brain/conventions/context-convention.md`. This is the authoritative source for the required section structure, content guidance, formatting rules, and quality gates for `context.md`.
-2. Read `.aib_memory/references.md`.
-3. Build the product-doc read set: every `path` where `type = product-doc`.
-4. If the read set is empty, skip Phase 2 and proceed directly to Phase 3.
+2. If `.aib_memory/instructions.md` lists additional file paths the developer wants AIB to treat as supplementary product-doc inputs, collect those paths into the supplementary read set. Otherwise the supplementary read set is empty.
+3. If the supplementary read set is empty, skip Phase 2 and proceed directly to Phase 3.
 
 ---
 
-## Phase 2 — Primary read (product documentation)
+## Phase 2 — Primary read (supplementary product documentation)
 
-> **Note:** This phase is skipped when the product-doc read set is empty (proceed directly to Phase 3).
+> **Note:** This phase is skipped when the supplementary read set is empty (proceed directly to Phase 3).
 
-1. Read every file in the product-doc read set.
-2. For each file, determine whether it contains real content or is a stub (seeded placeholder text only with no substantive information beyond template headings).
+1. Read every file in the supplementary read set.
+2. For each file, determine whether it contains real content or is a stub (placeholder text only with no substantive information beyond template headings).
 3. Record per-file status: `populated` or `stub`.
 
 ---
 
 ## Phase 3 — Supplementary read (workspace sources)
 
-When the product-doc read set is empty, this phase is the **primary synthesis source** (reverse-engineering mode). Apply the traceability and evidence-collection rules from the Reverse-Engineering Evidence Collection section below.
+When the supplementary read set is empty, this phase is the **primary synthesis source** (reverse-engineering mode). Apply the traceability and evidence-collection rules from the Reverse-Engineering Evidence Collection section below.
 
 1. Build a deterministic file inventory of the workspace root.
    - Include all files and directories.
@@ -113,16 +111,16 @@ Write the preamble exactly as specified in the `context-convention.md` Preamble 
 
 Write all mandatory sections in the exact order and with the exact headings defined in `context-convention.md`. For each section:
 
-- Synthesize relevant content from all populated product-doc files and workspace sources.
+- Synthesize relevant content from all populated supplementary files (if any) and workspace sources.
 - Apply the content guidance defined for the section in `context-convention.md`.
 - Include traceability references (e.g., `per ARCH-01`) where applicable — plain text only, no hyperlinks.
 - If no source content is available for a section, write the stub notice exactly as specified in `context-convention.md`.
 - Do NOT reproduce verbatim content from source files. Summarize and synthesize.
 
-When mapping product documentation to sections:
-- Use all product-doc content as source material. Map each document's content into the most relevant mandatory section(s) as defined in `context-convention.md`.
-- A single product-doc may contribute to multiple sections.
-- A single mandatory section may draw from multiple product-docs and workspace sources.
+When mapping documentation to sections:
+- Use all populated supplementary content as source material. Map each document's content into the most relevant mandatory section(s) as defined in `context-convention.md`.
+- A single supplementary document may contribute to multiple sections.
+- A single mandatory section may draw from multiple supplementary documents and workspace sources.
 
 ### 4.3 Workspace file inventory
 
@@ -147,9 +145,9 @@ For each entry:
 
 ## Context-window management
 
-If the aggregate size of all files to be read (product-docs + workspace sources) exceeds 80% of available context:
+If the aggregate size of all files to be read (supplementary docs + workspace sources) exceeds 80% of available context:
 
-1. Prioritize source files in this order (highest priority first): product-docs with `populated` status, `README.md`, `scripts/`, `tests/`, root configuration files.
+1. Prioritize source files in this order (highest priority first): supplementary docs with `populated` status, `README.md`, `scripts/`, `tests/`, root configuration files.
 2. For deprioritized files, read only file headers and first section, then summarize.
 3. In the preamble of `context.md`, add a note listing which files were summarized due to context-window limits.
 

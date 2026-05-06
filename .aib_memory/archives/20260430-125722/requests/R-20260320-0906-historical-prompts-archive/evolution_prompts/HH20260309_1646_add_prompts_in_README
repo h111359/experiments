@@ -1,0 +1,15 @@
+## Goal
+
+In `.aib_brain\README.md` should be added instruction how to use the prompts in `.aib_brain\prompts` starting with "aib-" to process the iteration
+
+## Context
+
+- If exists, consult the questionnaire file which is same name as the current one with difference - ending with ".questionnaire.md"
+- See `Concepts.md` for intended behavior
+
+## Objectives
+- Simple and clear guidance for the user to effectively use AIB
+
+## Rules
+
+## Format (optional)

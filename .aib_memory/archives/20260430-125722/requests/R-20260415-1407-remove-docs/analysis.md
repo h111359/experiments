@@ -1,0 +1,307 @@
+# Analysis
+
+## Executive Summary
+
+- **Request ID:** R-20260415-1407
+
+- **Request title:** Remove docs — Consolidate product knowledge into context.md
+
+- **Purpose:** Eliminate the parallel per-doc product documentation system (27 Markdown files under `.aib_memory/docs/`, 27 per-doc convention files, `product-documentation-convention.md`, and `aib-documentation.md` prompt). Consolidate all product knowledge into `.aib_memory/context.md`. Simplify the `implement` workflow by replacing the aib-documentation.md call with aib-context.md. Remove `.aib_brain/Product_Documentation.md` and migrate its domain taxonomy to `Concepts.md`.
+
+- **Scope magnitude:** 13 explicit scope items. Touches framework-layer assets in `.aib_brain/` and project-layer files in `.aib_memory/`. No product source-code, test, or CI changes.
+
+- **No `## Amend Request` section detected in `request.md`.**
+
+- **Q001 was answered (Option B) prior to this run.** Decision: redirect `aib-reverse-engineer.md` to write to `context.md` instead of per-doc product files, retaining workspace-scan logic. Applied to `## Scope` item 13 (placeholder completed) and `## Success criteria` (SC-11 added). Q001 removed from `## Questions & Decisions`; section removed from `request.md` (no remaining questions).
+
+- **`request.md` sections updated during this run:** `## Scope` item 13 text completed; `## Success criteria` SC-11 added; `## Assumptions` fully replaced (A5 aligned to Q001 Option B); `## Plan` fully replaced (new Task 8 inserted, Tasks 8–12 renumbered to 9–13 with updated cross-references); `## Testing` fully replaced (new T10 inserted, T10–T13 renumbered to T11–T14, T3/T4 updated for REF-ID renumbering); `## Documentation` fully replaced (aib-reverse-engineer.md entry added); `## Questions & Decisions` removed.
+
+---
+
+## Scope Interpretation
+
+- **In scope (explicit from request.md):**
+
+  - Delete all 48 files and subdirectories under `.aib_memory/docs/` (4 top-level category folders).
+
+  - Remove 27 per-doc convention files from `.aib_brain/conventions/` (arch-01-convention.md through sec-04-convention.md).
+
+  - Remove `.aib_brain/conventions/product-documentation-convention.md`.
+
+  - Remove `.aib_brain/prompts/aib-documentation.md`.
+
+  - Update `.aib_brain/prompts/aib-implement.md`: replace `Execute aib-documentation.md` with `Execute aib-context.md`.
+
+  - Update `.aib_brain/prompts/aib-context.md`: relax Phase 1 step 4 fail-closed guard; skip Phase 2 when product-doc set is empty.
+
+  - Update `.aib_memory/references.md`: remove REF-0001 to REF-0027; update REF-0029 to `type=product-doc`, `edit_allowed=Y`; renumber surviving rows to REF-0001 (context.md) and REF-0002 (Concepts.md).
+
+  - Remove `.aib_brain/Product_Documentation.md`; migrate domain taxonomy to `Concepts.md`.
+
+  - Update `.aib_brain/Concepts.md`: remove `aib-documentation.md` and `Product_Documentation.md` references; add domain taxonomy table; update action contract matrix.
+
+  - Update `.aib_brain/README.md`: remove `aib-documentation.md` references and documentation-update workflow steps.
+
+  - Update `.aib_brain/conventions/analysis-convention.md`: remove `Product_Documentation.md` reference in section 4.5.3.
+
+  - Regenerate `.aib_memory/context.md` as final step via `aib-context.md`.
+
+  - Update `.aib_brain/prompts/aib-reverse-engineer.md`: redirect output from per-doc files to `context.md`, retaining workspace-scan logic (Q001 Option B applied).
+
+- **Out of scope (explicit from request.md):**
+
+  - CI workflows or files under `scripts/`.
+
+  - Coding convention files in `.aib_brain/conventions/`.
+
+  - Creating a new convention for context.md (`context-convention.md` already exists).
+
+- **Implicit in scope (AIB framework):**
+
+  - Concepts.md action contract matrix `reverse-engineer` row must reflect `context.md` as output target after the redirect. (implicit rule - AIB framework)
+
+  - README.md Scenario 5 (reverse-engineer) and copy-paste invocations section must be reviewed for accuracy after prompt redirect. (implicit rule - AIB framework)
+
+  - Concepts.md folder structure diagram currently shows `.aib_memory/docs/` tree — must be updated to reflect docs/ removal. (implicit rule - AIB framework)
+
+---
+
+## Domain Knowledge Essentials
+
+- **AIB (AI Builder):** A minimal, model-agnostic, prompt-driven framework for specification-driven development. Stores reusable framework assets in `.aib_brain/` (replaceable on upgrade) and project-specific artifacts in `.aib_memory/` (governed by references.md access rules).
+
+- **Per-doc product documentation system (legacy):** 27 individual Markdown topic files under `.aib_memory/docs/`, each governed by a per-doc convention file (e.g., `arch-01-convention.md`) and populated by `aib-documentation.md` or `aib-reverse-engineer.md`. This entire system is eliminated by this request.
+
+- **context.md system (new unified approach):** A single `.aib_memory/context.md` synthesizing all product knowledge. Auto-generated by `aib-context.md`. Governed by `context-convention.md`. After this request it becomes the sole `product-doc` entry in `references.md`.
+
+- **Documentation domains:** AIB defines 11 documentation domains — ARCH (Architecture), CMP (Compute), DATA (Data), DEV (Development), DSR (Disaster Recovery), FNL (Financial), KNW (Knowledge), RQT (Requirements), OBS (Observability), OPR (Operations), SEC (Security). Their taxonomy table is in `Product_Documentation.md` and migrates to `Concepts.md`.
+
+- **request.md section lifecycles:** Mandatory sections (Goal, Background, Scope, Out of scope, Constraints, Success criteria) are human-authored and updated only when Q&D answers are applied. Optional sections (Assumptions, Plan, Testing, Documentation, Q&D) are fully replaced by `create-analysis` on every run.
+
+- **Framework-level authorization:** `.aib_brain/` assets are not subject to `edit_allowed` flags in `references.md`, but require explicit request authorization; this request provides that authorization for all `.aib_brain/` changes listed in scope.
+
+---
+
+## Technical Knowledge & Terms
+
+- **`.aib_brain/`:** Framework layer. Contains prompts, conventions, tools, templates, `Product_Documentation.md`, `Concepts.md`, `README.md`. Not modified by tool scripts; modified by explicit human or AI request authorization only.
+
+- **`.aib_memory/`:** Project layer. Contains requests register, `references.md`, request folders, `docs/` (being deleted), `context.md`. Subject to `edit_allowed` controls in `references.md`.
+
+- **`references.md`:** Markdown pipe-delimited table with columns: `ref_id`, `title`, `path`, `type`, `edit_allowed`, `source`, `notes`. Type values: `product-doc | source-code | domain | other`. Currently 29 rows (REF-0001 to REF-0029). After cleanup: 2 rows (REF-0001 = context.md, REF-0002 = Concepts.md).
+
+- **`product-doc` type:** Designates files AIB reads as product knowledge source. Drives which files `aib-context.md`, `aib-implement.md`, and `aib-reverse-engineer.md` target for reads or writes. Post-cleanup, only REF-0001 (`context.md`) carries this type.
+
+- **Fail-closed guard (`aib-context.md` Phase 1 step 4):** Current text: `"Verify the read set is non-empty. If empty, STOP and report an error."` After Task 7 this becomes: `"If the read set is empty, skip Phase 2 and proceed directly to Phase 3."` This is the critical enable for post-cleanup execution (A3, R2).
+
+- **Per-doc convention file:** A `.aib_brain/conventions/<domain-id-lower>-convention.md` file (e.g., `arch-01-convention.md`) governing one product-doc's structure and content. 27 files exist; all removed by this request.
+
+- **`product-documentation-convention.md`:** Master mapping file in `.aib_brain/conventions/` listing all per-doc convention files. Used by `aib-implement.md` and `aib-reverse-engineer.md` fail-closed preflight checks. Also removed by this request.
+
+- **`context-convention.md`:** Convention governing `context.md` output structure. Located at `.aib_brain/conventions/context-convention.md`. NOT removed; remains authoritative for the unified context output format.
+
+- **Phase 1/2/3 in `aib-context.md`:** Phase 1 = preflight (read conventions, build product-doc read set, fail-closed guard). Phase 2 = read all product-doc files. Phase 3 = workspace scan (all non-excluded files). After Task 7: Phase 2 is skipped when the product-doc set is empty; Phase 3 becomes the sole synthesis source.
+
+- **Action contract matrix:** Table in `Concepts.md` mapping AIB actions (initialize, create-request, close-request, create-analysis, reverse-engineer, implement) to required context, output targets, and output rules. The `implement` and `reverse-engineer` rows require update.
+
+- **REF-ID renumbering:** After cleanup, REF-0029 (context.md) becomes REF-0001 and REF-0028 (Concepts.md) becomes REF-0002. All former REF-0001 to REF-0027 rows are deleted.
+
+---
+
+## Impact Assessment
+
+### Affected Components / Areas
+
+- `.aib_memory/docs/` — entire directory tree (48 files, 4 top-level subdirs: 01 Product Management, 02 Domain, 03 Requirements, 04 Technology): **deleted**
+
+- `.aib_brain/conventions/` — 28 files removed (27 per-doc conventions arch-01 through sec-04, plus `product-documentation-convention.md`): **deleted**
+
+- `.aib_brain/prompts/aib-documentation.md` — **deleted**
+
+- `.aib_brain/prompts/aib-implement.md` — **modified** (`aib-documentation.md` call replaced with `aib-context.md`)
+
+- `.aib_brain/prompts/aib-context.md` — **modified** (Phase 1 step 4 fail-closed guard relaxed)
+
+- `.aib_brain/prompts/aib-reverse-engineer.md` — **modified** (output redirected to `context.md`; product-doc preflight replaced)
+
+- `.aib_memory/references.md` — **modified** (27 rows removed; REF-0029 → REF-0001 type=product-doc; REF-0028 → REF-0002)
+
+- `.aib_brain/Product_Documentation.md` — **deleted**
+
+- `.aib_brain/Concepts.md` — **modified** (domain taxonomy added; `aib-documentation.md` and `Product_Documentation.md` references removed; action contract matrix updated; folder structure diagram updated)
+
+- `.aib_brain/README.md` — **modified** (`aib-documentation.md` removed from available prompts list and workflow scenarios)
+
+- `.aib_brain/conventions/analysis-convention.md` — **modified** (section 4.5.3: `Product_Documentation.md` reference replaced with `Concepts.md` reference)
+
+- `.aib_memory/context.md` — **fully regenerated** via `aib-context.md` as final step (Task 13)
+
+### Change Type and Dependencies
+
+- `.aib_memory/docs/` — Remove; upstream dependency on Task 1 (context.md baseline verified). No downstream consumers post-cleanup.
+
+- `.aib_brain/conventions/` (28 files) — Remove; can run after Task 2 (docs/ deleted) or in parallel. No runtime imports from these files.
+
+- `aib-documentation.md` — Remove; update `aib-implement.md` before or simultaneously (Tasks 5 and 6 together per dependency note).
+
+- `aib-implement.md` — Modify; no upstream file dependencies; independent (Task 6).
+
+- `aib-context.md` — Modify; must complete before Task 13 (context.md regeneration). Task 7.
+
+- `aib-reverse-engineer.md` — Modify; logically aligned with Task 3 (references.md updated so context.md is recognized as `product-doc`). Task 8.
+
+- `references.md` — Modify; run after docs/ deletion (Task 3); removes product-doc entries, promotes context.md to `product-doc` type.
+
+- `Product_Documentation.md` — Remove; must happen after domain taxonomy is migrated to `Concepts.md` (Task 9). Task 11.
+
+- `Concepts.md` — Modify; reads `Product_Documentation.md` as migration source for domain taxonomy (Task 9 must precede Task 11). Task 9.
+
+- `README.md` — Modify; after `aib-documentation.md` is removed. Task 10.
+
+- `analysis-convention.md` — Modify; after Concepts.md and Product_Documentation.md changes are complete. Task 12.
+
+- `context.md` — Regenerate; final step, all Tasks 1–12 must be complete. Task 13.
+
+### Domain Impacts
+
+For each documentation domain (ARCH, CMP, DATA, DEV, DSR, FNL, KNW, RQT, OBS, OPR, SEC):
+
+- DOMAIN (ARCH): No product feature impact. ARCH domain product-doc files deleted as structural cleanup; content synthesized in `context.md`.
+
+- DOMAIN (CMP): No product feature impact. CMP domain product-doc files deleted; content in `context.md`.
+
+- DOMAIN (DATA): No product feature impact. DATA domain product-doc files deleted; content in `context.md`.
+
+- DOMAIN (DEV): No impact. No source-code files under `scripts/` or `tests/` are modified.
+
+- DOMAIN (DSR): No impact detected.
+
+- DOMAIN (FNL): No impact detected.
+
+- DOMAIN (KNW): Framework knowledge reorganized. The 11-domain taxonomy table (formerly in `Product_Documentation.md`) migrates to `Concepts.md`. KNW domain product-doc stubs in `docs/` are deleted.
+
+- DOMAIN (RQT): No product feature impact. RQT domain product-doc stubs in `docs/` are deleted.
+
+- DOMAIN (OBS): No impact detected.
+
+- DOMAIN (OPR): No product feature impact. `README.md` workflow description updated; no operational procedures changed.
+
+- DOMAIN (SEC): No product feature impact. SEC domain product-doc stubs in `docs/` are deleted.
+
+---
+
+## Research Plan and Findings
+
+**Methodology:** Internal file scan. All relevant files read directly from workspace. No external research required. Product-doc files REF-0001 to REF-0027 were skipped due to context-window management (see Files Read list); their content is fully synthesized in the verified current `context.md`.
+
+**Evidence summary:**
+
+- `references.md` — 27 `product-doc` entries confirmed (REF-0001 through REF-0027, all paths under `.aib_memory/docs/`). REF-0028 = `Concepts.md` (type=domain, edit_allowed=N). REF-0029 = `context.md` (type=other, edit_allowed=N). Both require update per Task 3.
+
+- `aib-context.md` Phase 1 step 4 — Exact text confirmed: `"Verify the read set is non-empty. If empty, STOP and report an error."` This is the fail-closed guard (A3, R2). Target replacement per Task 7: `"If the read set is empty, skip Phase 2 and proceed directly to Phase 3."`
+
+- `aib-implement.md` — Exact text confirmed: `"Execute .aib_brain\prompts\aib-documentation.md"` Must be replaced with `"Execute .aib_brain\prompts\aib-context.md"` per Task 6.
+
+- `aib-reverse-engineer.md` — Goal confirmed as populating `type=product-doc` files in references.md. Preflight is fail-closed on `product-documentation-convention.md` and per-doc conventions. Entire "Document population rules" section is per-doc oriented. All must be rewritten for context.md output per Task 8 (R3).
+
+- `Concepts.md` — Action contract matrix confirmed present. `implement` row says `"Auto-triggers update-documentation upon completion."` (references aib-documentation.md). `reverse-engineer` row targets "product-doc files in references.md." Folder structure diagram shows `.aib_memory/docs/` tree. `aib-documentation.md` and `Product_Documentation.md` references confirmed in multiple locations. All must be updated per Task 9.
+
+- `README.md` — `aib-documentation.md` confirmed in: available prompt files list, Scenario 3 (documentation update), copy-paste invocations block. Scenario 5 (reverse-engineer) references `docs/`. Must be updated per Task 10.
+
+- `analysis-convention.md` section 4.5.3 — Exact text confirmed: `"This section aligns directly with \`Product_Documentation.md\` domains."` Must be replaced with reference to `Concepts.md` `## Documentation Domains` section per Task 12.
+
+- `Product_Documentation.md` — 11-domain taxonomy table confirmed (ARCH, CMP, DATA, DEV, DSR, FNL, KNW, RQT, OBS, OPR, SEC) with scope descriptions. Migration source for Concepts.md `## Documentation Domains` section (Task 9, A4).
+
+- `context.md` — Generated 2026-04-15 13:00 +0300. Non-stub; all 12 mandatory sections confirmed present. Baseline verified (A1 partially met at analysis time; implementation Task 1 must re-verify before deletion proceeds).
+
+- Q001 — Confirmed answered with Option B (`[x]`). Applied to Scope item 13 and Success criteria SC-11 added.
+
+**Gaps and unknowns:**
+
+- `.aib_brain/tools/initialize.py` not read. If it has a hardcoded reference to `.aib_brain/Product_Documentation.md` for seeding `references.md`, re-running `initialize` after this request would fail or re-seed the obsolete 27 product-doc rows. Not in current request scope; flagged as R6.
+
+**Files Read:**
+
+- `.aib_memory/requests/R-20260415-1407-remove-docs/request.md` — Active request; Q001 answered Option B; Scope item 13 placeholder confirmed; all mandatory and optional sections confirmed present.
+
+- `.aib_brain/conventions/analysis-convention.md` — 8-section normative structure confirmed; section 4.5.3 `Product_Documentation.md` reference confirmed.
+
+- `.aib_brain/conventions/request-convention.md` — Optional section merging rules confirmed; Q&D answered-question handling rules confirmed.
+
+- `.aib_memory/references.md` — 27 product-doc entries, REF-0028 (Concepts.md, domain, N), REF-0029 (context.md, other, N) confirmed.
+
+- `.aib_brain/Concepts.md` — Action contract matrix, folder structure diagram, seeding rule, and all prompt references confirmed.
+
+- `.aib_brain/README.md` — Available prompts list, workflow scenarios, and `aib-documentation.md` references confirmed.
+
+- `.aib_brain/prompts/aib-implement.md` — `Execute .aib_brain\prompts\aib-documentation.md` line confirmed.
+
+- `.aib_brain/prompts/aib-context.md` — Phase 1 step 4 fail-closed guard text confirmed; Phase 3 workspace scan confirmed as the alternative path.
+
+- `.aib_brain/prompts/aib-reverse-engineer.md` — Product-doc output target and fail-closed preflight confirmed.
+
+- `.aib_brain/Product_Documentation.md` — 11-domain table with scope descriptions confirmed; migration source.
+
+- `.aib_memory/context.md` — Current (generated 2026-04-15 13:00 +0300); all 12 mandatory sections present; baseline verified.
+
+- Product-doc files REF-0001 to REF-0027 (`.aib_memory/docs/`): [SKIPPED — context limit; files are primary deletion targets; their content is fully synthesized in the verified current `context.md`; reading individual stubs provides no additional analytical value for this structural cleanup request.]
+
+---
+
+## Risks
+
+- Risk R1: `context.md` stale or incomplete at time of `docs/` deletion
+  - Probability: Low (context.md generated same day as request, 67 minutes before)
+  - Impact: High (product knowledge in docs/ permanently lost with no synthesis record)
+  - Mitigation: Task 1 explicitly verifies context.md baseline before any deletion; regenerates if stale. Task 2 MUST depend on Task 1 completion. Contingency: if context.md is confirmed stale, execute `aib-context.md` before proceeding to Task 2.
+  - Owner (role): AI Automation Agent (Task 1 executor)
+
+- Risk R2: `aib-context.md` Phase 1 fail-closed guard not updated before regeneration
+  - Probability: Low (Scope item 6 and Task 7 explicitly address this)
+  - Impact: High (post-cleanup execution of `aib-context.md` silently fails; `context.md` not regenerated; `implement` workflow broken at final step)
+  - Mitigation: Task 7 updates Phase 1 step 4 text; Task 13 has explicit dependency on Tasks 1–12. Contingency: if Task 7 is not verified complete, Task 13 regeneration MUST be deferred until confirmed.
+  - Owner (role): AI Automation Agent (Task 7 executor)
+
+- Risk R3: `aib-reverse-engineer.md` not updated — remains targeting deleted per-doc files
+  - Probability: Medium (there is no automatic safety net if Task 8 is skipped)
+  - Impact: Medium (reverse-engineer workflow becomes non-functional or silently writes to non-existent `docs/` path; not in daily implement flow but blocks future reverse-engineering capability)
+  - Mitigation: New Task 8 explicitly redirects `aib-reverse-engineer.md`; SC-11 verifies the change.
+  - Owner (role): AI Automation Agent (Task 8 executor)
+
+- Risk R4: Domain taxonomy migration from `Product_Documentation.md` to `Concepts.md` is incomplete
+  - Probability: Low (Task 9 procedure step 4 explicitly copies the 11-domain table; source file confirmed to contain it)
+  - Impact: Low (taxonomy is informational reference; operational impact limited to documentation completeness; content also present in verified `context.md`)
+  - Mitigation: Task 9 reads `Product_Documentation.md` before Task 11 deletes it; Task 9 must precede Task 11.
+  - Owner (role): AI Automation Agent (Task 9 executor)
+
+- Risk R5: `analysis-convention.md` section 4.5.3 retains `Product_Documentation.md` reference after deletion
+  - Probability: Low (Scope item 11 addresses this; SC-10 verifies it)
+  - Impact: Medium (future analysis runs follow a convention pointing to a non-existent file; AIB framework inconsistency)
+  - Mitigation: Task 12 updates section 4.5.3 text to reference `Concepts.md ## Documentation Domains`; SC-10 is a direct pass/fail check.
+  - Owner (role): AI Automation Agent (Task 12 executor)
+
+- Risk R6: `initialize.py` re-seeding behavior broken after `Product_Documentation.md` deletion
+  - Probability: Medium (likely `initialize.py` has a hardcoded reference to `.aib_brain/Product_Documentation.md` for seeding `references.md`)
+  - Impact: Medium (re-running `initialize` on an existing workspace would fail or re-seed obsolete 27 product-doc rows, requiring manual cleanup; not immediately breaking for current active workspace)
+  - Mitigation: Not in current request scope. Flagged for follow-up request to update `initialize.py` and `initialize` action seeding behavior. Immediate mitigation: do not re-run `initialize` after this change until the follow-up is addressed.
+  - Owner (role): AIB Maintainer (follow-up scope)
+
+---
+
+## Request Rewrite Summary
+
+- **Q001 — applied and removed:** Q001 (disposition of `aib-reverse-engineer.md`) was answered with Option B (`[x]`: redirect to `context.md`, reuse workspace-scan logic). Decision applied to `## Scope` item 13 (placeholder `"- "` completed with redirect specification) and `## Success criteria` (SC-11 added). Q001 block removed from `## Questions & Decisions`. Section removed from `request.md` — no remaining questions. QID log: Q001 applied-and-removed.
+
+- **`## Scope` item 13 — updated:** Placeholder text under item 13 replaced with full decision: update `aib-reverse-engineer.md` to redirect output from per-doc product files to `context.md`, retaining workspace-scan evidence-collection logic, output aligned to `context-convention.md`.
+
+- **`## Success criteria` SC-11 — added:** New measurable criterion: `aib-reverse-engineer.md` no longer references `.aib_memory/docs/` or per-doc convention files; correctly targets `.aib_memory/context.md` with workspace-scan logic intact.
+
+- **`## Assumptions` — fully replaced:** A5 updated from `"replaced by adapted aib-context.md"` to `"retained and updated to redirect to context.md"` per Q001 Option B; `Risk if false` sub-bullet added to A5. A1–A4 and A6 unchanged in substance.
+
+- **`## Plan` — fully replaced:** New Task 8 (Update `aib-reverse-engineer.md`) inserted after Task 7. Former Tasks 8–12 renumbered to Tasks 9–13. Cross-reference updates: Task 11 dependency `Task 8` → `Task 9`; Task 12 dependencies `Tasks 8, 10` → `Tasks 9, 11`; Task 13 dependencies `Tasks 1–11` → `Tasks 1–12`. Task 9 procedure step 3 updated — `"pending Q001"` phrase removed; step now reflects the decided redirect to `context.md`.
+
+- **`## Testing` — fully replaced:** New T10 (aib-reverse-engineer.md redirected check) inserted after T9. Former T10–T13 renumbered to T11–T14. T3 updated to reference the correct REF-0001 (formerly REF-0029) after Task 3 renumbering. T4 updated to reference REF-0001 instead of REF-0029.
+
+- **`## Documentation` — fully replaced:** Entry for `.aib_brain/prompts/aib-reverse-engineer.md` (ref_id: N/A) added; reason: update output target from per-doc product files to `context.md`.
+
+- **`## Questions & Decisions` — removed:** Q001 was the only question; after applying its answer the section is empty and removed per convention.

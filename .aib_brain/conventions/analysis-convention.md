@@ -31,11 +31,13 @@ Normative keywords **MUST**, **MUST NOT**, **SHALL**, **SHOULD**, and **MAY** ar
 
 *   File name **must** be exactly: `analysis.md`
 
-*   File **must** be placed in the respective request folder: `.aib_memory/requests/<request-folder>/analysis.md`
+*   **Two-phase placement rule:**
+    1.  **Active phase** — while the request is open, `analysis.md` resides at `.aib_memory/analysis.md` (workspace root of `.aib_memory/`, NOT inside the request subfolder).
+    2.  **Archived phase** — upon successful implementation completion, `analysis.md` is moved by `move-request-artifacts.py` to `.aib_memory/requests/<request-folder>/analysis.md` before `close-request.py` marks the request Closed.
 
 *   Exactly one analysis file per request **MAY** exist at a time.
 
-*   Regeneration **must** replace the same file path atomically.
+*   Re-runs of `aib-analysis.md` **must** fully replace the active copy at `.aib_memory/analysis.md` without merging; re-generation is atomic at the active location.
 
 *   Version metadata (for example: version/author/status headers) **must not** be embedded in the analysis file. Versioning is handled by VCS.
 

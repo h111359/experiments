@@ -160,3 +160,16 @@ class TestCloseRequest:
         rc = _run_close_request(workspace_dir)
         assert rc == 0
         assert not input_path.exists()
+
+    def test_warns_when_attachments_nonempty(self, workspace_dir: Path, capsys):
+        """SC-5: close-request.py prints a warning (non-blocking) when attachments/ is non-empty."""
+        _make_request(workspace_dir, "R-20260101-1007")
+        attachments_dir = workspace_dir / ".aib_memory" / "attachments"
+        attachments_dir.mkdir(parents=True, exist_ok=True)
+        # Place a developer file (not .gitkeep) to trigger the warning.
+        (attachments_dir / "spec.pdf").write_bytes(b"dummy")
+        rc = _run_close_request(workspace_dir)
+        assert rc == 0, "close-request.py must exit 0 even with non-empty attachments/"
+        captured = capsys.readouterr()
+        assert "WARNING" in captured.out
+        assert "attachments" in captured.out

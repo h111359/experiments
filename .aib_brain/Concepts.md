@@ -41,11 +41,11 @@ This section defines the deterministic action contract for user-triggered AIB op
 
 | Action | Required context | Output target | Output rule |
 | --- | --- | --- | --- |
-| `initialize` | Workspace root with `.aib_brain/` present | `.aib_memory/`, `.aib_memory/requests_register.md`, `.aib_memory/references.md`, `.aib_memory/requests/`, `.aib_memory/docs/` | MUST invoke `.aib_brain/tools/initialize.py` and seed memory using canonical schema and default seed rules. |
+| `initialize` | Workspace root with `.aib_brain/` present | `.aib_memory/`, `.aib_memory/requests_register.md`, `.aib_memory/requests/`, `.aib_memory/context.md`, `.aib_memory/input.md`, `.aib_memory/instructions.md` | MUST invoke `.aib_brain/tools/initialize.py` and seed memory using canonical schema and default seed rules. |
 | `create-request` | Initialized memory; no other request in `Active` state | `.aib_memory/requests_register.md`, `.aib_memory/requests/<request-folder>/request.md`, `.aib_memory/requests/<request-folder>/implementation.md` | MUST invoke `.aib_brain/tools/create-request.py` and register one new `Active` request. |
 | `close-request` | Resolved request in `Active` state | `.aib_memory/requests_register.md` | MUST invoke `.aib_brain/tools/close-request.py` and set request state to `Closed`. |
 | `create-analysis` | Resolved request | `.aib_memory/requests/<request-folder>/analysis.md`; `request.md` (optional sections 7–11) | MUST generate full analysis content from prompt/conventions. MUST update `request.md` with Assumptions, Plan, Testing, Documentation, and Questions & Decisions sections as applicable. |
-| `reverse-engineer` | Initialized memory + readable workspace sources | `.aib_memory/context.md` | MUST read `.aib_memory/references.md`, execute workspace-scan evidence collection (Phase 3 + Reverse-Engineering Evidence Collection of `aib-context.md`), and populate `context.md` with explicit traceability to workspace sources. |
+| `reverse-engineer` | Initialized memory + readable workspace sources | `.aib_memory/context.md` | MUST execute the workspace-scan evidence collection (Phase 3 + Reverse-Engineering Evidence Collection of `aib-context.md`) and populate `context.md` with explicit traceability to workspace sources. |
 | `implement` | Resolved request | `.aib_memory/requests/<request-folder>/implementation.md` | MUST rely on `request.md` as the sole implementation specification. MUST NOT read analysis, questionnaire, or plan iteration artifacts. Auto-triggers `aib-context.md` upon completion. |
 
 ### Determinism and safety rules
@@ -109,43 +109,9 @@ Workflow guardrails:
   
   - A file `.aib_memory/requests_register.md` shall contain a list with the requests the user has generated. Each request record shall contain the request ID in format "R-<YYYYMMDD>-<HHmi>", request title, relative path to the request folder and states (Active, Closed). Many Closed requests could coexist. Only one Active request shall exist at a time. No new requests shall be created until the current Active one is closed.
   
-  - A file `.aib_memory/references.md` shall contain the location of project documentation files. It also can be complemented by the human with other files which AIB shall read or edit. Initially it shall be seeded with a reference to `.aib_memory/context.md` as the authoritative product knowledge artefact (`type=product-doc`, `edit_allowed=Y`). Each file record shall have a toggle Y/N flag if AIB is allowed to edit the file.
-  
-  - The product knowledge for the workspace is consolidated in `.aib_memory/context.md`, generated and fully replaced by `aib-context.md` on each execution.
+  - The product knowledge for the workspace is consolidated in `.aib_memory/context.md`, generated and fully replaced by `aib-context.md` on each execution. Developers MAY use `.aib_memory/instructions.md` to flag any additional files that AIB prompts should read or treat with special care.
 
   - AIB shall be model and vendor agnostic. This means it shall be executable in all environments like VS Code with GitHub copilot, Claude Code, Cursor or similar and with different models like GPT 5.3 Codex, Claude Code 4.6 Opus, Gemini 3.1 or better.
-
-### references.md schema (normative)
-
-`references.md` defines what AIB may read and edit.
-
-Required table columns:
-- `ref_id`: Stable unique ID (format `REF-0001`, `REF-0002`, ...).
-- `title`: Human-readable file name.
-- `path`: Workspace-relative path (must not be absolute).
-- `type`: One of `product-doc|source-code|domain|other`.
-- `edit_allowed`: `Y|N`.
-- `source`: `default|user`.
-- `notes`: Optional constraints/context.
-
-Default seeding rule:
-- On memory initialization, seed `.aib_memory/references.md` with:
-  - REF-0001: `context.md` (`.aib_memory/context.md`, `type=product-doc`, `edit_allowed=Y`, `source=default`)
-  - REF-0002: AIB Concepts (`.aib_brain/Concepts.md`, `type=domain`, `edit_allowed=N`, `source=user`)
-
-#### Seeding mapping rule (normative)
-
-To eliminate interpretation variance, seeding to `.aib_memory/references.md` on `initialize` SHALL produce exactly two rows:
-
-| ref_id | title | path | type | edit_allowed | source | notes |
-| --- | --- | --- | --- | --- | --- | --- |
-| REF-0001 | AIB Context | .aib_memory/context.md | product-doc | Y | default | Unified workspace context synthesized by aib-context.md |
-| REF-0002 | AIB Concepts | .aib_brain\Concepts.md | domain | N | user | This document describes the concepts for AI Builder |
-
-Validation rules:
-- `ref_id` must be unique.
-- `path` must be unique.
-- Rows with invalid values are ignored by automation and reported as validation errors.
 
 ### Lifecycle state model (normative)
 
@@ -188,7 +154,6 @@ Concurrency rules:
   - tools/
 .aib_memory/
   - requests_register.md
-  - references.md
   - context.md
   - requests/
 
@@ -212,7 +177,6 @@ What each file means:
 ### Minimal list of templates
 
   - .aib_brain/templates/requests_register-template.md
-  - .aib_brain/templates/references-template.md
   - .aib_brain/templates/request-template.md
 
 ### Content headings per file
@@ -238,7 +202,6 @@ What each file means:
 ### Minimal conventions to be defined
 
   - .aib_brain/conventions/requests_register-convention.md
-  - .aib_brain/conventions/references-convention.md
   - .aib_brain/conventions/request-convention.md
   - .aib_brain/conventions/analysis-convention.md
   - .aib_brain/conventions/plan-convention.md

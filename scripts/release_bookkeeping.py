@@ -1,4 +1,16 @@
 #!/usr/bin/env python3
+"""
+release_bookkeeping.py: AIB CI release bookkeeping tool.
+
+Validates the SemVer marker in `.aib_brain/`, computes the next PATCH version,
+rotates the marker file, writes `logs/version_vX.Y.Z_log.md`, and creates a
+versioned zip of `.aib_brain/` under `versions/`. The `Changes:` section of the
+generated log prefers curated entries from `logs/next_version_changes.md` when
+present and non-empty; otherwise it falls back to git commit subjects.
+
+Part of the AIB release automation invoked by
+`.github/workflows/aib-semver-patch-bump-and-log.yml`.
+"""
 
 from __future__ import annotations
 
@@ -117,6 +129,56 @@ def _read_commit_subjects(path: Path | None) -> list[str]:
     return _normalize_subjects(path.read_text(encoding="utf-8").splitlines())
 
 
+def _read_curated_entries(path: Path | None) -> list[str]:
+    """Read curated change bullets from `logs/next_version_changes.md`.
+
+    Args:
+        path: Path to the curated change log file, or None if not provided.
+
+    Returns:
+        A list of normalized bullet text lines (the leading `- ` marker is
+        stripped). Returns an empty list when the path is None, the file does
+        not exist, or the file contains no bullet entries. A missing file is
+        treated as an empty curated source so callers can fall back to commit
+        subjects without error.
+    """
+    if path is None:
+        return []
+    # Absent file is a valid empty curated source (fallback path expected).
+    if not path.exists():
+        return []
+
+    entries: list[str] = []
+    for raw in path.read_text(encoding="utf-8").splitlines():
+        stripped = raw.strip()
+        if not stripped:
+            continue
+        # Accept only Markdown bullet lines per the instructions.md directive.
+        if stripped.startswith("- "):
+            text = stripped[2:].strip()
+        elif stripped.startswith("-"):
+            text = stripped[1:].strip()
+        else:
+            # Non-bullet content is ignored to keep the curated source strict.
+            continue
+        # Collapse internal whitespace for stable, idempotent output.
+        text = " ".join(text.split())
+        if text:
+            entries.append(text)
+    return entries
+
+
+def _reset_curated_file(path: Path) -> None:
+    """Clear the curated change log file to empty content.
+
+    Used as the lifecycle reset after curated entries have been incorporated
+    into the per-version log. Keeps the file VCS-tracked (created if missing)
+    so subsequent implementation runs can append again.
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("", encoding="utf-8")
+
+
 def _write_version_log(
     *,
     log_path: Path,
@@ -226,6 +288,15 @@ def main(argv: list[str]) -> int:
         help="Text file with one commit subject per line (will be normalized).",
     )
     parser.add_argument(
+        "--next-version-changes-file",
+        default=None,
+        help=(
+            "Curated change log file (e.g. logs/next_version_changes.md). When present "
+            "and non-empty, its Markdown bullets are preferred over commit subjects as "
+            "the Changes: source. After successful incorporation the file is reset to empty."
+        ),
+    )
+    parser.add_argument(
         "--github-output",
         default=None,
         help="If set, append step outputs in GitHub Actions GITHUB_OUTPUT format.",
@@ -241,6 +312,18 @@ def main(argv: list[str]) -> int:
     brain_path = Path(args.brain_dir)
     log_dir = Path(args.log_dir)
     commit_subjects = _read_commit_subjects(Path(args.commit_subjects_file) if args.commit_subjects_file else None)
+    curated_path = Path(args.next_version_changes_file) if args.next_version_changes_file else None
+    curated_entries = _read_curated_entries(curated_path)
+    # Source preference: curated entries first; commit subjects as fallback.
+    if curated_entries:
+        change_entries = curated_entries
+        used_curated = True
+    else:
+        change_entries = commit_subjects
+        used_curated = False
+    # Reconstruct the curated body as Markdown bullet lines for the commit message.
+    # Captured here (before any lifecycle reset) so it is available for GITHUB_OUTPUT.
+    changes_body = "\n".join(f"- {e}" for e in curated_entries)
     issue_value = (str(args.issue).strip() if args.issue is not None else None) or None
 
     base_markers = _markers_from_ls_tree(args.base_ref, args.brain_dir)
@@ -274,6 +357,7 @@ def main(argv: list[str]) -> int:
             with Path(args.github_output).open("a", encoding="utf-8") as fp:
                 fp.write(
                     f"new_version={target_marker}\nlog_path={log_path.as_posix()}\nchanged=false\n"
+                    f"changes_body<<AIB_CHANGES_BODY_EOF\n{changes_body}\nAIB_CHANGES_BODY_EOF\n"
                 )
         return 0
 
@@ -284,6 +368,7 @@ def main(argv: list[str]) -> int:
             with Path(args.github_output).open("a", encoding="utf-8") as fp:
                 fp.write(
                     f"new_version={target_marker}\nlog_path={log_path.as_posix()}\nchanged=false\n"
+                    f"changes_body<<AIB_CHANGES_BODY_EOF\n{changes_body}\nAIB_CHANGES_BODY_EOF\n"
                 )
         return 0
 
@@ -299,7 +384,7 @@ def main(argv: list[str]) -> int:
             version_heading=target_version.to_heading(),
             issue=issue_value,
             pr_number=str(args.pr_number) if args.pr_number else None,
-            commit_subjects=commit_subjects,
+            commit_subjects=change_entries,
         )
         _rotate_marker(brain_path, base_marker, target_marker)
         zip_path = _create_brain_zip(brain_path, log_dir.parent / "versions", target_marker)
@@ -312,11 +397,17 @@ def main(argv: list[str]) -> int:
             version_heading=target_version.to_heading(),
             issue=issue_value,
             pr_number=str(args.pr_number) if args.pr_number else None,
-            commit_subjects=commit_subjects,
+            commit_subjects=change_entries,
         )
         zip_path = _create_brain_zip(brain_path, log_dir.parent / "versions", target_marker)
         print(f"Created brain archive: {zip_path.as_posix()}")
         changed = True
+
+    # Lifecycle reset: only after curated entries were incorporated into the log.
+    # Skipped on the idempotent no-op early-exit branches above so reruns stay stable.
+    if changed and used_curated and curated_path is not None:
+        _reset_curated_file(curated_path)
+        print(f"Reset curated change log: {curated_path.as_posix()}")
 
     print(f"Computed new version: {target_marker}")
     print(f"Log file path: {log_path.as_posix()}")
@@ -325,6 +416,7 @@ def main(argv: list[str]) -> int:
         with Path(args.github_output).open("a", encoding="utf-8") as fp:
             fp.write(
                 f"new_version={target_marker}\nlog_path={log_path.as_posix()}\nchanged={'true' if changed else 'false'}\n"
+                f"changes_body<<AIB_CHANGES_BODY_EOF\n{changes_body}\nAIB_CHANGES_BODY_EOF\n"
             )
 
     return 0

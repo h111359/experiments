@@ -8,11 +8,14 @@ Scope
 
 File Location & Naming (normative)
 - MUST be named exactly `request.md`.  
-- MUST be placed inside a dedicated folder under `.aib_memory/requests/`.  
+- **Two-phase placement rule:**
+  1. **Active phase** — while the request is open, `request.md` resides at `.aib_memory/request.md` (workspace root of `.aib_memory/`, NOT inside the request subfolder). It is written here by `aib-analysis.md` and read from here by `aib-implement.md`.
+  2. **Archived phase** — upon successful implementation completion, `request.md` is moved by `move-request-artifacts.py` to `.aib_memory/requests/<request-folder>/request.md` before `close-request.py` marks the request Closed.
+- Re-runs of `aib-analysis.md` fully replace the active copy at `.aib_memory/request.md` without merging.
 - Request folder name MUST follow:  
   `R-<YYYYMMDD>-<HHmi>-<request_title>`  
   where the timestamp is created by tooling, not the human.
-- Only one `request.md` may exist per request folder.
+- Only one `request.md` may exist per request folder (archived phase).
 
 Request Identity (normative)
 - Request identity is defined by:
@@ -35,7 +38,7 @@ All sections (1–12) are mandatory and MUST be present, even if empty.
 
 2. `## Background`  
    - Context explaining why the change is needed.  
-   - MAY reference documentation files listed in `references.md`.
+   - MAY reference documentation files in the workspace (for example `.aib_memory/context.md`).
 
 3. `## Scope`  
    - Clear definition of what is included in the change.  
@@ -77,7 +80,7 @@ All sections (1–12) are mandatory and MUST be present, even if empty.
      **Risk Notes:** <if any>
      ```
    - Fully replaced on every analysis re-run.
-   - Every plan MUST include: (a) a task defining automated test steps for the request scope (covering all testable Success Criteria); (b) a task to update `context.md` and all editable documents listed in `references.md`, reflecting changes made and any discovered discrepancies.
+   - Every plan MUST include: (a) a task defining automated test steps for the request scope (covering all testable Success Criteria); (b) a task to update `.aib_memory/context.md` and any other documentation files affected by the request, reflecting changes made and any discovered discrepancies.
 
 9. `## Documentation`  
     - AI-generated list of documentation files that must be revised because of this request.  
@@ -107,7 +110,7 @@ All sections (1–12) are mandatory and MUST be present, even if empty.
     - Fully replaced on every analysis re-run.
 
 12. `## Internal Review of Request and Product Docs`  
-    - AI-generated factual findings from reading `request.md` and all product docs in `.aib_memory/references.md`.  
+    - AI-generated factual findings from reading `request.md` and `.aib_memory/context.md` (plus any additional documentation files explicitly listed by the developer in `.aib_memory/instructions.md`).  
     - Documents ambiguities, contradictions, missing information, and cross-reference issues found.  
     - Each finding: `- <finding-type>: <file> — <description>`.  
     - Finding types: `Ambiguity`, `Contradiction`, `Missing info`, `Cross-ref issue`, `OK`.  

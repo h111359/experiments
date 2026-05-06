@@ -12,8 +12,9 @@ Input resolution:
   - If more than one Active row is found: output the message **"ERROR: Register inconsistency — multiple Active requests found. Execution halted. Fix requests_register.md before running implement."** Do NOT proceed to any subsequent step. Do NOT write any output files.
   - If exactly one Active row is found: continue with input resolution below.
 - Resolve active request from `.aib_memory/requests_register.md` unless explicit ID is provided.
-- Use `request.md` as the authoritative source of truth for implementation scope, plan, and all context. Analysis, questionnaire, and plan iteration artifacts are NOT read during implementation.
-- Read `.aib_brain/Concepts.md` for normative lifecycle and safety rules.
+- Use `request.md` as the authoritative source of truth for implementation scope, plan, and all context. Read it from `.aib_memory/request.md` (the active location while the request is open). Analysis, questionnaire, and plan iteration artifacts are NOT read during implementation.
+- Read `.aib_memory/context.md`. If the file is absent or empty, continue normally with no error; otherwise treat its content as the unified workspace product context for this implementation run.
+- If `.aib_memory/instructions.md` lists additional file paths the developer has flagged for AIB to read, read each of those files before applying changes. Otherwise skip this step.
 - MUST NOT read `inputs/input-archive-*.md` files from any request folder.
 
 Execution requirements:
@@ -23,25 +24,16 @@ Execution requirements:
 - Resolve any test failures
 - Continue until done criteria are met or blockers are explicitly recorded.
 - Execute `.aib_brain\prompts\aib-context.md`
-- After completing all implementation work and the context update, auto-close the request by invoking:
+- After completing all implementation work and the context update, move the active-request artifacts to the request subfolder and then auto-close the request by invoking (in this exact order):
   ```
+  python .aib_brain/tools/move-request-artifacts.py --workspace .
   python .aib_brain/tools/close-request.py --workspace .
   ```
-  This MUST be the final step before confirming completion. Only invoke close-request.py after the implementation is confirmed successful (no unresolved test failures or blockers).
+  The move step MUST be executed before `close-request.py`. Only invoke these scripts after the implementation is confirmed successful (no unresolved test failures or blockers).
 - MUST confirm at the very end of the conversation with the text "--- I am done with the implementation ---" that all your activities are finished
 
 Documentation reading requirements:
-- Read `.aib_memory/references.md`.
-- Build a required-read set containing every `path` from references where:
-   - `type = product-doc`
-- Read every file in the required-read set before implementation.
-- Read `.aib_brain/conventions/context-convention.md` (authoritative convention for `.aib_memory/context.md`) before editing any `product-doc`.
-- Convention enforcement preflight (fail-closed for product-doc edits):
-   - For every `product-doc` in the required-read set:
-      - Read `.aib_brain/conventions/context-convention.md` as the authoritative convention.
-   - If any convention file cannot be read, DO NOT edit any product-docs; record the blocker and required remediation in `implementation.md`.
-- You MAY edit only files listed in `.aib_memory/references.md` with `edit_allowed=Y`.
-- Do not edit files listed with `edit_allowed=N` unless explicitly instructed otherwise.
+- Read `.aib_brain/conventions/context-convention.md` (authoritative convention for `.aib_memory/context.md`) before editing `.aib_memory/context.md` or any other documentation file. If the convention file cannot be read, DO NOT edit `.aib_memory/context.md`; record the blocker and required remediation in `implementation.md`.
 
 Coding convention requirements:
 - UNCONDITIONALLY read `.aib_brain/conventions/coding-general-convention.md` before generating or editing any source-code file.

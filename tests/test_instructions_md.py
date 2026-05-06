@@ -14,14 +14,22 @@ INSTRUCTIONS_PATH = WORKSPACE_ROOT / ".aib_memory" / "instructions.md"
 
 
 class TestInstructionsMdFile:
-    """Assertions for SC-1: .aib_memory/instructions.md exists and is empty."""
+    """Assertions for `.aib_memory/instructions.md` content.
+
+    Originally (R-20260421-1705) the file was required to be empty after init.
+    Updated by R-20260422-1308: the file MUST contain the persistent directive
+    instructing the agent to maintain `logs/next_version_changes.md`.
+    """
 
     def test_instructions_md_exists(self):
         assert INSTRUCTIONS_PATH.is_file(), ".aib_memory/instructions.md must exist"
 
-    def test_instructions_md_is_empty(self):
-        content = INSTRUCTIONS_PATH.read_text(encoding="utf-8").strip()
-        assert content == "", ".aib_memory/instructions.md must be empty"
+    def test_instructions_md_contains_next_version_changes_directive(self):
+        content = INSTRUCTIONS_PATH.read_text(encoding="utf-8")
+        assert content.strip(), ".aib_memory/instructions.md must not be empty"
+        assert "logs/next_version_changes.md" in content, (
+            "instructions.md must reference logs/next_version_changes.md"
+        )
 
 
 class TestPromptsContainInstructionsMd:

@@ -1,0 +1,4 @@
+[START] 2026-04-17T12:35:05.197556 — Close request
+[CMD] C:\Hristo\projects\AI_Builder\.venv\Scripts\python.exe C:\Hristo\projects\AI_Builder\.aib_brain\tools\close-request.py --workspace C:\Hristo\projects\AI_Builder
+[OUT] ERROR: No active request found; provide --request-id
+[EXIT] 1

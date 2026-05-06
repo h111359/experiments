@@ -84,7 +84,7 @@ Implement initial seeding tool for `.aib_memory` and generate register files.
 
 #### Changes
 - Added `tools/initialize.py` to create memory folders and seed default docs.
-- Created `.aib_memory/requests_register.md` and `.aib_memory/references.md`.
+- Created `.aib_memory/requests_register.md`.
 - Updated CI job to run initialization check on clean workspaces.
 
 #### Tests
@@ -97,11 +97,10 @@ Successful initialization. Workspace now reproducible; re‑runs converge with n
 
 #### Evidence
 - Path: `.aib_memory/requests_register.md`
-- Path: `.aib_memory/references.md`
 - Log snippet:
   ```text
   Seeding .aib_memory ... OK
-  Created requests_register.md, references.md
+  Created requests_register.md
   ```
 
 #### Notes (Optional)
