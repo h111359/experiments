@@ -15,35 +15,56 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from common import ACTIVE, get_semver, parse_markdown_table, read_text
-
-# Lifecycle scripts are excluded from dynamic discovery to prevent them from
-# reappearing in the menu; they are managed by the AI prompts directly.
-EXCLUDE_SCRIPTS = {
-    "menu.py",
-    "common.py",
-    "initialize.py",
-    "test_common.py",
-    "create-iteration.py",
-    "close-iteration.py",
-    "create-request.py",
-    "close-request.py",
-    "reverse-engineer.py",
-}
+from common import ACTIVE, artifact_name, get_semver, parse_markdown_table, read_text
 
 # Auto-refresh interval used by choose_action() when no key is pressed.
 _REFRESH_TIMEOUT_S: float = 3.0
 
-# Sentinel action that re-reads workspace state and re-renders the menu without
-# executing any tool script.
-_REFRESH_ACTION: dict[str, Any] = {
-    "id": "refresh",
-    "title": "Refresh",
-    "description": "Re-read workspace state and refresh the menu.",
-    "type": "refresh",
-    "script": None,
-    "parameters": [],
-    "destructive": False,
+# Hard-coded list of developer-facing menu actions.  Only scripts that are
+# genuinely useful to the developer from the menu surface are included here.
+# close-request.py is conditionally injected by filter_visible_actions when
+# an active request exists; it is NOT listed here.
+_SCRIPT_ACTIONS: list[dict[str, Any]] = []
+
+# Guidance messages for each detected workspace state.  Two-element lists
+# produce a two-line guidance block; single-element lists produce one line.
+_GUIDANCE_MESSAGES: dict[str, list[str]] = {
+    "idle": [
+        "No task in progress. Add your description to `.aib_memory/input.md`,"
+        " then execute: Execute `.aib_brain/prompts/aib-analyze.md`",
+        "Tip: Place supporting files in `.aib_memory/attachments/` to include extra context.",
+    ],
+    "input_ready": [
+        "Input ready. Execute analysis to create a request:"
+        " Execute `.aib_brain/prompts/aib-analyze.md`",
+        "Or go straight to implement — analysis runs automatically:"
+        " Execute `.aib_brain/prompts/aib-implement.md`",
+    ],
+    "request_incomplete": [
+        "Request active — no analysis yet. Run:"
+        " Execute `.aib_brain/prompts/aib-analyze.md`",
+    ],
+    "questions_pending": [
+        "Questions pending in input.md. Answer them then re-run:"
+        " Execute `.aib_brain/prompts/aib-analyze.md`",
+        "Or run implement directly — recommended options will be applied automatically:"
+        " Execute `.aib_brain/prompts/aib-implement.md`",
+    ],
+    "implementation_ready": [
+        "Request analysed and ready. Run:"
+        " Execute `.aib_brain/prompts/aib-implement.md`",
+        "To amend: write changes to `.aib_memory/input.md` then re-run:"
+        " Execute `.aib_brain/prompts/aib-analyze.md`",
+        "Tip: Place supporting files in `.aib_memory/attachments/` to include extra context.",
+    ],
+    "amendment_pending": [
+        "Amendments pending in input.md. Re-run analysis to incorporate changes:"
+        " Execute `.aib_brain/prompts/aib-analyze.md`",
+    ],
+    "unknown": [
+        "\u26a0 Workspace state could not be determined."
+        " Check `.aib_memory/` for inconsistencies.",
+    ],
 }
 
 # Conditional action for closing the active request; injected by
@@ -246,58 +267,32 @@ def parse_cli_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def discover_tool_scripts(tools_dir: Path) -> list[str]:
-    scripts: list[str] = []
-    for path in sorted(tools_dir.glob("*.py")):
-        if path.name in EXCLUDE_SCRIPTS:
-            continue
-        scripts.append(path.name)
-    return scripts
-
-
 def build_script_actions(tools_dir: Path) -> list[dict[str, Any]]:
-    """Build the full list of script actions dynamically.
+    """Return the hard-coded list of developer-facing menu actions.
 
-    All discovered ``.py`` files in ``tools_dir`` that are not in
-    ``EXCLUDE_SCRIPTS`` are listed with a minimal workspace parameter.
-    Lifecycle scripts (create-request, close-request) are excluded and
-    managed by the AI prompts directly.
+    The ``tools_dir`` parameter is accepted for API compatibility but is no
+    longer used now that actions are fully enumerated by ``_SCRIPT_ACTIONS``
+    rather than discovered dynamically from the filesystem.
+
+    Args:
+        tools_dir: Path to the tools directory (unused; kept for compatibility).
+
+    Returns:
+        A fresh copy of ``_SCRIPT_ACTIONS`` with sequentially renumbered IDs.
     """
-    actions: list[dict[str, Any]] = []
-
-    next_id = 1
-    for script in discover_tool_scripts(tools_dir):
-        stem = Path(script).stem
-        title = " ".join(part.capitalize() for part in stem.split("-"))
-        actions.append(
-            {
-                "id": str(next_id),
-                "title": title,
-                "description": "Auto-discovered tool script.",
-                "script": script,
-                "destructive": False,
-                "parameters": [
-                    {"name": "workspace", "flag": "--workspace", "type": "path", "required": True, "default": ".", "prompt": "Workspace path", "hint": "Root folder containing .aib_brain"},
-                ],
-            }
-        )
-        next_id += 1
-
-    # Renumber IDs sequentially so numeric keyboard shortcuts are deterministic.
+    actions = [dict(a) for a in _SCRIPT_ACTIONS]
     for idx, action in enumerate(actions, start=1):
         action["id"] = str(idx)
-
     return actions
 
 
 def filter_visible_actions(actions: list[dict[str, Any]], state: MenuState) -> list[dict[str, Any]]:
     """Return visible actions, appending close-request when an active request exists.
 
-    Lifecycle scripts are fully excluded via EXCLUDE_SCRIPTS so there is
-    nothing to conditionally hide from the dynamically discovered set.
-    The close-request action is injected at the end of the list when
-    state.has_active_request is True, disappearing automatically after
-    the request is closed on the next menu refresh.
+    The hard-coded action list contains only scripts that are permanently
+    developer-visible. The close-request action is injected at the end of the
+    list when state.has_active_request is True, disappearing automatically
+    after the request is closed on the next menu refresh.
     """
     visible = list(actions)
     if state.has_active_request:
@@ -466,7 +461,7 @@ def collect_parameters(action: dict[str, Any], workspace_default: str) -> dict[s
             values[name] = str(default_value) if default_value not in (None, "") else workspace_default
             continue
 
-        if name in {"request_id", "iteration_id"} and not required:
+        if name in {"request_id"} and not required:
             if default_value not in (None, ""):
                 values[name] = str(default_value)
             continue
@@ -541,26 +536,120 @@ def run_action(python_exe: str, tools_dir: Path, action: dict[str, Any], workspa
     input("Press Enter to return to menu...")
 
 
-def print_prompt_reference() -> None:
-    """Print copy-paste-ready prompt invocations for the three core AIB prompts."""
-    print("")
-    print("  ── AIB Prompts (copy-paste into your AI coding interface) ──")
-    print("  Execute `.aib_brain/prompts/aib-analysis.md`")
-    print("  Execute `.aib_brain/prompts/aib-implement.md`")
-    print("  Execute `.aib_brain/prompts/aib-context.md`")
-    print("")
+def _extract_section(text: str, section_title: str) -> str:
+    """Extract the body of a Markdown section identified by its H2 heading.
+
+    Searches for a line equal to ``## <section_title>`` and returns the text
+    between that heading line and the next ``##``-level heading (or EOF),
+    stripped of leading/trailing whitespace.
+
+    Args:
+        text: Full Markdown document text to search.
+        section_title: Section title without the ``## `` prefix.
+
+    Returns:
+        The section body stripped of surrounding whitespace, or an empty
+        string when the section heading is not found.
+    """
+    lines = text.splitlines()
+    header = f"## {section_title}"
+    inside = False
+    collected: list[str] = []
+    for line in lines:
+        if line.strip() == header:
+            inside = True
+            continue
+        if inside:
+            if line.startswith("## "):
+                break
+            collected.append(line)
+    return "\n".join(collected).strip()
+
+
+def _is_context_empty(workspace: Path) -> bool:
+    """Return True when .aib_memory/context.md is absent or contains only whitespace.
+
+    Args:
+        workspace: Resolved workspace root path.
+
+    Returns:
+        True if context.md does not exist or is blank; False otherwise.
+    """
+    context_path = workspace / ".aib_memory" / "context.md"
+    if not context_path.exists():
+        return True
+    return not context_path.read_text(encoding="utf-8").strip()
+
+
+def _detect_guidance_state(state: MenuState, workspace: Path) -> str:
+    """Detect the developer's next-action state from workspace artifacts.
+
+    Evaluates states in the following priority order:
+
+    1. No active request — inspect ``input.md ## Input``; empty → ``"idle"``;
+       non-empty → ``"input_ready"``.
+    2. Active request, ``input.md ## Questions`` non-empty → ``"questions_pending"``
+       (highest-priority active-request check, evaluated before plan.md presence).
+    3. Active request, ``plan-<ID>.md`` absent → ``"request_incomplete"``.
+    4. Active request, ``plan-<ID>.md`` present, ``## Input`` non-empty →
+       ``"amendment_pending"``.
+    5. Otherwise → ``"implementation_ready"``.
+
+    Any unhandled exception during detection returns ``"unknown"`` without
+    propagating the exception.
+
+    Args:
+        state: Current MenuState describing whether an active request exists.
+        workspace: Resolved workspace root path.
+
+    Returns:
+        One of: ``"idle"``, ``"input_ready"``, ``"request_incomplete"``,
+        ``"questions_pending"``, ``"implementation_ready"``,
+        ``"amendment_pending"``, or ``"unknown"``.
+    """
+    try:
+        input_path = workspace / ".aib_memory" / "input.md"
+        input_text = input_path.read_text(encoding="utf-8") if input_path.exists() else ""
+
+        if not state.has_active_request:
+            input_body = _extract_section(input_text, "Input")
+            return "input_ready" if input_body else "idle"
+
+        # Active-request branch — check questions first (priority over request-<ID>.md).
+        questions_body = _extract_section(input_text, "Questions")
+        if questions_body:
+            return "questions_pending"
+
+        # Look for the ID-suffixed active-phase request artifact.
+        req_filename = artifact_name("plan", state.active_request_id)
+        plan_md_path = workspace / ".aib_memory" / req_filename
+        if not plan_md_path.exists():
+            return "request_incomplete"
+
+        input_body = _extract_section(input_text, "Input")
+        return "amendment_pending" if input_body else "implementation_ready"
+
+    except Exception:  # noqa: BLE001
+        return "unknown"
 
 
 def render_menu(
     state: MenuState,
     script_actions: list[dict[str, Any]],
     selected_index: int,
+    workspace: Path,
 ) -> None:
-    """Render the interactive menu with active-request status and prompt reference.
+    """Render the interactive menu with active-request status and state-aware guidance.
 
     Accumulates the entire menu string into an in-memory buffer and flushes it to
     stdout in a single write, minimising the blank-window between clear and redraw.
     No print() or clear_screen() calls are made inside this function.
+
+    Args:
+        state: Current resolved menu state (active request info).
+        script_actions: Visible action list to render with numeric shortcuts.
+        selected_index: Zero-based index of the currently highlighted action.
+        workspace: Resolved workspace root path used for guidance-state detection.
     """
     buf = io.StringIO()
 
@@ -577,14 +666,24 @@ def render_menu(
         req_text = req_id
     buf.write(f"Active request: {req_text}\n")
 
-    # Inline prompt reference block (previously delegated to print_prompt_reference()).
+    # State-aware guidance block — displayed before the numbered options list
+    # so the recommended next step is visible immediately after the status line.
     buf.write("\n")
-    buf.write("  ── AIB Prompts (copy-paste into your AI coding interface) ──\n")
-    buf.write("  Execute `.aib_brain/prompts/aib-analysis.md`\n")
-    buf.write("  Execute `.aib_brain/prompts/aib-implement.md`\n")
-    buf.write("  Execute `.aib_brain/prompts/aib-context.md`\n")
-    buf.write("\n")
+    buf.write("  \u2500\u2500 Next Step \u2500\u2500\n")
+    guidance_state = _detect_guidance_state(state, workspace)
+    guidance_lines = _GUIDANCE_MESSAGES.get(guidance_state, _GUIDANCE_MESSAGES["unknown"])
+    for line in guidance_lines:
+        buf.write(f"  {line}\n")
 
+    # Additional line when context.md is absent or empty (orthogonal to state).
+    if _is_context_empty(workspace):
+        buf.write(
+            "  Context file is empty \u2014 context gathering will execute automatically before analysis."
+            " Execute `.aib_brain/prompts/aib-analyze.md` to begin.\n"
+        )
+
+    # Blank separator between guidance block and numbered options.
+    buf.write("\n")
     for idx, action in enumerate(script_actions, start=1):
         marker = ">" if idx - 1 == selected_index else " "
         number = str(idx)
@@ -611,9 +710,9 @@ def choose_action(tools_dir: Path, workspace: Path) -> dict[str, Any] | None:
 
     while True:
         state = resolve_menu_state(workspace)
-        script_actions = filter_visible_actions(all_script_actions, state) + [_REFRESH_ACTION]
+        script_actions = filter_visible_actions(all_script_actions, state)
         total_items = len(script_actions)
-        render_menu(state, script_actions, selected)
+        render_menu(state, script_actions, selected, workspace)
         key = get_key(timeout=_REFRESH_TIMEOUT_S)
 
         if key == "TIMEOUT":
@@ -626,26 +725,22 @@ def choose_action(tools_dir: Path, workspace: Path) -> dict[str, Any] | None:
             # 0 pressed; same exit intent as q/Q.
             return None
         if key == "UP":
-            selected = (selected - 1) % total_items
+            if total_items > 0:
+                selected = (selected - 1) % total_items
             continue
         if key == "DOWN":
-            selected = (selected + 1) % total_items
+            if total_items > 0:
+                selected = (selected + 1) % total_items
             continue
         if key == "ENTER":
             if selected < len(script_actions):
                 action = script_actions[selected]
-                if action.get("type") == "refresh":
-                    selected = 0
-                    continue
                 return action
         if key.startswith("DIGIT:"):
             digit = key.split(":", 1)[1]
             numeric = int(digit)
             if 1 <= numeric <= len(script_actions):
                 action = script_actions[numeric - 1]
-                if action.get("type") == "refresh":
-                    selected = 0
-                    continue
                 return action
 
 
@@ -694,7 +789,7 @@ def check_version_compatibility(workspace: Path, python_exe: str, tools_dir: Pat
     print(
         "\n  Your .aib_memory/ was created with a different AIB version.\n"
         "  Upgrading will archive the current .aib_memory/ and re-seed\n"
-        "  it from the new brain templates while preserving your curated\n"
+        "  it from the new brain assets while preserving your curated\n"
         "  files (context.md, instructions.md, and optionally requests/).\n"
     )
 

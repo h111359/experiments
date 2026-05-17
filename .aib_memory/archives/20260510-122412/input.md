@@ -1,0 +1,18 @@
+## Active request
+No active request
+
+## Options
+- [ ] No changes — provide answer only
+- [ ] Skip analysis document generation
+
+## Input
+
+What:
+Improve readability of the plan in request.md by transforming the parts to markdown sub-headers and add empty lines between.
+Steps in the procedure part of the tasks should be separated by an empty line for readability
+Propose other formatting improvements so the human to be able easily to read the file
+No markdown tables should be used
+
+Revise in similar way the format of the whole request.md file - it should looks pretty and nice for human reading.
+
+Why: Currently the file request.md is hard to be read by human.

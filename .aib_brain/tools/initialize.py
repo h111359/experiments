@@ -17,7 +17,6 @@ from common import (
     ValidationError,
     ensure_workspace,
     get_semver,
-    load_template,
     parse_markdown_table,
     print_error_and_exit,
     parse_args,
@@ -29,7 +28,7 @@ from common import (
 # normalised path matches one of these values are NOT reported during the
 # upgrade-time legacy inspection.
 _LEGACY_DEFAULT_REFERENCE_PATHS = frozenset(
-    {".aib_memory/context.md", ".aib_brain/Concepts.md"}
+    {".aib_memory/context.md"}
 )
 
 
@@ -48,7 +47,7 @@ def _seed_memory(workspace: Path, brain_dir: Path, memory_root: Path, force: boo
     (memory_root / "requests").mkdir(parents=True, exist_ok=True)
     (memory_root / "logs").mkdir(parents=True, exist_ok=True)
 
-    # Create the attachments staging folder used by aib-analysis.md as an
+    # Create the attachments staging folder used by aib-analyze.md as an
     # enriched input channel. A .gitkeep placeholder ensures the empty directory
     # is committed to VCS and available immediately after a fresh clone.
     attachments_dir = memory_root / "attachments"
@@ -62,14 +61,18 @@ def _seed_memory(workspace: Path, brain_dir: Path, memory_root: Path, force: boo
     if register_file.exists():
         print("requests_register.md already exists — skipping overwrite.")
     else:
-        requests_register = load_template(brain_dir, "requests_register-template.md")
+        requests_register = (
+            "# Requests Register\n\n"
+            "| request_id | title | folder | state | created_at | closed_at |\n"
+            "| --- | --- | --- | --- | --- | --- |\n"
+        )
         write_text(register_file, requests_register)
 
     context_file = memory_root / "context.md"
     if context_file.exists():
         print("context.md already exists — skipping overwrite.")
     else:
-        write_text(context_file, "# Context\n\nThis file is managed by the `aib-context.md` prompt. Run it to populate workspace context.\n")
+        write_text(context_file, "# Context\n\nThis file is managed by the `aib-refresh-context.md` prompt. Run it to populate workspace context.\n")
 
     input_file = memory_root / "input.md"
     if input_file.exists():
@@ -79,9 +82,7 @@ def _seed_memory(workspace: Path, brain_dir: Path, memory_root: Path, force: boo
             "## Active request\n"
             "No active request\n\n"
             "## Options\n"
-            "- [ ] No changes — provide answer only\n"
-            "- [ ] Skip analysis document generation\n"
-            "- Question threshold: [ ] 1 (all)  [ ] 2  [x] 3  [ ] 4  [ ] 5 (mandatory only)\n\n"
+            "- Minimum questions: 0\n\n"
             "## Input\n\n"
         )
         write_text(input_file, input_seed)

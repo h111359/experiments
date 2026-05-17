@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import importlib.util
-import shutil
 import sys
 import tempfile
 from pathlib import Path
@@ -12,7 +11,6 @@ import pytest
 
 WORKSPACE_ROOT = Path(__file__).resolve().parent.parent
 TOOLS_DIR = WORKSPACE_ROOT / ".aib_brain" / "tools"
-TEMPLATES_DIR = WORKSPACE_ROOT / ".aib_brain" / "templates"
 
 
 # ---------------------------------------------------------------------------
@@ -27,10 +25,8 @@ def _load_script(name: str):
 
 
 def _make_brain_only_workspace(root: Path) -> None:
-    """Create workspace with .aib_brain/ (templates included) but no .aib_memory/."""
-    (root / ".aib_brain" / "templates").mkdir(parents=True, exist_ok=True)
-    for tmpl in TEMPLATES_DIR.glob("*.md"):
-        shutil.copy(tmpl, root / ".aib_brain" / "templates" / tmpl.name)
+    """Create workspace with .aib_brain/ but no .aib_memory/."""
+    (root / ".aib_brain").mkdir(parents=True, exist_ok=True)
 
 
 def _make_brain_with_semver(root: Path, semver: str = "v1.2.8") -> None:
@@ -200,7 +196,7 @@ class TestUpgrade:
             _run_initialize(root)
             # Seed a request subfolder so archive contains requests/.
             (root / ".aib_memory" / "requests" / "R-test-request").mkdir(parents=True, exist_ok=True)
-            (root / ".aib_memory" / "requests" / "R-test-request" / "request.md").write_text("# Test\n", encoding="utf-8")
+            (root / ".aib_memory" / "requests" / "R-test-request" / "plan.md").write_text("# Test\n", encoding="utf-8")
             (root / ".aib_memory" / "requests_register.md").write_text("# Custom register\n", encoding="utf-8")
             # Simulate interactive TTY with user choosing archive-only (N).
             with patch("sys.stdin") as mock_stdin, patch("builtins.input", return_value="N"):
@@ -222,7 +218,7 @@ class TestUpgrade:
             _run_initialize(root)
             # Seed a request subfolder to verify full content is migrated.
             (root / ".aib_memory" / "requests" / "R-test-request").mkdir(parents=True, exist_ok=True)
-            (root / ".aib_memory" / "requests" / "R-test-request" / "request.md").write_text("# Test\n", encoding="utf-8")
+            (root / ".aib_memory" / "requests" / "R-test-request" / "plan.md").write_text("# Test\n", encoding="utf-8")
             (root / ".aib_memory" / "requests_register.md").write_text("# Custom register\n", encoding="utf-8")
             # Simulate interactive TTY with user choosing migrate (Y).
             with patch("sys.stdin") as mock_stdin, patch("builtins.input", return_value="Y"):
@@ -232,63 +228,12 @@ class TestUpgrade:
             content = (root / ".aib_memory" / "requests_register.md").read_text(encoding="utf-8")
             assert "# Custom register" in content
             # requests/ must exist in active memory with its content intact.
-            migrated_request = root / ".aib_memory" / "requests" / "R-test-request" / "request.md"
+            migrated_request = root / ".aib_memory" / "requests" / "R-test-request" / "plan.md"
             assert migrated_request.is_file(), "Migrated request folder must exist in active memory"
             # SC-1: requests/ must NOT exist in the archive after migration.
             archives_dir = root / ".aib_memory" / "archives"
             archive = next(d for d in archives_dir.iterdir() if d.is_dir())
             assert not (archive / "requests").exists(), "requests/ must be removed from archive after migration"
-
-
-# ---------------------------------------------------------------------------
-# Tests for the upgrade-time legacy references.md warning (SC-9).
-# ---------------------------------------------------------------------------
-
-_DEFAULT_REFS_TABLE = (
-    "| ref_id | path | type | edit_allowed |\n"
-    "| --- | --- | --- | --- |\n"
-    "| REF-0001 | .aib_memory/context.md | product-doc | N |\n"
-    "| REF-0002 | .aib_brain\\Concepts.md | domain | N |\n"
-)
-
-
-class TestUpgradeLegacyReferencesWarning:
-    def test_upgrade_warns_when_legacy_references_has_extra_rows(self, capsys):
-        with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            _make_brain_with_semver(root, "v1.2.8")
-            _run_initialize(root)
-            extra_table = _DEFAULT_REFS_TABLE + "| REF-0003 | docs/custom-extra.md | other | N |\n"
-            (root / ".aib_memory" / "references.md").write_text(extra_table, encoding="utf-8")
-            rc = _run_initialize(root, upgrade=True)
-            captured = capsys.readouterr()
-            assert rc == 0
-            assert "WARNING: legacy references.md contains entries beyond the two defaults" in captured.out
-            assert "  - docs/custom-extra.md" in captured.out
-
-    def test_upgrade_silent_when_only_default_references_present(self, capsys):
-        with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            _make_brain_with_semver(root, "v1.2.8")
-            _run_initialize(root)
-            (root / ".aib_memory" / "references.md").write_text(_DEFAULT_REFS_TABLE, encoding="utf-8")
-            rc = _run_initialize(root, upgrade=True)
-            captured = capsys.readouterr()
-            assert rc == 0
-            assert "WARNING: legacy references.md" not in captured.out
-
-    def test_upgrade_handles_unparseable_legacy_references(self, capsys):
-        with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            _make_brain_with_semver(root, "v1.2.8")
-            _run_initialize(root)
-            (root / ".aib_memory" / "references.md").write_text("not a table at all\n", encoding="utf-8")
-            rc = _run_initialize(root, upgrade=True)
-            captured = capsys.readouterr()
-            assert rc == 0
-            assert "WARNING: legacy references.md is not parseable; skipping migration check." in captured.out
-            assert (root / ".aib_memory" / "v1.2.8").is_file()
-            assert (root / ".aib_memory" / "instructions.md").is_file()
 
 
 # ---------------------------------------------------------------------------
@@ -333,15 +278,14 @@ class TestInitialize:
             assert "## Options" in content
             assert "## Input" in content
 
-    def test_input_md_has_threshold_scale_labels(self):
-        """Seeded input.md must include scale-direction labels on threshold values 1 and 5."""
+    def test_input_md_has_no_threshold_row(self):
+        """Seeded input.md must not include a Question threshold row (removed in R-20260508-0036)."""
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             _make_brain_only_workspace(root)
             _run_initialize(root)
             content = (root / ".aib_memory" / "input.md").read_text(encoding="utf-8")
-            assert "1 (all)" in content
-            assert "5 (mandatory only)" in content
+            assert "Question threshold" not in content
 
     def test_input_md_idempotent(self):
         with tempfile.TemporaryDirectory() as tmp:

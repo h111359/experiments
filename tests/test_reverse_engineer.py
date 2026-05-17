@@ -1,4 +1,4 @@
-"""Unit tests for .aib_brain/tools/reverse-engineer.py."""
+"""Unit tests for .aib_brain/tools/file-inventory.py."""
 
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ TOOLS_DIR = WORKSPACE_ROOT / ".aib_brain" / "tools"
 # ---------------------------------------------------------------------------
 
 def _load_rev_eng():
-    spec = importlib.util.spec_from_file_location("reverse_engineer", TOOLS_DIR / "reverse-engineer.py")
+    spec = importlib.util.spec_from_file_location("reverse_engineer", TOOLS_DIR / "file-inventory.py")
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     return mod
@@ -101,7 +101,7 @@ class TestReverseEngineerOutput:
         output_path = workspace_dir / "inventory.jsonl"
         old_argv = sys.argv[:]
         sys.argv = [
-            "reverse-engineer.py",
+            "file-inventory.py",
             "--workspace", str(workspace_dir),
             "--output", str(output_path),
         ]
@@ -125,7 +125,7 @@ class TestReverseEngineerOutput:
         output_path = workspace_dir / "limited.jsonl"
         old_argv = sys.argv[:]
         sys.argv = [
-            "reverse-engineer.py",
+            "file-inventory.py",
             "--workspace", str(workspace_dir),
             "--output", str(output_path),
             "--max-files", "3",

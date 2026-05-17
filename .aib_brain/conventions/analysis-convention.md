@@ -1,16 +1,16 @@
 # Analysis Document Convention
 
 **Scope:** Normative  
-**Applies to:** All files named `analysis.md` generated under `.aib_memory/requests/<request-folder>/`.
+**Applies to:** All files named `analysis-<request_id>.md` generated under `.aib_memory/` (active phase) and archived to `.aib_memory/requests/<request-folder>/` (archived phase).
 
 ## 1. Purpose
 
-The **Analysis document** is a **reasoning and knowledge-capture artifact** only. It records the AI's structured thinking about the user request ΓÇö research findings, scope interpretation, domain and technical context, impact awareness, and risk identification.
+The **Analysis document** is a **reasoning and knowledge-capture artifact** only. It records the AI's structured thinking about the user request - research findings, scope interpretation, domain and technical context, impact awareness, and risk identification.
 
 **The analysis document is NOT an implementation driver.**
 
 - `implement` MUST NOT read the analysis document.
-- All implementation-relevant content (assumptions, plan, testing, documentation touchpoints, open questions) is written into `request.md` by the `create-analysis` action.
+- All implementation-relevant content (assumptions, plan, testing, documentation touchpoints, open questions) is written into `plan-<request_id>.md` by the `aib-analyze.md` prompt.
 - Human stakeholders read the analysis for auditability and context; they do not use it as an execution specification.
 
 ***
@@ -29,15 +29,16 @@ Normative keywords **MUST**, **MUST NOT**, **SHALL**, **SHOULD**, and **MAY** ar
 
 ## 3. File Naming & Location (Normative)
 
-*   File name **must** be exactly: `analysis.md`
+*   File name **must** follow the pattern: `analysis-<request_id>.md`
+    where `<request_id>` is the active request ID (e.g. `analysis-R-20260509-2313.md`).
 
 *   **Two-phase placement rule:**
-    1.  **Active phase** — while the request is open, `analysis.md` resides at `.aib_memory/analysis.md` (workspace root of `.aib_memory/`, NOT inside the request subfolder).
-    2.  **Archived phase** — upon successful implementation completion, `analysis.md` is moved by `move-request-artifacts.py` to `.aib_memory/requests/<request-folder>/analysis.md` before `close-request.py` marks the request Closed.
+    1.  **Active phase** — while the request is open, `analysis-<request_id>.md` resides at `.aib_memory/analysis-<request_id>.md` (workspace root of `.aib_memory/`, NOT inside the request subfolder).
+    2.  **Archived phase** — upon successful implementation completion, `analysis-<request_id>.md` is moved by `move-request-artifacts.py` to `.aib_memory/requests/<request-folder>/analysis-<request_id>.md` (ID suffix preserved) before `close-request.py` marks the request Closed.
 
 *   Exactly one analysis file per request **MAY** exist at a time.
 
-*   Re-runs of `aib-analysis.md` **must** fully replace the active copy at `.aib_memory/analysis.md` without merging; re-generation is atomic at the active location.
+*   Re-runs of `aib-analyze.md` **must** amend the active copy at `.aib_memory/analysis-<request_id>.md` 
 
 *   Version metadata (for example: version/author/status headers) **must not** be embedded in the analysis file. Versioning is handled by VCS.
 
@@ -47,203 +48,130 @@ Normative keywords **MUST**, **MUST NOT**, **SHALL**, **SHOULD**, and **MAY** ar
 
 Each analysis file **must** contain the following sections in the exact order:
 
-1.  **Executive Summary** **[REQ]**
-2.  **Domain Knowledge Essentials** **[REQ]**
-3.  **Technical Knowledge & Terms** **[REQ]**
-4.  **Research Results** **[REQ]**
-5.  **External Benchmarking** **[REQ]**
-6.  **Minimal Spikes and Experiments** **[REQ]**
-7.  **AI Copilot Suggestions** **[REQ]**
-8.  **Testing** **[REQ]**
-9.  **Multi-Perspective Stakeholder Review** **[REQ]**
+1. **Overview** **[REQ]**
+2. **Files Read During This Analysis Run** **[REQ]**
+3. **Input Interpretation** **[REQ]**
+4. **Research Results** **[REQ]**
+5. **Implementation Alternatives** **[REQ]**
 
 ***
 
-### 4.1 Executive Summary
+### 4.1 Overview
 
-A concise overview in 5-10 bullets or sentences answering:
-
-*   Request ID
-
-*   Request title
-
-*   High-level purpose
-
-The summary must reference:
-
-*   The `request.md` content
-
-*   A brief note on which sections were added/updated in `request.md` during this analysis run (forward reference to section 8)
-
-After each bullet keep an empty line for readability.
-
-
-***
-
-### 4.2 Domain Knowledge Essentials
-
-Describe the minimum domain context required for correct decisions.
-
-Include:
-
-*   Business terminology and one-line definitions
-
-*   Impacted roles/personas
-
-*   Business processes touched
-
-*   Relevant metrics/KPIs and IDs (if defined)
-
-*   Acceptance impact from a business/product perspective
-
-***
-
-### 4.3 Technical Knowledge & Terms
-
-Describe the minimum technical context required for correct decisions.
-
-Include:
-
-*   Technologies, components, modules, and environments involved
-
-*   Data models/assets and runtime constraints
-
-*   Non-functional attributes (reliability, performance, security, operations)
-
-*   One-line definition for each key term/acronym on first use
-
-
-
-Rules:
-
-*   Summarize findings and implications; do not embed external links.
-
-*   If live web research was used, mention outcomes only, not URLs.
-
-*   Include a concise evidence log mapping `evidence -> implication`.
-
-*   The Files Read bullet list is required; omitting it is a convention violation.
-
-### 4.4. Research Results
-
-This section lists pattern-based research findings:
-
-1.  Pattern scan against organizational standards and prior similar solutions.
-
-
-## 5. External Benchmarking **[REQ]**
-
-This section MUST be present and substantive. It documents research-based context from outside the workspace.
+This section is for human review and auditability only; `implement` MUST NOT read or act on it. Fully replace on every re-run.
 
 **Mandatory content:**
 
-- Comparable solutions, frameworks, or patterns found in industry literature or open-source ecosystems relevant to the request scope.
-- Key takeaways and applicability assessment for each benchmark reference.
-- Explicit rationale for adoption, adaptation, or rejection of each benchmarked approach.
-- At minimum two external references must be documented per analysis. If no applicable external material exists, explicitly state why and document the absence.
+- Request ID
+
+- Request title
+
+- `### Background` — Context explaining why the change is needed, sourced from the developer's `## Input` content.
+
+- `### Scope` — Clear definition of what is included in the change, listing impacted functional areas, components, domains, or documents.
+
+- `### Out of scope` — Items intentionally excluded from the request.
+
+**Rules:**
+
+- Each sub-section (`### Background`, `### Scope`, `### Out of scope`) MUST contain at least one sentence.
+
+- On every re-run, fully replace this section.
+
+***
+
+### 4.2 Files Read During This Analysis Run **[REQ]**
+
+List every workspace file read during this analysis run.
+
+- Each entry MUST be a workspace-relative file path.
+
+- Include all files read for preflight, convention loading, and analysis drafting.
+
+- This section MUST NOT be empty.
+
+***
+
+### 4.3 Input Interpretation **[REQ]**
+
+This section contains an AI-generated, specification-grade interpretation of the developer's original `## Input` content. It rewrites the developer's intent using correct product terminology (from `context.md`) and relevant external domain knowledge. It is written in third-person specification prose. Its primary purpose is to serve as the authoritative source material for the Answer Application Sub-flow when creating `request-<request_id>.md` on re-run without access to the archived `input.md` (GC-01 compliance).
+
+**Rules:** MUST be present in every analysis run (first pass and re-run). MUST faithfully represent developer intent — enrichment, not replacement. MUST NOT be empty.
+
+***
+
+### 4.4 Research Results **[REQ]**
+
+This section is the primary AI reasoning artifact for the request. It documents the AI's full analytical thinking — workspace findings, relevant industry knowledge, feasibility assessment, and observations.
+
+**Mandatory content:**
+
+- Workspace pattern-scan findings: impacted components, cross-reference issues, relevant prior solutions found in the workspace.
+
+- Industry knowledge: best practices and external benchmarking relevant to the request topic. At minimum 3 findings from established frameworks, open-source communities, or industry literature, each with an applicability assessment.
+
+- AI Agent critique: a bullet-list review of all issues found in the request itself and in every workspace file read during this analysis run. Not limited to the current request scope. Each issue is listed as a bullet regardless of whether it relates to the request. Issue types include: misalignment, inconsistencies, logical errors, redundancies, misplaced content, unclear wording, broken cross-references, format drift, and other quality concerns.
 
 **Rules:**
 
 - Summarize findings and implications; do not embed external links.
-- Organize as a bulleted list with one sub-bullet per takeaway.
-- MUST NOT be empty or contain only a stub notice.
+
+- MUST NOT be empty or contain only stub notices.
+
+- `implement` MUST NOT read or act on this section.
 
 
-## 6. Minimal Spikes and Experiments **[REQ]**
+***
 
-This section documents the outcome of brief feasibility experiments or uncertainty-resolution spikes conducted as part of this analysis.
+### 4.5 Implementation Alternatives **[REQ]**
+
+This section is the primary driver for Q-block generation. It MUST be completed before any Q-block is written.
 
 **Mandatory content:**
 
-- For each spike or experiment: a one-sentence hypothesis, the approach taken, the observed outcome, and the conclusion drawn.
-- If no spike was conducted: a brief justification explaining why uncertainty was low enough not to require one.
+For each implementation decision fork identified in the request scope, define a named decision block containing:
 
-**Format per spike:**
+  - Identification of the specific task or step where this decision applies, plus an explanation of why the alternatives exist.
 
-- **Spike: <topic>**
-  - Hypothesis: <what was tested>
-  - Approach: <how it was tested>
-  - Outcome: <what was observed>
-  - Conclusion: <what is now known>
+  - Two or more named alternative approaches, each with:
+    - A one-sentence description.
+    - Key trade-offs (benefits and drawbacks).
+    - Expected codebase impact.
+
+  - The resolution: tag and rationale per the classification rules in `aib-analyze.md` section 7.3.2.
+    - Tag `ask` — a Q-block MUST be raised for developer input. The AI MUST NOT express a preference or steer the developer toward any option. Present choices neutrally.
+    - Tag `resolve-autonomously` — ONLY when the developer's own `input.md ## Input` text OR a named, specific section of a workspace convention file explicitly and unambiguously resolves the fork. The rationale MUST quote or cite the exact source text and file path. External benchmarking, industry best practices, and AI judgment are NOT valid justifications for this tag.
+
+- A `### Decision Points` section using a heading/sub-heading list — one `#### Fork: <name>` level-4 heading per fork, each containing bullet list items for Tag and Rationale/Resolution.
+
+- If no decision forks are identified, include a single entry documenting that fact.
 
 **Rules:**
 
-- MUST NOT be empty; use the "no spike needed" form when applicable.
-- Each spike MUST be independently reproducible from the described approach.
+- At least one named alternative MUST be documented per decision fork.
 
-
-## 7. AI Copilot Suggestions **[REQ]**
-
-This section is a **reasoning-only artifact**. It provides a sincere, pragmatic, senior-expert-level review of the request from the AI's perspective.
-
-**Purpose:** Surface improvement opportunities, potential pitfalls, and expert observations that a senior developer or solution architect would raise — covering aspects not necessarily visible from the formal request sections alone.
-
-**Mandatory content:**
-
-- At least three distinct observations covering different dimensions (e.g., design quality, implementation risk, missed simplification opportunities, maintainability, testability, or scope creep risk).
-- For each observation: a concise statement of the finding and a concrete actionable suggestion.
-- An explicit note if the scope appears larger or smaller than necessary to achieve the stated goal.
-
-**Tone and format:**
-
-- Written as a senior expert speaking directly to the developer — direct, honest, and constructive.
-- Organized as a bulleted list; one sub-bullet per actionable suggestion.
-- MUST NOT contain implementation steps, code snippets, or prescriptive instructions that could serve as a specification for `implement`.
-- MUST NOT be empty.
-
-**Restriction:** This section is a reasoning artifact only. `implement` MUST NOT read or act on this section. It is for human review and auditability only.
-
-
-## 8. Testing **[REQ]**
-
-This section defines the intent-level test cases for the request scope, covering what to test and what the expected observable outcome is.
-
-**Mandatory content:**
-
-- A numbered list of test cases using the format: `- T<n> — <name>: <description>. Expected outcome: <observable pass/fail result>.`
-- Coverage MUST include: file existence checks, content checks, tool/script execution, test suite runs, and re-run idempotency where applicable.
-- At least one test case for each Success Criterion defined in `request.md`.
-
-**UAT scenarios rule:**
-
-- If any test case cannot be expressed as an automated script assertion (e.g., it requires visual inspection, user interaction, or end-to-end user-workflow validation), `aib-analysis.md` MUST create a `UAT_scenarios.md` file in the request folder documenting those manual test scenarios. The automated test case list in this section still references those scenarios by ID (e.g., `See UAT_scenarios.md — UAT-01`).
-
-**Rules:**
+- When in doubt whether to tag `ask` or `resolve-autonomously`, always tag `ask`.
 
 - MUST NOT be empty.
+
 - Fully replaced on every analysis re-run.
 
+***
 
-## 9. Multi-Perspective Stakeholder Review **[REQ]**
-
-This section evaluates the request from five distinct stakeholder viewpoints.
-
-**Mandatory content:**
-
-- Each perspective MUST be written as a separate sub-section with one paragraph of evaluation and 2–5 bullet findings.
-- Required perspectives:
-  - **Senior Solution Architect**: technical feasibility, design integrity, architectural risk.
-  - **Product Owner**: business value, scope clarity, acceptance criteria completeness.
-  - **User**: usability, clarity of expected behavior changes, friction introduced.
-  - **Security Officer**: attack surface, data exposure, authentication/authorization impact.
-  - **Data Governance Officer**: data lineage, retention, classification, and compliance impact.
-
-**Rules:**
-
-- MUST NOT be empty.
-- Fully replaced on every analysis re-run.
-
-
-## 10. Maintenance Rules (Normative)
+## 5. Maintenance Rules (Normative)
 
 *   Idempotence: same memory state and same request should converge to same analysis intent.
 *   Change drivers: update analysis when scope changes, new evidence appears, or risk state changes.
 *   Closure: once a request is closed in `requests_register.md`, analysis remains unchanged except factual corrections.
 
-## 11. Formatting Requirements
+***
+
+## 6. Formatting Requirements
 
 *   All headings must use `##` or `###` consistent with this convention.
 *   Bullet lists must use `- `.
+*   Make a list of sub-bullets if the bullet text is split by symbols like `;`
+*   In case of enumerated parts in a single list item - position them in a sublist
 *   Tables must use standard GitHub Markdown table syntax.
 *   No HTML is allowed.
 *   No images, diagrams, embeds, or external hyperlinks.
@@ -252,15 +180,15 @@ This section evaluates the request from five distinct stakeholder viewpoints.
 
 ***
 
-## 12. Determinism Rules (Normative)
+## 7. Determinism Rules (Normative)
 
 *   Given the same memory state and request input, analysis output intent must be identical.
 *   AI must not guess beyond request scope.
-*   If request ambiguity exists that cannot be resolved internally, create a `Q<nnn>` question block in `request.md` -> `## Questions & Decisions` instead of making assumptions.
+*   If request ambiguity exists that cannot be resolved internally, create a `Q<nnn>` question block in `plan-<request_id>.md` -> `## Decisions` instead of making assumptions.
 
 ***
 
-## 13. Prohibited Content
+## 8. Prohibited Content
 
 *   Secrets, private keys, credentials, tokens, or sensitive PII.
 *   External hyperlinks.

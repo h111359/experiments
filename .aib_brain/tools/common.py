@@ -12,10 +12,8 @@ from typing import List, Sequence, Tuple
 
 ACTIVE = "Active"
 CLOSED = "Closed"
-COMPLETED = "Completed"
 
 REQ_ID_PATTERN = re.compile(r"^R-\d{8}-\d{4}$")
-ITER_ID_PATTERN = re.compile(r"^\d{2}$")
 
 
 class ValidationError(RuntimeError):
@@ -28,7 +26,6 @@ def parse_args(description: str) -> argparse.Namespace:
     parser.add_argument("--request-id", default=None, help="Explicit request ID")
     parser.add_argument("--title", default=None, help="Request title (create-request only)")
     parser.add_argument("--summary", default="", help="Short summary text")
-    parser.add_argument("--iteration-id", default=None, help="Explicit iteration ID")
     parser.add_argument("--force", action="store_true", default=False, help="Force overwrite of existing files (initialize only)")
     parser.add_argument("--upgrade", action="store_true", default=False, help="Upgrade .aib_memory/ structure from .aib_brain/ templates (initialize only)")
     return parser.parse_args()
@@ -125,13 +122,6 @@ def format_markdown_table(header: Sequence[str], rows: Sequence[Sequence[str]]) 
     return "\n".join(out) + "\n"
 
 
-def load_template(brain_dir: Path, name: str) -> str:
-    path = brain_dir / "templates" / name
-    if not path.exists():
-        raise ValidationError(f"Missing template: {path}")
-    return path.read_text(encoding="utf-8")
-
-
 def requests_register_path(workspace: Path) -> Path:
     return workspace / ".aib_memory" / "requests_register.md"
 
@@ -174,27 +164,52 @@ def update_requests_register(workspace: Path, rows: Sequence[Sequence[str]]) -> 
     write_text(requests_register_path(workspace), text)
 
 
-REQUIRED_REQUEST_SECTIONS = [
+REQUIRED_PLAN_SECTIONS = [
     "## Goal",
-    "## Background",
-    "## Scope",
-    "## Out of scope",
     "## Constraints",
     "## Success criteria",
+    "## Plan",
 ]
 
 
-def validate_request_md(path: Path) -> None:
-    """Raise ValidationError if ``request.md`` is missing any required section."""
+def validate_plan_md(path: Path) -> None:
+    """Raise ValidationError if ``plan.md`` is missing any required section."""
     content = read_text(path)
     if not content:
-        raise ValidationError(f"request.md is empty or missing: {path}")
-    for heading in REQUIRED_REQUEST_SECTIONS:
+        raise ValidationError(f"plan.md is empty or missing: {path}")
+    for heading in REQUIRED_PLAN_SECTIONS:
         # Match heading at the start of a line, case-insensitive
         if not re.search(r"^" + re.escape(heading), content, re.IGNORECASE | re.MULTILINE):
             raise ValidationError(
-                f"request.md missing required section '{heading}': {path}"
+                f"plan.md missing required section '{heading}': {path}"
             )
+
+
+def artifact_name(artifact_type: str, request_id: str) -> str:
+    """Construct the active-phase artifact filename for a given artifact type and request ID.
+
+    Active-phase artifacts reside at ``.aib_memory/<artifact_type>-<request_id>.md``
+    while the request is open. This helper centralises filename construction to avoid
+    scattered string literals across tool scripts and prompts.
+
+    Args:
+        artifact_type: Artifact category; one of ``"plan"``, ``"analysis"``,
+            or ``"UAT_scenarios"``.
+        request_id: The request identifier, which must match the pattern
+            ``R-YYYYMMDD-HHmi`` (e.g. ``"R-20260509-2313"``).
+
+    Returns:
+        The filename string, e.g. ``"plan-R-20260509-2313.md"``.
+
+    Raises:
+        ValueError: If ``request_id`` does not match the expected pattern, to
+            prevent path traversal via malformed identifiers.
+    """
+    if not REQ_ID_PATTERN.match(request_id):
+        raise ValueError(
+            f"Invalid request_id '{request_id}'; expected pattern R-YYYYMMDD-HHmi"
+        )
+    return f"{artifact_type}-{request_id}.md"
 
 
 def print_error_and_exit(message: str) -> None:

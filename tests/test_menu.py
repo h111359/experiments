@@ -15,6 +15,8 @@ import pytest
 import menu
 from menu import (
     MenuState,
+    _detect_guidance_state,
+    _is_context_empty,
     _make_log_path,
     _run_and_tee,
     _sanitize_action_id,
@@ -22,6 +24,7 @@ from menu import (
     build_script_actions,
     collect_parameters,
     filter_visible_actions,
+    render_menu,
     resolve_menu_state,
     validate_param,
 )
@@ -45,13 +48,6 @@ REGISTER_SEP =    "| --- | --- | --- | --- | --- | --- |"
 def _register_with_row(req_id: str, folder: str, state: str) -> str:
     row = f"| {req_id} | My Request | {folder} | {state} | 2026-01-01 10:00:00 +0000 |  |"
     return f"# Requests Register\n\n{REGISTER_HEADER}\n{REGISTER_SEP}\n{row}\n"
-
-
-def _iterations_with_row(iter_id: str, state: str) -> str:
-    header = "| iteration_id | state | created_at | closed_at | summary |"
-    sep =    "| --- | --- | --- | --- | --- |"
-    row =    f"| {iter_id} | {state} | 2026-01-01 10:00:00 +0000 |  | Initial |"
-    return f"# Iterations\n\n{header}\n{sep}\n{row}\n"
 
 
 # ---------------------------------------------------------------------------
@@ -172,17 +168,252 @@ class TestBuildScriptActions:
         for absent in ["create-request.py", "close-request.py"]:
             assert absent not in scripts
 
-    def test_excluded_scripts_absent(self, tools_dir: Path):
+
+# ---------------------------------------------------------------------------
+# Hard-coded action list (SC-03, SC-04, SC-10, SC-11)
+# ---------------------------------------------------------------------------
+
+class TestHardCodedActionList:
+    """Verify the explicit hard-coded menu action list requirements."""
+
+    def test_move_request_artifacts_absent(self, tools_dir: Path):
+        """SC-03: move-request-artifacts.py must never appear in the action list."""
         actions = build_script_actions(tools_dir)
         scripts = [a["script"] for a in actions]
-        from menu import EXCLUDE_SCRIPTS
-        for excluded in EXCLUDE_SCRIPTS:
-            assert excluded not in scripts
+        assert "move-request-artifacts.py" not in scripts
+
+    def test_no_glob_discovery(self, tools_dir: Path):
+        """SC-04: build_script_actions must not return auto-discovered scripts."""
+        actions = build_script_actions(tools_dir)
+        # Hard-coded list is intentionally empty; no auto-discovered scripts.
+        assert len(actions) == 0
+
+    def test_exclude_scripts_not_in_module(self):
+        """SC-11: EXCLUDE_SCRIPTS must not exist in menu module."""
+        import menu as _menu
+        assert not hasattr(_menu, "EXCLUDE_SCRIPTS")
 
 
 # ---------------------------------------------------------------------------
-# validate_param
+# State-aware guidance (_detect_guidance_state)  (SC-05 to SC-17)
 # ---------------------------------------------------------------------------
+
+_INPUT_MD_SEED = (
+    "## Active request\n"
+    "No active request\n\n"
+    "## Options\n\n"
+    "## Input\n\n"
+)
+
+_INPUT_MD_WITH_CONTENT = (
+    "## Active request\n"
+    "R-20260101-1000 \u2014 My Request\n\n"
+    "## Options\n\n"
+    "## Input\n"
+    "Do something useful.\n"
+)
+
+_INPUT_MD_WITH_QUESTIONS = (
+    "## Active request\n"
+    "R-20260101-1000 \u2014 My Request\n\n"
+    "## Questions\n"
+    "Q1: Which approach?\n\n"
+    "## Input\n\n"
+)
+
+
+def _make_input_md(tmp_path: Path, content: str) -> None:
+    mem = tmp_path / ".aib_memory"
+    mem.mkdir(parents=True, exist_ok=True)
+    (mem / "input.md").write_text(content, encoding="utf-8")
+
+
+def _make_request_md(tmp_path: Path, req_id: str = "R-20260101-1000") -> None:
+    # Create the ID-suffixed active-phase plan artifact so _detect_guidance_state can find it.
+    (tmp_path / ".aib_memory" / f"plan-{req_id}.md").write_text("# Plan\n", encoding="utf-8")
+
+
+class TestDetectGuidanceState:
+    """Unit tests for _detect_guidance_state covering all seven workspace states."""
+
+    def test_idle_no_active_request_empty_input(self, tmp_path: Path):
+        """SC-05: No active request + empty Input section → 'idle'."""
+        _make_input_md(tmp_path, _INPUT_MD_SEED)
+        state = MenuState(None, None)
+        result = _detect_guidance_state(state, tmp_path)
+        assert result == "idle"
+
+    def test_idle_when_input_md_absent(self, tmp_path: Path):
+        """No active request + no input.md → 'idle'."""
+        (tmp_path / ".aib_memory").mkdir(parents=True, exist_ok=True)
+        state = MenuState(None, None)
+        result = _detect_guidance_state(state, tmp_path)
+        assert result == "idle"
+
+    def test_input_ready_no_active_request_with_content(self, tmp_path: Path):
+        """SC-06: No active request + substantive Input content → 'input_ready'."""
+        _make_input_md(tmp_path, _INPUT_MD_WITH_CONTENT)
+        state = MenuState(None, None)
+        result = _detect_guidance_state(state, tmp_path)
+        assert result == "input_ready"
+
+    def test_request_incomplete_active_no_request_md_empty_input(self, tmp_path: Path):
+        """SC-07: Active request + no plan.md + empty Input → 'request_incomplete'."""
+        _make_input_md(tmp_path, _INPUT_MD_SEED)
+        state = MenuState("R-20260101-1000", ".aib_memory/requests/R-20260101-1000")
+        result = _detect_guidance_state(state, tmp_path)
+        assert result == "request_incomplete"
+
+    def test_implementation_ready_active_request_md_present_empty_input(self, tmp_path: Path):
+        """SC-08: Active request + plan.md present + empty Input + no questions → 'implementation_ready'."""
+        _make_input_md(tmp_path, _INPUT_MD_SEED)
+        _make_request_md(tmp_path)
+        state = MenuState("R-20260101-1000", ".aib_memory/requests/R-20260101-1000")
+        result = _detect_guidance_state(state, tmp_path)
+        assert result == "implementation_ready"
+
+    def test_questions_pending_active_with_questions(self, tmp_path: Path):
+        """SC-12: Active request + non-empty Questions section → 'questions_pending' (priority)."""
+        _make_input_md(tmp_path, _INPUT_MD_WITH_QUESTIONS)
+        state = MenuState("R-20260101-1000", ".aib_memory/requests/R-20260101-1000")
+        result = _detect_guidance_state(state, tmp_path)
+        assert result == "questions_pending"
+
+    def test_questions_pending_priority_over_request_md_absence(self, tmp_path: Path):
+        """SC-12: questions_pending detected even when plan.md is absent."""
+        _make_input_md(tmp_path, _INPUT_MD_WITH_QUESTIONS)
+        # No plan.md created — questions_pending must still take priority.
+        state = MenuState("R-20260101-1000", ".aib_memory/requests/R-20260101-1000")
+        result = _detect_guidance_state(state, tmp_path)
+        assert result == "questions_pending"
+
+    def test_questions_not_pending_when_section_empty(self, tmp_path: Path):
+        """SC-13: Empty Questions section must NOT trigger questions_pending."""
+        content = (
+            "## Active request\nR-001 — My Request\n\n"
+            "## Questions\n\n"
+            "## Input\n\n"
+        )
+        _make_input_md(tmp_path, content)
+        _make_request_md(tmp_path)
+        state = MenuState("R-20260101-1000", ".aib_memory/requests/R-20260101-1000")
+        result = _detect_guidance_state(state, tmp_path)
+        assert result == "implementation_ready"
+
+    def test_amendment_pending_active_request_md_present_with_input(self, tmp_path: Path):
+        """SC-14: Active request + plan.md present + substantive Input + no questions → 'amendment_pending'."""
+        content = (
+            "## Active request\nR-001 — My Request\n\n"
+            "## Questions\n\n"
+            "## Input\n"
+            "Add a new feature.\n"
+        )
+        _make_input_md(tmp_path, content)
+        _make_request_md(tmp_path)
+        state = MenuState("R-20260101-1000", ".aib_memory/requests/R-20260101-1000")
+        result = _detect_guidance_state(state, tmp_path)
+        assert result == "amendment_pending"
+
+    def test_unknown_returned_on_exception(self, tmp_path: Path):
+        """SC-15: Any unhandled exception during detection must return 'unknown'."""
+        _make_input_md(tmp_path, _INPUT_MD_SEED)
+        state = MenuState("R-20260101-1000", ".aib_memory/requests/R-20260101-1000")
+        with patch("menu._extract_section", side_effect=OSError("disk error")):
+            result = _detect_guidance_state(state, tmp_path)
+        assert result == "unknown"
+
+
+# ---------------------------------------------------------------------------
+# _GUIDANCE_MESSAGES key set (SC-17)
+# ---------------------------------------------------------------------------
+
+class TestGuidanceMessagesKeys:
+    def test_exactly_seven_keys(self):
+        """SC-17: _GUIDANCE_MESSAGES must have exactly the seven specified keys."""
+        import menu as _menu
+        expected = {
+            "idle", "input_ready", "request_incomplete", "questions_pending",
+            "implementation_ready", "amendment_pending", "unknown",
+        }
+        assert set(_menu._GUIDANCE_MESSAGES.keys()) == expected
+
+
+# ---------------------------------------------------------------------------
+# _is_context_empty and render_menu guidance block (SC-16)
+# ---------------------------------------------------------------------------
+
+class TestIsContextEmpty:
+    def test_absent_context_returns_true(self, tmp_path: Path):
+        (tmp_path / ".aib_memory").mkdir(parents=True, exist_ok=True)
+        assert _is_context_empty(tmp_path) is True
+
+    def test_empty_context_returns_true(self, tmp_path: Path):
+        mem = tmp_path / ".aib_memory"
+        mem.mkdir(parents=True, exist_ok=True)
+        (mem / "context.md").write_text("   \n", encoding="utf-8")
+        assert _is_context_empty(tmp_path) is True
+
+    def test_non_empty_context_returns_false(self, tmp_path: Path):
+        mem = tmp_path / ".aib_memory"
+        mem.mkdir(parents=True, exist_ok=True)
+        (mem / "context.md").write_text("# Product Context\n\nSome content.\n", encoding="utf-8")
+        assert _is_context_empty(tmp_path) is False
+
+
+class TestRenderMenuGuidance:
+    """SC-16: Verify the context-empty guidance line in render_menu output."""
+
+    def _capture_menu(self, state: MenuState, workspace: Path) -> str:
+        actions = build_script_actions(workspace / ".aib_brain" / "tools")
+        with patch("sys.stdout", new_callable=io.StringIO) as mock_stdout:
+            render_menu(state, actions, 0, workspace)
+            return mock_stdout.getvalue()
+
+    def test_context_empty_line_shown_when_context_absent(self, tmp_path: Path):
+        """SC-16: When context.md is absent, render_menu includes the context guidance line."""
+        mem = tmp_path / ".aib_memory"
+        mem.mkdir(parents=True, exist_ok=True)
+        (mem / "input.md").write_text(_INPUT_MD_SEED, encoding="utf-8")
+        state = MenuState(None, None)
+        output = self._capture_menu(state, tmp_path)
+        assert "aib-analyze.md" in output
+
+    def test_context_empty_line_absent_when_context_present(self, tmp_path: Path):
+        """SC-16: When context.md has content, no context guidance line is shown."""
+        mem = tmp_path / ".aib_memory"
+        mem.mkdir(parents=True, exist_ok=True)
+        (mem / "input.md").write_text(_INPUT_MD_SEED, encoding="utf-8")
+        (mem / "context.md").write_text("# Context\n\nSome product context.\n", encoding="utf-8")
+        state = MenuState(None, None)
+        output = self._capture_menu(state, tmp_path)
+        assert "Context file is empty" not in output
+
+    def test_no_prompts_block_in_render_menu(self, tmp_path: Path):
+        """SC-01: render_menu must not contain the AIB Prompts copy-paste block."""
+        mem = tmp_path / ".aib_memory"
+        mem.mkdir(parents=True, exist_ok=True)
+        (mem / "input.md").write_text(_INPUT_MD_SEED, encoding="utf-8")
+        state = MenuState(None, None)
+        output = self._capture_menu(state, tmp_path)
+        assert "\u2500\u2500 AIB Prompts" not in output
+
+    def test_no_refresh_action_in_render_menu(self, tmp_path: Path):
+        """SC-02: render_menu must not contain a Refresh numbered action."""
+        mem = tmp_path / ".aib_memory"
+        mem.mkdir(parents=True, exist_ok=True)
+        (mem / "input.md").write_text(_INPUT_MD_SEED, encoding="utf-8")
+        state = MenuState(None, None)
+        output = self._capture_menu(state, tmp_path)
+        assert "Refresh" not in output
+
+    def test_render_menu_guidance_before_options(self, tmp_path: Path):
+        """SC-A3: Guidance block must appear before the numbered options list."""
+        mem = tmp_path / ".aib_memory"
+        mem.mkdir(parents=True, exist_ok=True)
+        (mem / "input.md").write_text(_INPUT_MD_SEED, encoding="utf-8")
+        state = MenuState(None, None)
+        output = self._capture_menu(state, tmp_path)
+        assert output.index("\u2500\u2500 Next Step \u2500\u2500") < output.index("0) Quit")
 
 class TestValidateParam:
     def test_required_empty_fails(self):
@@ -580,4 +811,72 @@ class TestRunAndTee:
         assert exit_code == 0
 
 
+# ---------------------------------------------------------------------------
+# choose_action — UP/DOWN zero-division guard (SC-06)
+# ---------------------------------------------------------------------------
 
+class TestChooseActionZeroDivisionGuard:
+    """Verify that choose_action does not raise ZeroDivisionError when total_items == 0."""
+
+    def _make_workspace(self, tmp_path: Path) -> Path:
+        """Set up a minimal workspace with no active request (so action list is empty)."""
+        brain_dir = tmp_path / ".aib_brain"
+        brain_dir.mkdir(parents=True)
+        mem_dir = tmp_path / ".aib_memory"
+        mem_dir.mkdir(parents=True)
+        reg = mem_dir / "requests_register.md"
+        reg.write_text(
+            "# Requests Register\n\n"
+            "| request_id | title | folder | state | created_at | closed_at |\n"
+            "| --- | --- | --- | --- | --- | --- |\n",
+            encoding="utf-8",
+        )
+        (mem_dir / "input.md").write_text(
+            "## Active request\nNo active request\n\n## Options\n\n## Input\n\n",
+            encoding="utf-8",
+        )
+        return tmp_path
+
+    def test_up_key_with_zero_items_no_zerodivision(self, tmp_path: Path):
+        """UP key pressed when total_items == 0 must not raise ZeroDivisionError."""
+        workspace = self._make_workspace(tmp_path)
+        tools_dir = workspace / ".aib_brain" / "tools"
+        # Provide key sequence: UP then QUIT to exit the loop.
+        keys = iter(["UP", "QUIT"])
+        with patch("menu.get_key", side_effect=lambda **_: next(keys)):
+            with patch("menu.render_menu"):
+                result = menu.choose_action(tools_dir, workspace)
+        assert result is None  # QUIT returns None
+
+    def test_down_key_with_zero_items_no_zerodivision(self, tmp_path: Path):
+        """DOWN key pressed when total_items == 0 must not raise ZeroDivisionError."""
+        workspace = self._make_workspace(tmp_path)
+        tools_dir = workspace / ".aib_brain" / "tools"
+        keys = iter(["DOWN", "QUIT"])
+        with patch("menu.get_key", side_effect=lambda **_: next(keys)):
+            with patch("menu.render_menu"):
+                result = menu.choose_action(tools_dir, workspace)
+        assert result is None
+
+
+# ---------------------------------------------------------------------------
+# Guidance messages — attachments hint (SC-5, SC-6)
+# ---------------------------------------------------------------------------
+
+class TestGuidanceAttachmentsHint:
+    """Verify that idle and implementation_ready guidance messages include an attachments reminder."""
+
+    def test_idle_guidance_contains_attachments_reminder(self) -> None:
+        """'idle' guidance must contain at least one line referencing 'attachments'."""
+        assert any("attachments" in line for line in menu._GUIDANCE_MESSAGES["idle"]), (
+            "_GUIDANCE_MESSAGES['idle'] must include a line referencing '.aib_memory/attachments/'."
+        )
+
+    def test_implementation_ready_guidance_contains_attachments_reminder(self) -> None:
+        """'implementation_ready' guidance must contain at least one line referencing 'attachments'."""
+        assert any(
+            "attachments" in line for line in menu._GUIDANCE_MESSAGES["implementation_ready"]
+        ), (
+            "_GUIDANCE_MESSAGES['implementation_ready'] must include a line referencing "
+            "'.aib_memory/attachments/'."
+        )

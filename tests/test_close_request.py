@@ -16,7 +16,6 @@ from common import format_markdown_table, parse_markdown_table, read_text, write
 # ---------------------------------------------------------------------------
 
 REGISTER_HEADER = ["request_id", "title", "folder", "state", "created_at", "closed_at"]
-ITER_HEADER = ["iteration_id", "state", "created_at", "closed_at", "summary"]
 
 
 def _make_request(workspace: Path, req_id: str, state: str = "Active") -> Path:
@@ -33,33 +32,14 @@ def _make_request(workspace: Path, req_id: str, state: str = "Active") -> Path:
     rows.append([req_id, "Test Request", folder_rel, state, "2026-01-01 10:00:00 +0000", ""])
     write_text(reg_path, "# Requests Register\n\n" + format_markdown_table(header, rows))
 
-    # Write a minimal request.md stub satisfying validate_request_md
-    request_md = (
-        "# Request\n\n"
+    # Write a minimal plan.md stub
+    plan_md = (
         "## Goal\n\n"
-        "## Background\n\n"
-        "## Scope\n\n"
-        "## Out of scope\n\n"
         "## Constraints\n\n"
         "## Success criteria\n"
     )
-    write_text(folder / "request.md", request_md)
-    write_text(
-        folder / "iterations.md",
-        "# Iterations\n\n" + format_markdown_table(ITER_HEADER, [["01", "Completed", "2026-01-01 10:00:00 +0000", "2026-01-01 11:00:00 +0000", "Initial"]]),
-    )
+    write_text(folder / "plan.md", plan_md)
     return folder
-
-
-def _add_active_iteration(request_folder: Path) -> None:
-    iter_path = request_folder / "iterations.md"
-    content = read_text(iter_path)
-    header, rows = parse_markdown_table(content)
-    if not header:
-        header = ITER_HEADER
-    rows = [r for r in rows if r[1] != "Active"]
-    rows.append(["02", "Active", "2026-01-01 12:00:00 +0000", "", "Follow-up"])
-    write_text(iter_path, "# Iterations\n\n" + format_markdown_table(header, rows))
 
 
 def _load_script(name: str):
@@ -110,14 +90,6 @@ class TestCloseRequest:
         matching = [r for r in rows if r[col["request_id"]] == "R-20260101-1001"]
         assert matching[0][col["closed_at"]] != ""
 
-    def test_auto_closes_active_iteration(self, workspace_dir: Path):
-        folder = _make_request(workspace_dir, "R-20260101-1002")
-        _add_active_iteration(folder)
-        rc = _run_close_request(workspace_dir)
-        assert rc == 0
-        iter_content = read_text(folder / "iterations.md")
-        assert "Active" not in iter_content
-
     def test_already_closed_request_fails(self, workspace_dir: Path):
         _make_request(workspace_dir, "R-20260101-1003", state="Closed")
         rc = _run_close_request(workspace_dir, "R-20260101-1003")
@@ -147,8 +119,7 @@ class TestCloseRequest:
         assert rc == 0
         content = read_text(input_path)
         assert "No active request" in content
-        assert "1 (all)" in content
-        assert "5 (mandatory only)" in content
+        assert "Question threshold" not in content
         assert "R-20260101-1005" not in content
 
     def test_does_not_fail_when_input_md_missing(self, workspace_dir: Path):

@@ -4,8 +4,6 @@
 
 AI Builder (AIB) is a minimal, model-agnostic framework for specification-driven development.
 
-See `.aib_brain/Concepts.md` for the complete definition of goals, concepts, objectives, requirements, and implementation details.
-
 ## Installation
 
 Download the versioned archive for your target release from the `versions/` folder in this repository:

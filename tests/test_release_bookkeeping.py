@@ -258,6 +258,60 @@ def test_idempotent_rerun_after_reset(repo: Path) -> None:
 # Tests for changes_body GITHUB_OUTPUT emission
 # ---------------------------------------------------------------------------
 
+def test_minor_version_pre_bumped_on_branch_accepted(tmp_path: Path) -> None:
+    """A branch that already carries a MINOR bump (e.g. v1.1.0) must be accepted."""
+    _init_repo(tmp_path, base_marker="v1.0.0")
+    # Simulate a manually pre-bumped MINOR version on the branch.
+    brain = tmp_path / ".aib_brain"
+    (brain / "v1.0.0").unlink()
+    (brain / "v1.1.0").write_text("", encoding="utf-8")
+    _git(["add", "-A"], cwd=tmp_path)
+    _git(["commit", "-q", "-m", "manual minor bump"], cwd=tmp_path)
+
+    result = _run_script(tmp_path)
+    assert result.returncode == 0, result.stderr
+
+    log_path = tmp_path / "logs" / "version_v1.1.0_log.md"
+    assert log_path.exists(), "Version log for pre-bumped MINOR version must be created"
+    assert (brain / "v1.1.0").exists(), "MINOR marker must remain unchanged"
+    assert not (brain / "v1.0.0").exists()
+    assert not (brain / "v1.0.1").exists(), "Script must NOT auto-apply an extra PATCH bump"
+
+
+def test_major_version_pre_bumped_on_branch_accepted(tmp_path: Path) -> None:
+    """A branch that already carries a MAJOR bump (e.g. v2.0.0) must be accepted."""
+    _init_repo(tmp_path, base_marker="v1.2.22")
+    brain = tmp_path / ".aib_brain"
+    (brain / "v1.2.22").unlink()
+    (brain / "v2.0.0").write_text("", encoding="utf-8")
+    _git(["add", "-A"], cwd=tmp_path)
+    _git(["commit", "-q", "-m", "manual major bump"], cwd=tmp_path)
+
+    result = _run_script(tmp_path)
+    assert result.returncode == 0, result.stderr
+
+    log_path = tmp_path / "logs" / "version_v2.0.0_log.md"
+    assert log_path.exists(), "Version log for pre-bumped MAJOR version must be created"
+    assert (brain / "v2.0.0").exists()
+    assert not (brain / "v1.2.22").exists()
+    assert not (brain / "v1.2.23").exists(), "Script must NOT auto-apply an extra PATCH bump"
+
+
+def test_marker_backwards_from_base_raises_error(tmp_path: Path) -> None:
+    """A branch marker older than the base marker must raise an error."""
+    _init_repo(tmp_path, base_marker="v1.2.5")
+    brain = tmp_path / ".aib_brain"
+    # Place a marker that is older than the base.
+    (brain / "v1.2.5").unlink()
+    (brain / "v1.2.3").write_text("", encoding="utf-8")
+    _git(["add", "-A"], cwd=tmp_path)
+    _git(["commit", "-q", "-m", "backwards marker"], cwd=tmp_path)
+
+    result = _run_script(tmp_path)
+    assert result.returncode != 0
+    assert "went backwards" in result.stderr or "went backwards" in result.stdout
+
+
 def test_changes_body_output_emitted_when_curated_non_empty(repo: Path, tmp_path: Path) -> None:
     """changes_body output must contain curated bullet lines when curated file is non-empty."""
     curated = repo / "logs" / "next_version_changes.md"

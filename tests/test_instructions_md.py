@@ -36,13 +36,13 @@ class TestPromptsContainInstructionsMd:
     """Assertions for SC-2: each prompt file contains the instructions.md pre-read step."""
 
     PROMPT_FILES = [
-        "aib-analysis.md",
+        "aib-analyze.md",
         "aib-implement.md",
-        "aib-context.md",
+        "aib-refresh-context.md",
     ]
 
     def test_aib_analysis_contains_instructions_md(self):
-        path = PROMPTS_DIR / "aib-analysis.md"
+        path = PROMPTS_DIR / "aib-analyze.md"
         content = path.read_text(encoding="utf-8")
         assert "instructions.md" in content
 
@@ -52,7 +52,7 @@ class TestPromptsContainInstructionsMd:
         assert "instructions.md" in content
 
     def test_aib_context_contains_instructions_md(self):
-        path = PROMPTS_DIR / "aib-context.md"
+        path = PROMPTS_DIR / "aib-refresh-context.md"
         content = path.read_text(encoding="utf-8")
         assert "instructions.md" in content
 

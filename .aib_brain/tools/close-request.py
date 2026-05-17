@@ -15,7 +15,6 @@ from pathlib import Path
 from common import (
     ACTIVE,
     CLOSED,
-    COMPLETED,
     ValidationError,
     ensure_workspace,
     format_markdown_table,
@@ -79,20 +78,6 @@ def main() -> None:
             raise ValidationError("Request already closed")
 
         folder_rel = target[col["folder"]]
-        iterations_path = workspace / folder_rel / "iterations.md"
-        if iterations_path.exists():
-            it_header, it_rows = parse_markdown_table(read_text(iterations_path))
-            it_col = {name: idx for idx, name in enumerate(it_header)}
-            active_iterations = [r for r in it_rows if r[it_col["state"]] == ACTIVE]
-            if active_iterations:
-                now = now_iso()
-                for r in active_iterations:
-                    r[it_col["state"]] = COMPLETED
-                    r[it_col["closed_at"]] = now
-                content = "# Iterations\n\n" + format_markdown_table(it_header, it_rows)
-                write_text(iterations_path, content)
-                for r in active_iterations:
-                    print(f"Auto-closed iteration {r[it_col['iteration_id']]} before closing request.")
 
         # Move active-request artifacts from .aib_memory/ root to the request
         # subfolder before marking Closed. This is a safety-net call; if
@@ -119,7 +104,7 @@ def main() -> None:
         ):
             print(
                 "WARNING: .aib_memory/attachments/ is non-empty. "
-                "Files were not archived — consider running aib-analysis.md before closing."
+                "Files were not archived — consider running aib-analyze.md before closing."
             )
 
         # Reset input.md to the seed template so the Active request line reads
@@ -131,9 +116,7 @@ def main() -> None:
                 "## Active request\n"
                 "No active request\n\n"
                 "## Options\n"
-                "- [ ] No changes — provide answer only\n"
-                "- [ ] Skip analysis document generation\n"
-                "- Question threshold: [ ] 1 (all)  [ ] 2  [x] 3  [ ] 4  [ ] 5 (mandatory only)\n\n"
+                "- Minimum questions: 0\n\n"
                 "## Input\n\n"
             )
             write_text(input_file, input_seed)

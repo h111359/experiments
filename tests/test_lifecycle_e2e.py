@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import shutil
 import subprocess
 import sys
 import tempfile
@@ -12,7 +11,6 @@ import pytest
 
 WORKSPACE_ROOT = Path(__file__).resolve().parent.parent
 TOOLS_DIR = WORKSPACE_ROOT / ".aib_brain" / "tools"
-TEMPLATES_DIR = WORKSPACE_ROOT / ".aib_brain" / "templates"
 
 
 # ---------------------------------------------------------------------------
@@ -20,9 +18,7 @@ TEMPLATES_DIR = WORKSPACE_ROOT / ".aib_brain" / "templates"
 # ---------------------------------------------------------------------------
 
 def _make_brain_only_workspace(root: Path) -> None:
-    (root / ".aib_brain" / "templates").mkdir(parents=True, exist_ok=True)
-    for tmpl in TEMPLATES_DIR.glob("*.md"):
-        shutil.copy(tmpl, root / ".aib_brain" / "templates" / tmpl.name)
+    (root / ".aib_brain").mkdir(parents=True, exist_ok=True)
 
 
 def _run(script_name: str, workspace: Path, extra_args: list[str] | None = None) -> subprocess.CompletedProcess:

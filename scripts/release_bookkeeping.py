@@ -32,7 +32,7 @@ class ReleaseBookkeepingError(RuntimeError):
     pass
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, order=True)
 class Version:
     major: int
     minor: int
@@ -333,16 +333,25 @@ def main(argv: list[str]) -> int:
     head_marker = _require_single_marker(head_markers, where=brain_path.as_posix())
 
     base_version = Version.parse_marker(base_marker)
-    target_version = base_version.bump_patch()
-    target_marker = target_version.to_marker()
+    head_version = Version.parse_marker(head_marker)
 
-    # Ensure the PR branch marker state is consistent.
-    if head_marker not in (base_marker, target_marker):
+    # Determine the target version:
+    # - head == base: auto-apply PATCH bump (normal CI path).
+    # - head > base:  branch already carries a manual bump (PATCH, MINOR, or MAJOR); use as-is.
+    # - head < base:  marker went backwards — always an error.
+    if head_version < base_version:
         raise ReleaseBookkeepingError(
-            "SemVer marker state mismatch between base and PR branch. "
+            "SemVer marker went backwards on PR branch. "
             f"Base marker is '{base_marker}', but PR branch marker is '{head_marker}'. "
-            "Rebase the PR branch onto the latest base branch and rerun."
+            "Ensure the PR branch marker is at least as recent as the base branch marker."
         )
+    elif head_version == base_version:
+        target_version = base_version.bump_patch()
+    else:
+        # head_version > base_version: branch already carries the target bump.
+        target_version = head_version
+
+    target_marker = target_version.to_marker()
 
     log_path = log_dir / f"version_{target_marker}_log.md"
 

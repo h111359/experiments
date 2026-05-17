@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import shutil
 import sys
 import tempfile
 from pathlib import Path
@@ -16,7 +15,6 @@ import pytest
 
 WORKSPACE_ROOT = Path(__file__).resolve().parent.parent
 TOOLS_DIR = WORKSPACE_ROOT / ".aib_brain" / "tools"
-TEMPLATES_DIR = WORKSPACE_ROOT / ".aib_brain" / "templates"
 
 if str(TOOLS_DIR) not in sys.path:
     sys.path.insert(0, str(TOOLS_DIR))
@@ -35,13 +33,9 @@ REGISTER_CONTENT = (
 
 def _seed_workspace(root: Path) -> None:
     """Create the minimum workspace structure required by AIB tool scripts."""
-    (root / ".aib_brain" / "templates").mkdir(parents=True, exist_ok=True)
+    (root / ".aib_brain").mkdir(parents=True, exist_ok=True)
     (root / ".aib_memory" / "requests").mkdir(parents=True, exist_ok=True)
     (root / ".aib_memory" / "docs").mkdir(parents=True, exist_ok=True)
-
-    # Copy real templates so scripts can load them
-    for tmpl in TEMPLATES_DIR.glob("*.md"):
-        shutil.copy(tmpl, root / ".aib_brain" / "templates" / tmpl.name)
 
     # Seed empty requests register
     register = root / ".aib_memory" / "requests_register.md"

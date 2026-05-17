@@ -1,4 +1,4 @@
-name: AIB SemVer PATCH bump and log
+name: AIB SemVer bump and log
 
 on:
   pull_request:
