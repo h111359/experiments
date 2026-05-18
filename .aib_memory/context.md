@@ -1,6 +1,6 @@
 # Product Context
 
-> **Auto-generated** by `aib-refresh-context.md` on 2026-05-17 23:55 +03:00.
+> **Auto-generated** by `aib-refresh-context.md` on 2026-05-18 19:35 +03:00.
 > Framework definition assets (`.aib_brain/`) are excluded by design — see `.aib_brain/` for AIB framework internals.
 > This document is a synthesis of product documentation and workspace sources. It is fully replaced on each execution.
 
@@ -22,11 +22,13 @@ AIB operates in the software engineering / internal tooling domain. It supports 
 
 - **Communicate user intent**: Developer writes into `.aib_memory/input.md`; the AI agent reads it, auto-creates a request, archives the input, and resets the file.
 
-- **Execute analysis workflow**: AI agent generates `plan.md` (auto-request branch) and/or `analysis.md` with 5 mandatory sections (Overview, Files Read During This Analysis Run, Input Interpretation, Research Results, Implementation Alternatives); updates `plan.md` with Plan and Decisions sections. The analysis prompt requires a mandatory Decision Fork Enumeration step and a `### Decision Points` heading/sub-heading list within `## Implementation Alternatives` of the analysis document. When multiple valid implementation choices exist, AI-generated Q-blocks are written to `input.md ## Questions` for developer review. The prompt includes an `## Execution Model Summary` section, a `## Global Constraints` section (GC-01 through GC-06), and a `## Failure Handling` section. Section 4 (Preflight) is organized into four labeled phases: Phase 1 (State Resolution), Phase 2 (Input Acquisition), Phase 3 (State Mutation), and Phase 4 (Context Enrichment). Section 7.3 is split into three sub-sections: 7.3.1 Decision Identification, 7.3.2 Decision Classification, and 7.3.3 Q-block Generation. Section 8 is split into three sub-sections: 8.1 Eligibility Check, 8.2 Finalize Script Invocation, and 8.3 Post-conditions. Section 4.8 (Answer Application Sub-flow) begins with an all-answered pre-check that halts execution when any Q-block is unanswered, leaving `input.md` unchanged.
+- **Execute analysis workflow**: AI agent generates `plan.md` (auto-request branch) and/or `analysis.md` with 5 mandatory sections (Overview, Files Read During This Analysis Run, Input Interpretation, Research Results, Implementation Alternatives); updates `plan.md` with Plan and Decisions sections. On every run — first pass or re-run — `aib-analyze.md` fully replaces (overwrites) `analysis-<request_id>.md`; appending to, prepending to, or partially editing the existing file is PROHIBITED. The analysis prompt requires a mandatory Decision Fork Enumeration step and a `### Decision Points` heading/sub-heading list within `## Implementation Alternatives` of the analysis document. When multiple valid implementation choices exist, AI-generated Q-blocks are written to `input.md ## Questions` for developer review. The prompt includes an `## Execution Model Summary` section, a `## Global Constraints` section (GC-01 through GC-06), and a `## Failure Handling` section. Section 4 (Preflight) is organized into four labeled phases: Phase 1 (State Resolution), Phase 2 (Input Acquisition), Phase 3 (State Mutation), and Phase 4 (Context Enrichment). Section 7.3 is split into three sub-sections: 7.3.1 Decision Identification, 7.3.2 Decision Classification, and 7.3.3 Q-block Generation. Section 8 is split into three sub-sections: 8.1 Eligibility Check, 8.2 Finalize Script Invocation, and 8.3 Post-conditions. Section 4.8 (Answer Application Sub-flow) begins with an all-answered pre-check that halts execution when any Q-block is unanswered, leaving `input.md` unchanged. `analysis-convention.md` section 3 is titled "File Naming, Location & Write Behavior (Normative)".
 
 - **Execute implement workflow**: AI agent applies request scope, updates product docs, creates/appends `implementation.md`, and auto-closes the request upon successful completion.
 
 - **Release bookkeeping**: CI-automated version bump (auto-applies PATCH when head marker equals the base; accepts any manually pre-applied MINOR or MAJOR bump), per-version log creation, and `.aib_brain/` zip archive in `versions/` on pull request events targeting `main`.
+
+- **Video Tutorials**: `recordings/` at the repository root contains eight sequentially numbered WebM video files (01_installation through 08_context) providing step-by-step walkthroughs of the AIB workflow.
 
 Organizational units: Product Team (request lifecycle), AIB Maintainers (framework assets), Repository Contributors (read/write access gated by repository permissions).
 
@@ -706,7 +708,7 @@ CI rollback: reset or rebase the PR branch to remove the stale version log, then
 
 - `tests/test_requirements_analysis_convention.py` — Structural integrity tests for `requirements-analysis-convention.md`: verifies file existence, mandatory preamble sections, all eight category sections, checkbox format, at least two framework citations (BABOK, IEEE, INVEST, SMART), and pass/threshold language in the Acceptance Gate Declaration section.
 
-All tests use `tempfile.TemporaryDirectory` for isolation. 289 tests pass.
+All tests use `tempfile.TemporaryDirectory` for isolation.
 
 ### CI/CD Pipeline
 
@@ -861,6 +863,8 @@ All workspace files are listed below in ascending path order; excluded directori
 - `logs/` — Per-version release log files committed to VCS.
 
 - `logs/next_version_changes.md` — Curated, append-only bullet list of user-visible changes maintained by the AI agent during implementation; preferred `Changes:` source for the next release log; reset to empty by CI after incorporation; VCS-tracked.
+
+- `recordings/` — Contains 8 WebM video tutorial files following the pattern `NN_title.webm`; individual items are not listed.
 
 - `versions/` — Versioned `.aib_brain/` zip archives committed to VCS; used for installation.
 

@@ -239,7 +239,7 @@ _Opens with a brownfield context check; then covers steps 6–9 (within section 
 
 ### 6.1 File placement and replacement
 
-- Full content replacement of `.aib_memory/analysis-<request_id>.md` (NOT inside the request subfolder — the active analysis lives at `.aib_memory/` root while the request is active, using the ID-suffixed filename).
+- Full content replacement (overwrite) of `.aib_memory/analysis-<request_id>.md` (NOT inside the request subfolder — the active analysis lives at `.aib_memory/` root while the request is active, using the ID-suffixed filename). On every run — first pass or re-run — the file is written from scratch and ALL prior content is discarded. MUST NOT append to, prepend to, or partially edit the existing file. The fact that the prior analysis file was read during this run (e.g., to source ## Input Interpretation for the Answer Application Sub-flow) does NOT authorize retaining any of its content in the output.
 - Must follow the section structure defined in `analysis-convention.md`.
 - Always generated unless triggered from `aib-implement.md` (see Standard Flow Final Step note in section 8).
 

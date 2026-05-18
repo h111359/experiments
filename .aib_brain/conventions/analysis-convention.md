@@ -27,7 +27,7 @@ Normative keywords **MUST**, **MUST NOT**, **SHALL**, **SHOULD**, and **MAY** ar
 
 ***
 
-## 3. File Naming & Location (Normative)
+## 3. File Naming, Location & Write Behavior (Normative)
 
 *   File name **must** follow the pattern: `analysis-<request_id>.md`
     where `<request_id>` is the active request ID (e.g. `analysis-R-20260509-2313.md`).
@@ -38,7 +38,7 @@ Normative keywords **MUST**, **MUST NOT**, **SHALL**, **SHOULD**, and **MAY** ar
 
 *   Exactly one analysis file per request **MAY** exist at a time.
 
-*   Re-runs of `aib-analyze.md` **must** amend the active copy at `.aib_memory/analysis-<request_id>.md` 
+*   Re-runs of `aib-analyze.md` **must** fully replace (overwrite) the active copy at `.aib_memory/analysis-<request_id>.md`. Appending to, prepending to, or partially editing the existing file is PROHIBITED. The prior file content is discarded entirely; the output is always written from scratch as a complete, self-contained document.
 
 *   Version metadata (for example: version/author/status headers) **must not** be embedded in the analysis file. Versioning is handled by VCS.
 

@@ -9,7 +9,7 @@ Produce or modify `.aib_memory/context.md` — a unified, structured synthesis o
 ## Core requirements (normative):
 - MUST be workspace/tool/model/vendor agnostic.
 - MUST handle large repos (chunked inventory + selective deep reads).
-- MUST produce full content replacement of `.aib_memory/context.md` on each execution (not append).
+- MUST produce full content replacement of `.aib_memory/context.md` on each execution (not append, prepend, or partially edit).
 - Re-execution with unchanged sources MUST produce semantically equivalent output.
 - Explore especially `.aib_brain/` folder contents as it is the prime product artefact.
 

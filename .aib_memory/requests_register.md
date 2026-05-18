@@ -31,3 +31,6 @@
 | R-20260517-1625 | Improve context generation and input reset rules | .aib_memory/requests/R-20260517-1625-improve-context-generation-and-input-reset-rules | Closed | 2026-05-17 16:25:56 +0300 | 2026-05-17 17:56:26 +0300 |
 | R-20260517-1808 | Restructure analysis document sections and format | .aib_memory/requests/R-20260517-1808-restructure-analysis-document-sections-and-format | Closed | 2026-05-17 18:08:00 +0300 | 2026-05-17 22:08:37 +0300 |
 | R-20260517-2334 | Create user guide as self-contained HTML page | .aib_memory/requests/R-20260517-2334-create-user-guide-as-self-contained-html-page | Closed | 2026-05-17 23:34:02 +0300 | 2026-05-17 23:59:34 +0300 |
+| R-20260518-1226 | Fix analysis.md full-replace rule to prevent duplication | .aib_memory/requests/R-20260518-1226-fix-analysis-md-full-replace-rule-to-prevent-duplication | Closed | 2026-05-18 12:26:00 +0300 | 2026-05-18 13:05:02 +0300 |
+| R-20260518-1314 | Fix user guide to reflect AIB as a product | .aib_memory/requests/R-20260518-1314-fix-user-guide-to-reflect-aib-as-a-product | Closed | 2026-05-18 13:14:22 +0300 | 2026-05-18 13:36:22 +0300 |
+| R-20260518-1920 | Describe recordings folder in README.md | .aib_memory/requests/R-20260518-1920-describe-recordings-folder-in-readme-md | Closed | 2026-05-18 19:20:40 +0300 | 2026-05-18 19:49:05 +0300 |

@@ -380,7 +380,6 @@
         <ul>
           <li><strong>Python 3.10+</strong> available in your terminal (<code>python --version</code> to verify).</li>
           <li><strong>Terminal</strong> open at the repository root (where <code>.aib_brain/</code> and <code>.aib_memory/</code> are located).</li>
-          <li><strong>Git</strong> available on PATH (required for CI release bookkeeping).</li>
           <li>An <strong>AI coding interface</strong> such as VS Code with GitHub Copilot, Claude Code, or Cursor.</li>
         </ul>
 
@@ -620,7 +619,8 @@
   conventions/       ← Convention files defining document structure and quality gates
   prompts/           ← Prompt files invoked in your AI chat interface
   tools/             ← Python tool scripts for deterministic AIB actions
-  README.md          ← This guide's source of truth
+  README.md          ← Quick-start overview and workspace guide
+  user_guide.html    ← Self-contained interactive user guide (browser-viewable)
   run.bat            ← Windows launcher for the interactive menu
   run.sh             ← Linux/macOS launcher for the interactive menu
   vM.m.p             ← SemVer marker file (e.g. v1.3.0)
@@ -628,7 +628,7 @@
 .aib_memory/         ← Workspace-specific artifacts (project-scoped)
   archives/          ← Archived snapshots of previous .aib_memory/ states
   attachments/       ← Staging folder for supplementary input files
-  logs/              ← Version logs and curated change bullets
+  logs/              ← Tool execution and action logs
   requests/          ← Closed request subfolders (plan, analysis, implementation)
   context.md         ← Auto-generated product knowledge document
   input.md           ← Primary user-to-agent communication file
@@ -710,7 +710,7 @@
           <li><span class="glossary-term">Auto-close</span> — Behavior whereby <code>aib-implement.md</code> invokes <code>close-request.py</code> automatically after successful implementation.</li>
           <li><span class="glossary-term">Auto-request</span> — Behavior of <code>aib-analyze.md</code> whereby, when no Active request exists and <code>input.md</code> is non-empty, it auto-creates a request and generates <code>plan.md</code> from <code>input.md</code> content.</li>
           <li><span class="glossary-term">Brain Folder</span> — Folder (<code>.aib_brain/</code>) containing reusable AIB assets: prompts, conventions, and tool scripts.</li>
-          <li><span class="glossary-term">CI</span> — Continuous Integration: automated pipeline that runs on pull request events targeting <code>main</code>.</li>
+          <li><span class="glossary-term">CI</span> — Continuous Integration: automated pipeline that runs on pull request events.</li>
           <li><span class="glossary-term">Convention File</span> — A file in <code>.aib_brain/conventions/</code> that defines the required structure and validation rules for a specific product doc or coding standard.</li>
           <li><span class="glossary-term">Curated Change Log</span> — <code>logs/next_version_changes.md</code>: append-only Markdown bullet list maintained by the AI agent during implementation; preferred source of <code>Changes:</code> bullets in the next per-version release log; reset to empty by CI after incorporation.</li>
           <li><span class="glossary-term">FR</span> — Functional Requirement.</li>
@@ -729,7 +729,7 @@
           <li><span class="glossary-term">SLO</span> — Service Level Objective.</li>
           <li><span class="glossary-term">Tool Script</span> — A Python script in <code>.aib_brain/tools/</code> implementing a deterministic AIB action.</li>
           <li><span class="glossary-term">User Guide</span> — Self-contained HTML file at <code>.aib_brain/user_guide.html</code>; browser-viewable reference documentation for AIB users covering the full AIB workflow, prompt invocations, Q&amp;A mechanism, workspace structure, and glossary. Requires no network connectivity to open.</li>
-          <li><span class="glossary-term">VCS</span> — Version Control System (Git in this workspace).</li>
+          <li><span class="glossary-term">VCS</span> — Version Control System.</li>
           <li><span class="glossary-term">Versioned Archive</span> — Zip file created by CI per version bump, stored in <code>versions/aib_brain_vX.Y.Z.zip</code>; committed to VCS; used for AIB installation.</li>
           <li><span class="glossary-term">Workspace</span> — The repository root containing both the AIB brain folder and memory folder plus any product-specific code and configuration.</li>
         </ul>
