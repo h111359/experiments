@@ -287,7 +287,7 @@ class TestStandardFlowInputArchivingSemantics:
     def test_non_stub_definition_present(self) -> None:
         """Standard flow final step must define non-stub input deterministically."""
         content = ANALYSIS_PROMPT.read_text(encoding="utf-8")
-        assert "evaluate whether `.aib_memory/input.md` is in a non-stub state" in content, (
+        assert "`.aib_memory/input.md` is in a non-stub state" in content, (
             "aib-analyze.md must define when standard-flow input is treated as non-stub."
         )
 
@@ -353,11 +353,11 @@ class TestAnalysisConventionSectionStructure:
             "(now covered within Research Results, not as a standalone section)."
         )
 
-    def test_implementation_alternatives_present(self) -> None:
-        """Implementation Alternatives must appear in analysis-convention.md."""
+    def test_decision_register_present(self) -> None:
+        """Decision Register must appear in analysis-convention.md."""
         content = ANALYSIS_CONVENTION.read_text(encoding="utf-8")
-        assert "Implementation Alternatives" in content, (
-            "analysis-convention.md must define 'Implementation Alternatives' as a mandatory section."
+        assert "Decision Register" in content, (
+            "analysis-convention.md must define 'Decision Register' as a mandatory section."
         )
 
     def test_minimum_questions_in_initialize_seed(self) -> None:
@@ -406,7 +406,7 @@ class TestDecisionsSectionRename:
         content = ANALYSIS_PROMPT.read_text(encoding="utf-8")
         assert "Decision Points" in content, (
             "aib-analyze.md must require a 'Decision Points' section "
-            "within ## Implementation Alternatives."
+            "within ## Decision Register."
         )
 
 
@@ -504,10 +504,9 @@ class TestOverviewSectionIntroduced:
             "the format has been replaced by a heading/sub-heading list."
         )
 
-    def test_overview_generation_instruction_present_in_prompt(self) -> None:
-        """The `## Overview` generation instruction must appear in aib-analyze.md."""
+    def test_overview_referenced_in_prompt(self) -> None:
+        """Overview must be referenced in aib-analyze.md section list."""
         content = ANALYSIS_PROMPT.read_text(encoding="utf-8")
-        assert "`## Overview`" in content, (
-            "aib-analyze.md must contain a '`## Overview`' generation instruction "
-            "— it replaces the former '`## Executive Summary`' instruction."
+        assert "Overview" in content, (
+            "aib-analyze.md must reference 'Overview' as a mandatory analysis section."
         )

@@ -22,15 +22,15 @@ AIB operates in the software engineering and internal tooling domain. It support
 
 - **Communicate user intent**: Developer writes into `.aib_memory/input.md`; the AI agent reads it, auto-creates a request, archives the input, and resets the file.
 
-- **Execute analysis workflow**: AI agent generates `plan.md` (auto-request branch) and/or `analysis.md` with 5 mandatory sections (Overview, Files Read During This Analysis Run, Input Interpretation, Research Results, Implementation Alternatives); updates `plan.md` with Plan and Decisions sections. On every run — first pass or re-run — `aib-analyze.md` fully replaces (overwrites) `analysis-<request_id>.md`; appending to, prepending to, or partially editing the existing file is PROHIBITED.
+- **Execute analysis workflow**: AI agent generates `plan.md` (auto-request branch) and/or `analysis.md` with 5 mandatory sections (Overview, Files Read During This Analysis Run, Input Interpretation, Research Results, Decision Register); updates `plan.md` with Plan and Decisions sections. On every run — first pass or re-run — `aib-analyze.md` fully replaces (overwrites) `analysis-<request_id>.md`; appending to, prepending to, or partially editing the existing file is PROHIBITED.
 
-- **Analysis workflow structure**: The analysis prompt includes an `## Execution Model Summary` chapter, a `## Global Constraints` section (GC-01 through GC-07), and a `## Failure Handling` section. Section 5 (Execution Procedure) is organized into six labeled phases: Phase 1 (State Resolution), Phase 2 (Input Acquisition), Phase 3 (State Mutation), Phase 4 (Context Enrichment), Phase 5 (Analysis Generation), and Phase 6 (Finalization).
+- **Analysis workflow structure**: The analysis prompt follows a 9-step linear execution sequence: (1) Preflight + State Resolution, (2) Context Check, (3) Read Inputs, (4) Halt on Unanswered Questions, (5) Generate Analysis, (6) Archive Input and Reset, (7) Quality Check, (8) Q-block Generation, (9) Plan Generation. The prompt includes an `## Execution Model Summary` chapter, a `## Global Constraints` section (GC-01 through GC-07), and a `## Failure Handling` section.
 
-- **Analysis Q-block rules**: Section 6.3 (Q-block Rules) is split into three sub-sections: 6.3.1 Decision Identification, 6.3.2 Decision Classification, and 6.3.3 Q-block Generation. Phase 6 (Finalization, section 5.7) is split into three sub-sections: 5.7.1 Eligibility Check, 5.7.2 Finalize Script Invocation, and 5.7.3 Post-conditions.
+- **Analysis Q-block rules**: Section 6.3 (Q-block Rules) is split into three sub-sections: 6.3.1 Decision Identification, 6.3.2 Decision Classification, and 6.3.3 Q-block Generation. Q-blocks support two formats: multiple-choice (with 3+ options and a recommended marker) and free-text (with `- Answer: ___` for unbounded information needs). Step 6 (Archive Input and Reset, section 5.6) is split into three sub-sections: 5.6.1 Eligibility Check, 5.6.2 Finalize Script Invocation, and 5.6.3 Post-conditions.
 
-- **Analysis Decision Points requirement**: The analysis prompt requires a mandatory Decision Fork Enumeration step and a `### Decision Points` heading/sub-heading list within `## Implementation Alternatives` of the analysis document. When multiple valid implementation choices exist, AI-generated Q-blocks are written to `input.md ## Questions` for developer review.
+- **Analysis Decision Points requirement**: The analysis prompt requires a mandatory Decision Fork Enumeration step and a `### Decision Points` heading/sub-heading list within `## Decision Register` of the analysis document. When multiple valid implementation choices exist, AI-generated Q-blocks are written to `input.md ## Questions` for developer review.
 
-- **Answer Application Sub-flow**: Section 7.2 (Answer Application Sub-flow) begins with an all-answered pre-check that halts execution when any Q-block is unanswered, leaving `input.md` unchanged. `analysis-convention.md` section 3 is titled "File Naming, Location & Write Behavior (Normative)".
+- **Answer Application Sub-flow**: Section 7.2 (Answer Application Sub-flow) begins with an all-answered pre-check that halts execution when any Q-block is unanswered, leaving `input.md` unchanged. A Q-block is answered when at least one checkbox is marked `[x]` or the `- Answer:` line has non-empty text. `analysis-convention.md` section 3 is titled "File Naming, Location & Write Behavior (Normative)".
 
 - **Execute implement workflow**: AI agent applies request scope, updates product docs, creates/appends `implementation.md`, and auto-closes the request upon successful completion.
 
@@ -196,7 +196,7 @@ Architectural decisions include the following.
 
 AIB prompt files are plain Markdown documents executed by an AI coding agent. Tool scripts are Python 3 scripts that perform file system operations deterministically.
 
-- `aib-analyze.md` implements an 8-chapter prompt structure: Objective; Execution Model Summary; Global Rules; Inputs/Outputs/Dependencies; Execution Procedure; Output Specifications; Sub-flows; Completion Confirmation.
+- `aib-analyze.md` implements a 9-step linear prompt structure: Objective; Execution Model Summary; Global Rules; Inputs/Outputs/Dependencies; Execution Procedure (steps 1–9); Output Specifications; Sub-flows; Completion Confirmation.
 
 - `aib-implement.md` reads the active plan, applies code and documentation changes, runs tests, and invokes `move-request-artifacts.py` and `close-request.py` on success.
 

@@ -52,7 +52,7 @@ Each analysis file **must** contain the following sections in the exact order:
 2. **Files Read During This Analysis Run** **[REQ]**
 3. **Input Interpretation** **[REQ]**
 4. **Research Results** **[REQ]**
-5. **Implementation Alternatives** **[REQ]**
+5. **Decision Register** **[REQ]**
 
 ***
 
@@ -114,8 +114,6 @@ This section is the primary AI reasoning artifact for the request. It documents 
 
 **Rules:**
 
-- Summarize findings and implications; do not embed external links.
-
 - MUST NOT be empty or contain only stub notices.
 
 - `implement` MUST NOT read or act on this section.
@@ -123,7 +121,7 @@ This section is the primary AI reasoning artifact for the request. It documents 
 
 ***
 
-### 4.5 Implementation Alternatives **[REQ]**
+### 4.5 Decision Register **[REQ]**
 
 This section is the primary driver for Q-block generation. It MUST be completed before any Q-block is written.
 
@@ -138,19 +136,25 @@ For each implementation decision fork identified in the request scope, define a 
     - Key trade-offs (benefits and drawbacks).
     - Expected codebase impact.
 
-  - The resolution: tag and rationale per the classification rules in `aib-analyze.md` section 7.3.2.
-    - Tag `ask` — a Q-block MUST be raised for developer input. The AI MUST NOT express a preference or steer the developer toward any option. Present choices neutrally.
+  - Resolution classification:
     - Tag `resolve-autonomously` — ONLY when the developer's own `input.md ## Input` text OR a named, specific section of a workspace convention file explicitly and unambiguously resolves the fork. The rationale MUST quote or cite the exact source text and file path. External benchmarking, industry best practices, and AI judgment are NOT valid justifications for this tag.
+    - Tag `ask` — a Q-block MUST be raised for developer input. The AI MUST NOT express a preference or steer the developer toward any option. Present choices neutrally.
 
-- A `### Decision Points` section using a heading/sub-heading list — one `#### Fork: <name>` level-4 heading per fork, each containing bullet list items for Tag and Rationale/Resolution.
+  - Resolution outcome: After resolution, retain only the chosen alternative. Discard non-chosen alternatives from the final document.
+
+- A `### Decision Points` section using a heading/sub-heading list — one `#### Choice: <name>` level-4 heading per fork, each containing bullet list items for Tag and Rationale/Resolution.
 
 - If no decision forks are identified, include a single entry documenting that fact.
 
 **Rules:**
 
-- At least one named alternative MUST be documented per decision fork.
+- At least one alternative MUST be documented per decision fork.
 
 - When in doubt whether to tag `ask` or `resolve-autonomously`, always tag `ask`.
+
+- `resolve-autonomously` MUST cite a concrete source (exact source text and file path).
+
+- Update resolution after human answer is received.
 
 - MUST NOT be empty.
 
@@ -158,15 +162,7 @@ For each implementation decision fork identified in the request scope, define a 
 
 ***
 
-## 5. Maintenance Rules (Normative)
-
-*   Idempotence: same memory state and same request should converge to same analysis intent.
-*   Change drivers: update analysis when scope changes, new evidence appears, or risk state changes.
-*   Closure: once a request is closed in `requests_register.md`, analysis remains unchanged except factual corrections.
-
-***
-
-## 6. Formatting Requirements
+## 5. Formatting Requirements
 
 *   All headings must use `##` or `###` consistent with this convention.
 *   Bullet lists must use `- `.
@@ -181,19 +177,16 @@ For each implementation decision fork identified in the request scope, define a 
 
 ***
 
-## 7. Determinism Rules (Normative)
+## 6. Determinism Rules (Normative)
 
-*   Given the same memory state and request input, analysis output intent must be identical.
 *   AI must not guess beyond request scope.
 *   If request ambiguity exists that cannot be resolved internally, create a `Q<nnn>` question block in `plan-<request_id>.md` -> `## Decisions` instead of making assumptions.
 
 ***
 
-## 8. Prohibited Content
+## 7. Prohibited Content
 
 *   Secrets, private keys, credentials, tokens, or sensitive PII.
-*   External hyperlinks.
-*   Embedded images or diagrams.
 *   In-file version/author/status metadata headers.
 
 ***

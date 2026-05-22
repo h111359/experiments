@@ -83,9 +83,9 @@ When `aib-analyze.md` identifies decision points with multiple valid implementat
 2. Each question includes:
    - The question text.
    - A `> **Why this matters:**` line explaining the implementation impact.
-   - Mutually exclusive options with checkboxes; the first option is marked `*(recommended)*` as the AI's preferred choice.
-   - A `> Answer:` field for free-text responses.
-3. Answer questions by checking `[x]` next to your chosen option, or writing a free-text answer in the `> Answer:` field.
+   - For multiple-choice: mutually exclusive options with checkboxes; the first option is marked `*(recommended)*` as the AI's preferred choice.
+   - For free-text: a `- Answer: ___` field when no bounded options exist.
+3. Answer questions by checking `[x]` next to your chosen option (multiple-choice), or writing a free-text answer after `- Answer:`.
 4. If you leave a question unanswered, the Answer Application Sub-flow halts with an error message and leaves `input.md` unchanged. All Q-blocks must be answered before re-running analysis.
 5. Re-run `aib-analyze.md` — the prompt reads your answers, applies them to the relevant `plan.md` sections, and clears the `## Questions` section from `input.md`.
 
