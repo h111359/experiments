@@ -130,23 +130,25 @@ When `aib-analyze.md` identifies decision points with multiple valid implementat
 
 .aib_brain/
   - conventions/
-  - prompts/  
+  - prompts/
   - tools/
   - README.md
   - run.bat
   - run.sh
   - user_guide.html
-  - vM.m.p (semver file)
+  - vM.m.p (semver marker file)
 .aib_memory/
-  - archives/
   - attachments/
-  - logs/
   - requests/
-  - context.md 
+  - context.md
   - input.md
   - instructions.md
   - requests_register.md
-  - vM.m.p (semver file)
+logs/
+  - next_version_changes.md
+  - version_vX.Y.Z_log.md (per-version logs)
+versions/
+  - aib_brain_vX.Y.Z.zip (versioned archives)
 
 ## Request Folder Artifacts
 

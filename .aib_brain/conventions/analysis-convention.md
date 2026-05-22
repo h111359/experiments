@@ -170,13 +170,14 @@ For each implementation decision fork identified in the request scope, define a 
 
 *   All headings must use `##` or `###` consistent with this convention.
 *   Bullet lists must use `- `.
+*   When listing multiple consecutive items, present them as a list rather than a single long sentence: use a bulleted list when order does not matter and an enumerated (numbered) list when order matters. Apply this rule whenever listing two or more discrete items. Ensure list items use parallel phrasing (same grammatical form) and consistent punctuation; keep items concise. If a list item contains enumerated parts, place them in a sublist.
 *   Make a list of sub-bullets if the bullet text is split by symbols like `;`
 *   In case of enumerated parts in a single list item - position them in a sublist
 *   Tables must use standard GitHub Markdown table syntax.
 *   No HTML is allowed.
-*   No images, diagrams, embeds, or external hyperlinks.
 *   The document must be deterministic (same inputs -> same output intent).
 *   Separate chapters, bullets with empty lines for readability
+*   
 
 ***
 

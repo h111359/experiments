@@ -34,3 +34,5 @@
 | R-20260518-1226 | Fix analysis.md full-replace rule to prevent duplication | .aib_memory/requests/R-20260518-1226-fix-analysis-md-full-replace-rule-to-prevent-duplication | Closed | 2026-05-18 12:26:00 +0300 | 2026-05-18 13:05:02 +0300 |
 | R-20260518-1314 | Fix user guide to reflect AIB as a product | .aib_memory/requests/R-20260518-1314-fix-user-guide-to-reflect-aib-as-a-product | Closed | 2026-05-18 13:14:22 +0300 | 2026-05-18 13:36:22 +0300 |
 | R-20260518-1920 | Describe recordings folder in README.md | .aib_memory/requests/R-20260518-1920-describe-recordings-folder-in-readme-md | Closed | 2026-05-18 19:20:40 +0300 | 2026-05-18 19:49:05 +0300 |
+| R-20260519-1209 | Fix analysis duplication on re-run after Q&A answers | .aib_memory/requests/R-20260519-1209-fix-analysis-duplication-on-re-run-after-q-a-answers | Closed | 2026-05-19 12:09:54 +0300 | 2026-05-19 14:27:34 +0300 |
+| R-20260521-1709 | Restructure aib-analyze.md for clarity and readability | .aib_memory/requests/R-20260521-1709-restructure-aib-analyze-md-for-clarity-and-readability | Closed | 2026-05-21 17:09:43 +0300 | 2026-05-22 12:22:49 +0300 |
