@@ -274,7 +274,8 @@ class TestInitialize:
             input_path = root / ".aib_memory" / "input.md"
             assert input_path.is_file()
             content = input_path.read_text(encoding="utf-8")
-            assert "## Active request" in content
+            assert "## Status" in content
+            assert "State: idle" in content
             assert "## Options" in content
             assert "## Input" in content
 

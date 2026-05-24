@@ -2,7 +2,7 @@
 
 Open [user_guide.html](.aib_brain/user_guide.html) in a browser for the full interactive user guide.
 
-AI Builder (AIB) is a minimal but powerful framework for AI specification based development called. AIB serves for software development, documentation creation, data processing and all other activities which can be achieved with AI.
+AI Builder (AIB) is a minimal but powerful framework for AI specification-driven development. AIB serves for software development, documentation creation, data processing and all other activities which can be achieved with AI.
 
 ## Objectives:
 
@@ -85,11 +85,10 @@ When `aib-analyze.md` identifies decision points with multiple valid implementat
    - A `> **Why this matters:**` line explaining the implementation impact.
    - For multiple-choice: mutually exclusive options with checkboxes; the first option is marked `*(recommended)*` as the AI's preferred choice.
    - For free-text: a `- Answer: ___` field when no bounded options exist.
+   - Format templates and rules for both Q-block types are defined in `.aib_brain/conventions/q-block-convention.md`.
 3. Answer questions by checking `[x]` next to your chosen option (multiple-choice), or writing a free-text answer after `- Answer:`.
 4. If you leave a question unanswered, the Answer Application Sub-flow halts with an error message and leaves `input.md` unchanged. All Q-blocks must be answered before re-running analysis.
 5. Re-run `aib-analyze.md` — the prompt reads your answers, applies them to the relevant `plan.md` sections, and clears the `## Questions` section from `input.md`.
-
-**One Q&A cycle:** After all questions are answered and the analysis prompt is re-run, no new questions are generated (all ambiguities are resolved).
 
 **Note:** The `## Questions` section is ephemeral — it is never part of the `input.md` seed template and is fully cleared after each Q&A cycle.
 

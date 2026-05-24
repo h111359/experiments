@@ -1,6 +1,6 @@
 # Product Context
 
-> **Auto-generated** by `aib-refresh-context.md` on 2026-05-22 local time.
+> **Auto-generated** by `aib-refresh-context.md` on 2026-05-23 local time.
 > Framework definition assets (`.aib_brain/`) are excluded by design — see `.aib_brain/` for AIB framework internals.
 > This document is a synthesis of product documentation and workspace sources. It is fully replaced on each execution.
 
@@ -24,13 +24,19 @@ AIB operates in the software engineering and internal tooling domain. It support
 
 - **Execute analysis workflow**: AI agent generates `plan.md` (auto-request branch) and/or `analysis.md` with 5 mandatory sections (Overview, Files Read During This Analysis Run, Input Interpretation, Research Results, Decision Register); updates `plan.md` with Plan and Decisions sections. On every run — first pass or re-run — `aib-analyze.md` fully replaces (overwrites) `analysis-<request_id>.md`; appending to, prepending to, or partially editing the existing file is PROHIBITED.
 
-- **Analysis workflow structure**: The analysis prompt follows a 9-step linear execution sequence: (1) Preflight + State Resolution, (2) Context Check, (3) Read Inputs, (4) Halt on Unanswered Questions, (5) Generate Analysis, (6) Archive Input and Reset, (7) Quality Check, (8) Q-block Generation, (9) Plan Generation. The prompt includes an `## Execution Model Summary` chapter, a `## Global Constraints` section (GC-01 through GC-07), and a `## Failure Handling` section.
+- **Analysis workflow structure — step sequence**: The analysis prompt (`aib-analyze.md`) follows a 10-step linear execution sequence: (1) Preflight + State Resolution, (2) Context Check, (3) Read Inputs, (4) Halt on Unanswered Questions, (5) Generate Analysis, (6) Quality Check, (7) Archive Input and Reset, (8) Q-block Generation, (9) Plan Generation, (10) Completion Confirmation.
 
-- **Analysis Q-block rules**: Section 6.3 (Q-block Rules) is split into three sub-sections: 6.3.1 Decision Identification, 6.3.2 Decision Classification, and 6.3.3 Q-block Generation. Q-blocks support two formats: multiple-choice (with 3+ options and a recommended marker) and free-text (with `- Answer: ___` for unbounded information needs). Step 6 (Archive Input and Reset, section 5.6) is split into three sub-sections: 5.6.1 Eligibility Check, 5.6.2 Finalize Script Invocation, and 5.6.3 Post-conditions.
+- **Analysis workflow structure — prompt sections**: The prompt includes an `## Execution Model Summary` chapter, a `## Global Constraints` section (GC-01 through GC-05), and a `## Failure Handling` section.
 
-- **Analysis Decision Points requirement**: The analysis prompt requires a mandatory Decision Fork Enumeration step and a `### Decision Points` heading/sub-heading list within `## Decision Register` of the analysis document. When multiple valid implementation choices exist, AI-generated Q-blocks are written to `input.md ## Questions` for developer review.
+- **Analysis workflow structure — Appendix A and Answer Sub-flow**: The Auto-Request Creation Branch is defined in **Appendix A** (after the Execution Procedure section S10) and triggered from step 1 via a single concise trigger line; the Answer Application Sub-flow is inlined within step 4.
 
-- **Answer Application Sub-flow**: Section 7.2 (Answer Application Sub-flow) begins with an all-answered pre-check that halts execution when any Q-block is unanswered, leaving `input.md` unchanged. A Q-block is answered when at least one checkbox is marked `[x]` or the `- Answer:` line has non-empty text. `analysis-convention.md` section 3 is titled "File Naming, Location & Write Behavior (Normative)".
+- **Analysis workflow structure — step-completion notes and state**: After completing each step S01–S10, `aib-analyze.md` emits a `[S0N done] <outcome>` step-completion note. When Q-blocks are generated in step S08, `aib-analyze.md` directly edits `input.md` to set `State: questions_generated`.
+
+- **Analysis Q-block rules**: Section 6 (Q-block Rules) is split into three sub-sections: 6.1 Decision Identification, 6.2 Decision Classification, and 6.3 Q-block Generation. Q-block format templates and format-level rules (multiple-choice with 3+ options and a recommended marker; free-text with `- Answer: ___`) are defined in `.aib_brain/conventions/q-block-convention.md` (authoritative source); `aib-analyze.md` section 6.3 references that convention for format specification and retains format selection guidance.
+
+- **Analysis Decision Points requirement**: The analysis prompt requires a mandatory Decision Point Enumeration step and a `### Decision Points` heading/sub-heading list within `## Decision Register` of the analysis document. When multiple valid implementation choices exist, AI-generated Q-blocks are written to `input.md ## Questions` for developer review.
+
+- **Answer Application Sub-flow**: The Answer Application Sub-flow (inlined in step 4) begins with an all-answered pre-check that halts execution when any Q-block is unanswered, leaving `input.md` unchanged. A Q-block is answered when at least one checkbox is marked `[x]` or the `- Answer:` line has non-empty text. `analysis-convention.md` section 3 is titled "File Naming, Location & Write Behavior (Normative)".
 
 - **Execute implement workflow**: AI agent applies request scope, updates product docs, creates/appends `implementation.md`, and auto-closes the request upon successful completion.
 
@@ -76,7 +82,7 @@ No regulatory bodies or external data providers are identified. All artifacts ar
 
 **Input Archive**: File written by `aib-analyze.md` to `<request-folder>/inputs/input-archive-<YYYY-MM-DD_HH-MI-SS>.md` preserving the original `input.md` content for audit; MUST NOT be read by any prompt.
 
-**input.md**: Ephemeral primary user-agent communication channel. Seeded by `initialize.py`; written by the developer; read and processed by `aib-analyze.md`; reset to seed template after processing.
+**input.md**: Ephemeral primary user-agent communication channel. Seeded by `initialize.py`; written by the developer; read and processed by `aib-analyze.md`; reset to seed template after processing. The file contains a `## Status` section with two variable lines: the active request ID line and a `State: <value>` line. Allowed state values are `idle` (no active request), `analysis_ready` (after finalize-input.py reset), `implementation_ready` (reserved for future use), and `questions_generated` (set by aib-analyze.md S08 when Q-blocks are written).
 
 **instructions.md**: Persistent workspace-level behavioral directives file located at `.aib_memory/instructions.md`. Read by every AIB prompt as the first step before executing its main logic. Free-form Markdown; no schema enforcement. If absent or empty, prompts proceed normally. Seeded as an empty file by `initialize.py`; editable directly by users. Currently populated with the curated-change-log directive instructing the agent to maintain `logs/next_version_changes.md`.
 
@@ -148,7 +154,7 @@ AIB requirements are organized by functional area. The product has no externally
 
 - FR-004: AIB MUST update `plan-<request_id>.md` with a Plan and Decisions section after analysis generation.
 
-- FR-005: AIB MUST write AI-generated Q-blocks to `input.md ## Questions` when genuine implementation decision forks exist.
+- FR-005: AIB MUST write AI-generated Q-blocks to `input.md ## Questions` when genuine implementation decision points exist.
 
 - FR-006: AIB MUST support an Answer Application Sub-flow that applies developer-answered Q-blocks to `plan.md` and regenerates analysis without Q-blocks on re-run.
 
@@ -188,7 +194,7 @@ Architectural decisions include the following.
 
 - ADR-002: Distribute AIB as a versioned zip archive of `.aib_brain/` rather than a package manager dependency, keeping the framework self-contained and offline-capable.
 
-- ADR-003: Co-locate Q-block generation rules with output specifications (section 6.3 of `aib-analyze.md`) to reduce navigation distance between generation instructions and classification rules.
+- ADR-003: Q-block format templates and format-level rules are defined in `.aib_brain/conventions/q-block-convention.md` (authoritative source); `aib-analyze.md` S08.2 references that convention for format specification and retains format selection guidance.
 
 - ADR-004: Use CI-automated SemVer PATCH bumps with manual override for MINOR and MAJOR to minimize developer ceremony around release numbering.
 
@@ -196,7 +202,7 @@ Architectural decisions include the following.
 
 AIB prompt files are plain Markdown documents executed by an AI coding agent. Tool scripts are Python 3 scripts that perform file system operations deterministically.
 
-- `aib-analyze.md` implements a 9-step linear prompt structure: Objective; Execution Model Summary; Global Rules; Inputs/Outputs/Dependencies; Execution Procedure (steps 1–9); Output Specifications; Sub-flows; Completion Confirmation.
+- `aib-analyze.md` implements a 10-step linear prompt structure: Objective; Execution Model Summary; Global Rules; Inputs/Outputs/Dependencies; Execution Procedure (steps 1–10); Output Specifications; Sub-flows; Completion Confirmation.
 
 - `aib-implement.md` reads the active plan, applies code and documentation changes, runs tests, and invokes `move-request-artifacts.py` and `close-request.py` on success.
 
@@ -209,8 +215,6 @@ AIB prompt files are plain Markdown documents executed by an AI coding agent. To
 - `close-request.py` updates `requests_register.md` state to Closed, moves active artifacts (`plan-*.md`, `analysis-*.md`, `implementation.md`) into the request folder, and resets `input.md`.
 
 - `release_bookkeeping.py` validates the SemVer marker, computes the next PATCH version, writes `logs/version_vX.Y.Z_log.md`, and creates `versions/aib_brain_vX.Y.Z.zip`; prefers `logs/next_version_changes.md` as the `Changes:` source over git commit subjects.
-
-- `write_analysis.py` at the workspace root is a standalone utility for writing the analysis artifact.
 
 ## Data Architecture
 
@@ -274,17 +278,11 @@ The workspace contains the following non-excluded files and directories, sorted 
 
 - `docs/Analyze_AIB.prompt.md` — Prompt file for running AI-assisted analysis of the AIB codebase itself.
 
-- `docs/aib-refresh-context-AIB_version.md` — Supplementary context refresh document for the AIB product version.
-
-- `docs/Copilot_Issue_Assignment_Rules.md` — Rules governing how GitHub Copilot assigns issues in this repository.
-
 - `docs/Development_and_Deployment_Specification.md` — Specification document covering development and deployment procedures.
 
-- `logs/` — Contains per-version release log files and the curated change log; individual version logs follow the pattern `version_vX.Y.Z_log.md`.
+- `logs/` — Contains per-version release log files and the curated change log; individual version logs follow the pattern `version_vX.Y.Z_log.md`; individual version log items are not listed.
 
 - `logs/next_version_changes.md` — Curated append-only bullet list of changes for the next release; read by `release_bookkeeping.py` as the preferred `Changes:` source.
-
-- `logs/` — Contains 38 per-version release log files following the pattern `version_vX.Y.Z_log.md`; individual items are not listed.
 
 - `recordings/` — Contains 8 sequential WebM tutorial video files (01_installation through 08_context) providing step-by-step AIB workflow walkthroughs.
 
@@ -331,5 +329,3 @@ The workspace contains the following non-excluded files and directories, sorted 
 - `tests/test_user_guide_product_accuracy.py` — Tests asserting that the user guide accurately reflects the current AIB product state.
 
 - `versions/` — Contains 26 versioned `.aib_brain/` zip archives following the pattern `aib_brain_vX.Y.Z.zip`; individual items are not listed.
-
-- `write_analysis.py` — Standalone utility script for writing the analysis artifact.

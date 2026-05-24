@@ -25,8 +25,9 @@ _FINALIZE_SCRIPT = _TOOLS_DIR / "finalize-input.py"
 
 # Minimal seed template WITHOUT toggle lines (new format introduced in R-20260511-2019).
 _SEED_TEMPLATE = (
-    "## Active request\n"
-    "No active request\n\n"
+    "## Status\n"
+    "No active request\n"
+    "State: analysis_ready\n\n"
     "## Options\n"
     "- Minimum questions: 0\n\n"
     "## Input\n\n"
@@ -34,8 +35,9 @@ _SEED_TEMPLATE = (
 
 # A non-stub input.md with meaningful developer content.
 _NON_STUB_INPUT = (
-    "## Active request\n"
-    "R-TEST-0001 \u2014 My Test Request\n\n"
+    "## Status\n"
+    "R-TEST-0001 \u2014 My Test Request\n"
+    "State: analysis_ready\n\n"
     "## Options\n"
     "- Minimum questions: 0\n\n"
     "## Input\n"
@@ -190,7 +192,7 @@ class TestInputMdReset:
     """Verify that input.md is reset to the seed template with the active request ID."""
 
     def test_input_md_reset_contains_request_id(self):
-        """After run, input.md must contain the active request ID in ## Active request."""
+        """After run, input.md must contain the active request ID in ## Status."""
         with tempfile.TemporaryDirectory() as tmp:
             ws = _make_workspace(tmp, request_id="R-20260101-1200", title="My Test")
             (ws / ".aib_memory" / "input.md").write_text(_NON_STUB_INPUT, encoding="utf-8")
@@ -201,6 +203,8 @@ class TestInputMdReset:
             reset = (ws / ".aib_memory" / "input.md").read_text(encoding="utf-8")
             assert "R-20260101-1200" in reset, "Reset input.md must contain the request ID"
             assert "My Test" in reset, "Reset input.md must contain the request title"
+            assert "## Status" in reset, "Reset input.md must contain ## Status heading"
+            assert "State: analysis_ready" in reset, "Reset input.md must contain State: analysis_ready"
 
     def test_input_md_no_toggle_lines(self):
         """After run, input.md must NOT contain either removed toggle line."""
@@ -256,4 +260,38 @@ class TestCliErrorHandling:
             result = _run_finalize(Path(tmp))
             assert result.returncode != 0, (
                 "finalize-input.py must exit non-zero for a workspace missing .aib_brain/."
+            )
+
+
+# ---------------------------------------------------------------------------
+# Tests: stub-equivalence with differing State values
+# ---------------------------------------------------------------------------
+
+class TestStubEquivalenceStateVariants:
+    """Verify that _is_stub_equivalent ignores differences in the State: line value."""
+
+    def test_stub_equivalent_when_state_differs(self):
+        """Two input.md instances differing only in State: value must both be stub-equivalent."""
+        with tempfile.TemporaryDirectory() as tmp:
+            ws = _make_workspace(tmp, request_id="R-20260101-1200", title="My Test")
+
+            # Write a stub-equivalent input.md with State: questions_generated (different from seed).
+            stub_questions_state = (
+                "## Status\n"
+                "R-20260101-1200 \u2014 My Test\n"
+                "State: questions_generated\n\n"
+                "## Options\n"
+                "- Minimum questions: 0\n\n"
+                "## Input\n\n"
+            )
+            (ws / ".aib_memory" / "input.md").write_text(stub_questions_state, encoding="utf-8")
+
+            result = _run_finalize(ws, request_id="R-20260101-1200")
+            assert result.returncode == 0, result.stderr
+
+            # Must be treated as stub-equivalent — no archive file should be created.
+            inputs_dir = ws / ".aib_memory" / "requests" / "R-20260101-1200-my-test" / "inputs"
+            archive_files = list(inputs_dir.glob("input-archive-*.md")) if inputs_dir.exists() else []
+            assert len(archive_files) == 0, (
+                f"No archive expected for stub-equivalent input with different State; found: {[f.name for f in archive_files]}"
             )

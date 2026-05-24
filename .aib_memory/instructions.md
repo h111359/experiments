@@ -35,4 +35,4 @@ Apply the following rules:
 
 ## README maintenance
 
-After each execution of the implementation prompt `.aib_brain\prompts\aib-implement.md` make a review of `.aib_brain\README.md` against `.aib_memory\context.md` and modify accordingly the found discrepancies. `.aib_memory\context.md` is a source of truth. Modification of `.aib_brain\README.md` is allowed exception from the rule no `.aib_brain` files to be changed.
+After each execution of the implementation prompt `.aib_brain/prompts/aib-implement.md` make a review of `.aib_brain/README.md` reflecting if needed the changes made in the current request. Modification of `.aib_brain/README.md` is allowed exception from the rule no `.aib_brain` files to be changed.

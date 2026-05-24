@@ -20,7 +20,7 @@ The **Analysis document** is a **reasoning and knowledge-capture artifact** only
 This convention applies only to analysis artifacts for a single request:
 
 *   Target files: `analysis.md`
-*   Location: `.aib_memory/requests/<request-folder>/`
+*   Location: `.aib_memory/` (active phase) or `.aib_memory/requests/<request-folder>/` (archived phase)
 *   Out of scope: plan, questionnaire, and implementation records (defined by their own conventions or removed)
 
 Normative keywords **MUST**, **MUST NOT**, **SHALL**, **SHOULD**, and **MAY** are interpreted per BCP 14 (RFC 2119 / RFC 8174).
@@ -123,11 +123,11 @@ This section is the primary AI reasoning artifact for the request. It documents 
 
 ### 4.5 Decision Register **[REQ]**
 
-This section is the primary driver for Q-block generation. It MUST be completed before any Q-block is written.
+This section captures the pivotal decisions that shape the solution to be implemented. Each entry is called a "Decision Point." A decision point is either resolved autonomously by the AI agent based on collected context, raised as a question for the user, or already resolved by the user.
 
 **Mandatory content:**
 
-For each implementation decision fork identified in the request scope, define a named decision block containing:
+For each Decision Point identified in the request scope, define a named decision block containing:
 
   - Identification of the specific task or step where this decision applies, plus an explanation of why the alternatives exist.
 
@@ -137,18 +137,19 @@ For each implementation decision fork identified in the request scope, define a 
     - Expected codebase impact.
 
   - Resolution classification:
-    - Tag `resolve-autonomously` — ONLY when the developer's own `input.md ## Input` text OR a named, specific section of a workspace convention file explicitly and unambiguously resolves the fork. The rationale MUST quote or cite the exact source text and file path. External benchmarking, industry best practices, and AI judgment are NOT valid justifications for this tag.
+    - Tag `resolve-autonomously` — ONLY when the developer's own `input.md ## Input` text OR a named, specific section of a workspace convention file explicitly and unambiguously resolves the decision point. The rationale MUST quote or cite the exact source text and file path. External benchmarking, industry best practices, and AI judgment are NOT valid justifications for this tag.
     - Tag `ask` — a Q-block MUST be raised for developer input. The AI MUST NOT express a preference or steer the developer toward any option. Present choices neutrally.
+    - Tag `resolved-by-user` - for the decision points for which the user has already taken a decision
 
   - Resolution outcome: After resolution, retain only the chosen alternative. Discard non-chosen alternatives from the final document.
 
-- A `### Decision Points` section using a heading/sub-heading list — one `#### Choice: <name>` level-4 heading per fork, each containing bullet list items for Tag and Rationale/Resolution.
+- A `### Decision Points` section using a heading/sub-heading list — one `#### Decision Point: <name>` level-4 heading per decision point, each containing bullet list items for Tag and Rationale/Resolution.
 
-- If no decision forks are identified, include a single entry documenting that fact.
+- If no decision points are identified, include a single entry documenting that fact.
 
 **Rules:**
 
-- At least one alternative MUST be documented per decision fork.
+- At least one alternative MUST be documented per decision point.
 
 - When in doubt whether to tag `ask` or `resolve-autonomously`, always tag `ask`.
 
@@ -177,14 +178,7 @@ For each implementation decision fork identified in the request scope, define a 
 
 ***
 
-## 6. Determinism Rules (Normative)
-
-*   AI must not guess beyond request scope.
-*   If request ambiguity exists that cannot be resolved internally, create a `Q<nnn>` question block in `plan-<request_id>.md` -> `## Decisions` instead of making assumptions.
-
-***
-
-## 7. Prohibited Content
+## 6. Prohibited Content
 
 *   Secrets, private keys, credentials, tokens, or sensitive PII.
 *   In-file version/author/status metadata headers.

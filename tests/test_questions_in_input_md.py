@@ -39,8 +39,8 @@ class TestThresholdRemovedFromSeedTemplates:
         for line in source.splitlines():
             if "Question threshold" in line:
                 # Allow the line only if it is purely a documentation/description line
-                # (i.e., it does not contain a seed template marker like "## Active request").
-                assert "## Active request" not in line, (
+                # (i.e., it does not contain a seed template marker like "## Status").
+                assert "## Status" not in line, (
                     f"Seed template line still contains 'Question threshold': {line!r}"
                 )
 
@@ -56,16 +56,16 @@ class TestAnalysisPromptQuestionsSection:
 
     def test_analysis_references_why_this_matters(self):
         """Each Q-block in input.md must include a 'Why this matters' impact line (SC-2)."""
-        # SC-2: Q-block format includes impact explanation.
-        source = (PROMPTS_DIR / "aib-analyze.md").read_text(encoding="utf-8")
+        # SC-2: Q-block format includes impact explanation (defined in q-block-convention.md).
+        source = (BRAIN_DIR / "conventions" / "q-block-convention.md").read_text(encoding="utf-8")
         assert "Why this matters" in source
 
     def test_analysis_references_recommended_marker(self):
         """Q-block format must explicitly require the *(recommended)* marker on the first listed option."""
-        # SC-2: recommended marker is required; AI marks the preferred option first.
-        source = (PROMPTS_DIR / "aib-analyze.md").read_text(encoding="utf-8")
+        # SC-2: recommended marker is required; AI marks the preferred option first (defined in q-block-convention.md).
+        source = (BRAIN_DIR / "conventions" / "q-block-convention.md").read_text(encoding="utf-8")
         assert "MUST mark" in source and "*(recommended)*" in source, (
-            "aib-analyze.md must explicitly require the *(recommended)* marker "
+            "q-block-convention.md must explicitly require the *(recommended)* marker "
             "on the first listed option in Q-block options."
         )
 

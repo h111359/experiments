@@ -199,23 +199,26 @@ class TestHardCodedActionList:
 # ---------------------------------------------------------------------------
 
 _INPUT_MD_SEED = (
-    "## Active request\n"
-    "No active request\n\n"
+    "## Status\n"
+    "No active request\n"
+    "State: idle\n\n"
     "## Options\n\n"
     "## Input\n\n"
 )
 
 _INPUT_MD_WITH_CONTENT = (
-    "## Active request\n"
-    "R-20260101-1000 \u2014 My Request\n\n"
+    "## Status\n"
+    "R-20260101-1000 \u2014 My Request\n"
+    "State: analysis_ready\n\n"
     "## Options\n\n"
     "## Input\n"
     "Do something useful.\n"
 )
 
 _INPUT_MD_WITH_QUESTIONS = (
-    "## Active request\n"
-    "R-20260101-1000 \u2014 My Request\n\n"
+    "## Status\n"
+    "R-20260101-1000 \u2014 My Request\n"
+    "State: questions_generated\n\n"
     "## Questions\n"
     "Q1: Which approach?\n\n"
     "## Input\n\n"
@@ -290,7 +293,7 @@ class TestDetectGuidanceState:
     def test_questions_not_pending_when_section_empty(self, tmp_path: Path):
         """SC-13: Empty Questions section must NOT trigger questions_pending."""
         content = (
-            "## Active request\nR-001 — My Request\n\n"
+            "## Status\nR-001 \u2014 My Request\nState: analysis_ready\n\n"
             "## Questions\n\n"
             "## Input\n\n"
         )
@@ -303,7 +306,7 @@ class TestDetectGuidanceState:
     def test_amendment_pending_active_request_md_present_with_input(self, tmp_path: Path):
         """SC-14: Active request + plan.md present + substantive Input + no questions → 'amendment_pending'."""
         content = (
-            "## Active request\nR-001 — My Request\n\n"
+            "## Status\nR-001 \u2014 My Request\nState: analysis_ready\n\n"
             "## Questions\n\n"
             "## Input\n"
             "Add a new feature.\n"
@@ -832,7 +835,7 @@ class TestChooseActionZeroDivisionGuard:
             encoding="utf-8",
         )
         (mem_dir / "input.md").write_text(
-            "## Active request\nNo active request\n\n## Options\n\n## Input\n\n",
+            "## Status\nNo active request\nState: idle\n\n## Options\n\n## Input\n\n",
             encoding="utf-8",
         )
         return tmp_path

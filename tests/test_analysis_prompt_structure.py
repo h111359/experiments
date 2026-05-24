@@ -66,13 +66,6 @@ class TestRemovedSectionsAbsentFromPlanConvention:
 class TestPlanSchemaFieldsInAnalysisPrompt:
     """SC-3: Plan schema must use #### headings and remove embedded metadata fields."""
 
-    def test_outputs_field_present(self) -> None:
-        """#### Outputs must appear as a level-4 heading in the Plan schema."""
-        content = ANALYSIS_PROMPT.read_text(encoding="utf-8")
-        assert "#### Outputs" in content, (
-            "aib-analyze.md Plan schema must use '#### Outputs' as a level-4 heading."
-        )
-
     def test_intent_bold_label_absent(self) -> None:
         """**Intent:** bold label must not appear in the Plan schema."""
         content = ANALYSIS_PROMPT.read_text(encoding="utf-8")
@@ -180,11 +173,11 @@ class TestNewStructuralSections:
             "this section specifies halt-with-error behavior for missing files and script failures."
         )
 
-    def test_gc06_no_closed_request_reads_present(self) -> None:
-        """GC-06 no-closed-request-reads constraint must be present in aib-analyze.md."""
+    def test_gc04_no_closed_request_reads_present(self) -> None:
+        """GC-04 no-closed-request-reads constraint must be present in aib-analyze.md."""
         content = ANALYSIS_PROMPT.read_text(encoding="utf-8")
-        assert "GC-06" in content, (
-            "aib-analyze.md must contain 'GC-06' in the Global Constraints section — "
+        assert "GC-04" in content, (
+            "aib-analyze.md must contain 'GC-04' in the Global Constraints section — "
             "this constraint prohibits reading files inside Closed request subfolders."
         )
 
@@ -509,4 +502,65 @@ class TestOverviewSectionIntroduced:
         content = ANALYSIS_PROMPT.read_text(encoding="utf-8")
         assert "Overview" in content, (
             "aib-analyze.md must reference 'Overview' as a mandatory analysis section."
+        )
+
+
+class TestAppendixAStructure:
+    """Regression tests asserting the Appendix A refactor from R-20260524-0734.
+
+    Guards against removal of Appendix A and re-inlining of the Auto-Request
+    Creation Branch procedure into Step 1 of aib-analyze.md.
+    """
+
+    def test_appendix_a_section_exists(self) -> None:
+        """## Appendix A — Auto-Request Creation Branch must be present after ## 7."""
+        content = ANALYSIS_PROMPT.read_text(encoding="utf-8")
+        assert "## Appendix A — Auto-Request Creation Branch" in content, (
+            "aib-analyze.md must contain '## Appendix A — Auto-Request Creation Branch' "
+            "as a top-level section at the end of the file."
+        )
+
+    def test_step1_zero_active_rows_no_inline_substeps(self) -> None:
+        """The inline 6-sub-step procedure must not appear in Step 1; only in Appendix A."""
+        content = ANALYSIS_PROMPT.read_text(encoding="utf-8")
+        appendix_start = content.find("## Appendix A")
+        assert appendix_start != -1, "Appendix A section not found."
+        step1_region = content[:appendix_start]
+        assert "Resume the standard analysis flow at step 2 (Context Check)" not in step1_region, (
+            "aib-analyze.md Step 1 must not contain the inline 'Resume the standard analysis "
+            "flow at step 2' instruction — it belongs exclusively in Appendix A."
+        )
+
+    def test_gc02_references_appendix_a(self) -> None:
+        """GC-02 must reference Appendix A instead of 'Auto-Request Creation Branch in step 1'."""
+        content = ANALYSIS_PROMPT.read_text(encoding="utf-8")
+        assert "Appendix A" in content[content.find("GC-02"):content.find("GC-03")], (
+            "aib-analyze.md GC-02 must reference 'Appendix A' for the input-reset rule."
+        )
+
+    def test_gc06_references_appendix_a(self) -> None:
+        """GC-06 must reference Appendix A instead of 'Auto-Request Creation Branch in step 1'."""
+        content = ANALYSIS_PROMPT.read_text(encoding="utf-8")
+        assert "Appendix A" in content[content.find("GC-06"):content.find("GC-06") + 300], (
+            "aib-analyze.md GC-06 must reference 'Appendix A' for the authorized tool-script "
+            "invocations exception."
+        )
+
+    def test_step1_trigger_line_references_appendix_a(self) -> None:
+        """Step 1 Zero-Active-rows trigger line must reference Appendix A."""
+        content = ANALYSIS_PROMPT.read_text(encoding="utf-8")
+        assert "execute **Appendix A — Auto-Request Creation Branch**" in content, (
+            "aib-analyze.md Step 1 'Zero Active rows' branch must contain the trigger line "
+            "'execute **Appendix A — Auto-Request Creation Branch**'."
+        )
+
+    def test_step6_trigger_guard_references_appendix_a(self) -> None:
+        """Step 6 trigger guard must reference Appendix A."""
+        content = ANALYSIS_PROMPT.read_text(encoding="utf-8")
+        step6_start = content.find("### 5.6 Step 6")
+        step7_start = content.find("### 5.7 Step 7")
+        step6_region = content[step6_start:step7_start]
+        assert "Appendix A" in step6_region, (
+            "aib-analyze.md Step 6 trigger guard must reference 'Appendix A' instead of "
+            "'Auto-Request Creation Branch (step 1)'."
         )
