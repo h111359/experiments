@@ -224,7 +224,7 @@ S08.1. If [Questions-expected] is more than the decision points marked as `ask` 
 
 S08.2. For every Decision Point tagged `ask`, generate one Q-block following the instructions in `.aib_brain/conventions/q-block-convention.md`. Q-blocks MUST reference the alternative by name from the Decision Register section when applicable. Write Q-blocks to a `## Questions` section appended to `input.md`.
 
-S08.3. Edit `.aib_memory/input.md` to replace the line `State: analysis_ready` with `State: questions_generated`. Output `Note: New questions generated.` and HALT.
+S08.3. Edit `.aib_memory/input.md` to replace the line `State: analysis_ready` with `State: questions_generated`. Output `Note: New questions generated. Answer them and run again analyze.` and HALT.
 
 S08.4. If no Decision Point tagged `ask` are found, do NOT write a `## Questions` section. Continue with the next step.
 

@@ -4,6 +4,20 @@ Open [user_guide.html](.aib_brain/user_guide.html) in a browser for the full int
 
 AI Builder (AIB) is a minimal but powerful framework for AI specification-driven development. AIB serves for software development, documentation creation, data processing and all other activities which can be achieved with AI.
 
+## The Most Important Commands for Copy-Paste
+
+**Launch the interactive menu:**
+
+.aib_brain\run.bat        # Windows
+
+sh .aib_brain/run.sh      # Linux / macOS
+
+**Prompt Invocations**
+
+Execute .aib_brain/prompts/aib-analyze.md
+
+Execute .aib_brain/prompts/aib-implement.md
+
 ## Objectives:
 
   - To analyze the user input and to generate analysis and plan markdown files
