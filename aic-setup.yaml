@@ -1,0 +1,28 @@
+# AIC setup template
+# Defines local memory paths used by gen-aic-pack.md.
+
+aic:
+  # Current user task / intent.
+  input_file: ".aic/input.md"
+
+  # Persisted project memory.
+  # Keep this compressed and project-specific.
+  context_file: ".aic/context.md"
+
+  # Generated package to attach to external AI chats.
+  output_file: ".aic/aic_pack.md"
+
+  # Optional behavior flags.
+  options:
+    max_tokens: 5000
+    target_tokens: 3000
+    scan_repository_by_default: false
+    include_source_code_blocks: false
+    include_old_requests: false
+
+  # Optional additional local files that may be read when useful.
+  # Keep this list short.
+  optional_files:
+    - ".aic/decisions.md"
+    - ".aic/requirements.md"
+    - ".aic/technical-context.md"
