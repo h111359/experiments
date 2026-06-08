@@ -145,6 +145,14 @@ When `aib-analyze.md` identifies decision points with multiple valid implementat
   - conventions/
   - prompts/
   - tools/
+    - close-request.py
+    - create-request.py
+    - edit-context.py (CRUD for atomic statements in context.md)
+    - file-inventory.py
+    - finalize-input.py
+    - initialize.py
+    - move-request-artifacts.py
+    - verify-context.py (validates context.md format: 10 automated checks)
   - README.md
   - run.bat
   - run.sh
@@ -167,7 +175,7 @@ versions/
 
 | Artifact | Created by | Description |
 | --- | --- | --- |
-| `plan-<id>.md` | `aib-analyze.md` | Request plan and decisions. Active copy lives at `.aib_memory/plan-<id>.md`; moved to request subfolder after implementation. |
+| `plan-<id>.md` | `aib-analyze.md` | Self-sufficient execution specification. Contains full background, exact file paths in all procedure steps, and exact `edit-context.py` invocations for context updates. No external file (including `context.md`) is needed to execute the plan. Active copy lives at `.aib_memory/plan-<id>.md`; moved to request subfolder after implementation. |
 | `analysis-<id>.md` | `aib-analyze.md` | Reasoning artifact (not read by `implement`). |
 | `implementation.md` | `aib-implement.md` | Append-only implementation log. |
 | `inputs/input-archive-*.md` | `aib-analyze.md` | Archived `input.md` per analysis run. Never read by prompts after archiving. |

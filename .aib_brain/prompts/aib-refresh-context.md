@@ -25,6 +25,10 @@ Produce or modify `.aib_memory/context.md` — a unified, structured synthesis o
 1. Read `.aib_brain/conventions/context-convention.md`. This is the authoritative source for the required section structure, content guidance, formatting rules, and quality gates for `context.md`.
 2. If `.aib_memory/instructions.md` lists additional file paths the developer wants AIB to treat as supplementary product-doc inputs, collect those paths into the supplementary read set. Otherwise the supplementary read set is empty.
 3. If the supplementary read set is not empty, read every file in the supplementary read set.
+4. **Format detection:** Read `.aib_memory/context.md` (if it exists). Determine whether the file is in the new atomic format by checking for the presence of `## 2. Statements` as a section heading and atomic statement lines matching the pattern `- <AREA>-<TYPE>-<HASH>: <text>`. Set internal variable [format-is-atomic] accordingly.
+   - If the file is in the OLD format (12-section prose): treat existing content as informational input alongside workspace files for generating atomic statements. The old content informs synthesis but is not preserved structurally.
+   - If the file is in the NEW format (3-section atomic): existing atomic statements serve as the baseline. Add, modify, or remove statements as needed based on workspace evidence.
+   - If the file does not exist: proceed with full generation in atomic format.
 
 ---
 
@@ -96,46 +100,78 @@ Apply the formatting rules defined in the `## Formatting Rules` section of `.aib
 
 All content MUST reflect the current state of the product only.
 MUST NOT include version history annotations such as "introduced in vX.Y.Z", "added in vX", "deprecated as of vX", "removed as of", or "(Deprecated)" labels.
-Glossary entries for deprecated or removed concepts MUST NOT be included; only currently active concepts and terms belong in the glossary.
 Describe what currently exists and is active; historical change information belongs in changelogs and version logs, not in context.md.
 
 ### 4.1 Preamble
 
 Write the preamble exactly as specified in the `context-convention.md` Preamble Format section. Replace the timestamp placeholder with the actual generation timestamp in local project time.
 
-### 4.2 Mandatory sections
+### 4.2 Section 1 — Product Identity
 
-Write all mandatory sections in the exact order and with the exact headings defined in `context-convention.md`. For each section:
+Write `## 1. Product Identity` with free-form prose content following the Section 1 content guidance in `context-convention.md`. Synthesize from all available workspace sources and supplementary files.
 
-- Synthesize relevant content from all populated supplementary files (if any) and workspace sources.
-- Apply the content guidance defined for the section in `context-convention.md`.
-- Include traceability references (e.g., `per ARCH-01`) where applicable — plain text only, no hyperlinks.
-- If no source content is available for a section, write the stub notice exactly as specified in `context-convention.md`.
-- Do NOT reproduce verbatim content from source files. Summarize and synthesize.
+### 4.3 Section 2 — Statements
 
-When mapping documentation to sections:
-- Use all populated supplementary content as source material. Map each document's content into the most relevant mandatory section(s) as defined in `context-convention.md`.
-- A single supplementary document may contribute to multiple sections.
-- A single mandatory section may draw from multiple supplementary documents and workspace sources.
+Write `## 2. Statements` containing atomic statements organized into the 22 subsections defined in `context-convention.md`.
 
-### 4.3 Workspace file inventory
+For each subsection area:
+1. Identify all relevant facts, requirements, constraints, decisions, and information from workspace sources that belong to this area.
+2. For each fact, compose a single-sentence atomic statement.
+3. Compute the 8-character hash using `hashlib.sha256(text.encode('utf-8')).hexdigest()[:8]` where `text` is the statement text.
+4. Assign the appropriate statement type letter (N, R, C, E, L, U, A, D, I).
+5. Format as: `- <AREA>-<TYPE>-<HASH>: <text>`
+6. Add optional `{Related to: <id1>, <id2>}` suffix where relationships between statements exist.
 
-Write the final mandatory section (`## Workspace File Inventory`) listing all non-excluded files and directories discovered in Phase 2. Follow the format defined in `context-convention.md` Section 12.
+When converting from old format:
+- Map content from old `## Domain Knowledge` to areas DO, CO.
+- Map content from old `## Concepts` to area CO.
+- Map content from old `## Constraints & Assumptions` to appropriate areas with type C or A.
+- Map content from old `## Requirements` to area FN with type R.
+- Map content from old `## Architecture & Decisions` to areas TD, TS with types D, I.
+- Map content from old `## Technical Design` to area TD.
+- Map content from old `## Data Architecture` to area DS, DF.
+- Map content from old `## Security & Compliance` to area SC.
+- Map content from old `## Operations` to area OP.
+- Map content from old `## Development Practices` to area DV.
+- Use best judgment for placement when content spans multiple areas.
+
+### 4.4 Section 3 — Workspace File Inventory
+
+Write `## 3. Workspace File Inventory` listing all non-excluded files and directories discovered in Phase 2. Follow the format defined in `context-convention.md` Section 3.
 
 For each entry:
 
-- **File entries:** Write `- \`path\` — description.` where description is one sentence derived from knowledge synthesized in earlier sections (Sections 1–11) or from direct file content read in Phase 2.
+- **File entries:** Write `- \`path\` — description.` where description is one sentence derived from knowledge synthesized in earlier sections or from direct file content read in Phase 2.
 
-- **Directory entries:** Write `- \`dir/\` — description.` for every directory and subdirectory present in the workspace (using a trailing slash). Derive the description from the folder's evident role (e.g., contents and purpose inferred from earlier synthesis). Add a directory entry for every folder and subfolder; do not omit any directory that contains listed files.
+- **Directory entries:** Write `- \`dir/\` — description.` for every directory and subdirectory present in the workspace (using a trailing slash). Derive the description from the folder's evident role.
 
-- **Repetitive request artifact files** (`request.md`, `implementation.md`, `analysis.md` within `.aib_memory/requests/<request-folder>/`): use a formulaic description based on the request folder slug (e.g., "Request definition for <human-readable-slug>.", "Implementation log for <human-readable-slug>.", "Analysis artifact for <human-readable-slug>.").
+- **Repetitive items:** Apply the grouping rule for directories containing three or more items with repeating naming patterns.
+
 - Sort all entries (files and directories together) ascending by path.
+
+---
+
+## Phase 4b — Enrichment Verification Passes
+
+After synthesis, execute the following enrichment passes to ensure completeness:
+
+### Pass 1 — Analysis decisions verification
+
+Read `.aib_memory/analysis-<request_id>.md` for the active request (if it exists, check `requests_register.md` for the Active request). Verify all decisions from the Decision Register section are reflected as statements (type D) in the appropriate area subsection of `## 2. Statements`. Add missing decision statements.
+
+### Pass 2 — Plan results verification
+
+Read `.aib_memory/plan-<request_id>.md` for the active request (if it exists). Verify all completed task outcomes and architectural decisions from the plan are reflected in context statements. Add missing statements.
+
+### Pass 3 — Modified files verification
+
+Compare workspace file state against context statements. Verify that any new files, removed files, or renamed files since the last context generation are reflected in `## 3. Workspace File Inventory`. Verify that significant functional changes to existing files are reflected as updated or new statements in `## 2. Statements`.
 
 ---
 
 ## Phase 5 — Write output
 
-1. **Rule 16 verification pass (MUST complete before writing):** Scan every generated bullet item in the full synthesized content. For each bullet item, count the terminal sentence-ending marks (`.`, `!`, `?`). If any bullet item contains more than two terminal sentences, split it at sentence boundaries into two or more new bullet items, each beginning with `- ` and separated from adjacent bullets by one blank line (Rule 12). Repeat the scan until zero Rule 16 violations remain. Only after zero violations are confirmed in the complete synthesized content may you proceed to write the file.
+1. **Statement uniqueness verification pass (MUST complete before writing):** Scan all generated atomic statements in Section 2. For each statement, extract the index (area+type+hash). If any duplicate index is found, resolve by adjusting the statement text (which changes the hash) or removing the duplicate. Only after zero uniqueness violations remain may you proceed to write the file.
 2. Write the complete synthesized content to `.aib_memory/context.md`, replacing any existing content entirely.
 3. Do NOT append — full replacement on every execution.
 4. Do NOT modify any other file.
@@ -147,10 +183,19 @@ For each entry:
 
 1. Re-read `.aib_memory/context.md` as written.
 2. Extract all level-2 headings from the document in order.
-3. Compare the extracted list against the mandatory section list from `.aib_brain/conventions/context-convention.md` (exact heading text and order).
+3. Compare the extracted list against the mandatory section list from `.aib_brain/conventions/context-convention.md` (exact heading text: `## 1. Product Identity`, `## 2. Statements`, `## 3. Workspace File Inventory` — in that order).
 4. If any heading is non-compliant — wrong name, wrong order, or missing — identify each correction needed.
 5. For each non-compliant section, rewrite it (heading and content) to match the convention; do not alter compliant sections.
-6. After all corrections are applied, confirm the written file is compliant.
+6. Verify all atomic statements in Section 2 have unique indices and match the required format.
+7. After all corrections are applied, confirm the written file is compliant.
+
+---
+
+## Phase 7 — Format Verification
+
+1. Invoke `python .aib_brain/tools/verify-context.py --workspace .` to run automated format checks against the written `context.md`.
+2. If the script exits with code 0 (all checks pass), proceed to completion.
+3. If the script exits with code 1 (one or more checks fail), review the reported failures and correct the deviations in `context.md`. Re-run the verification script until all checks pass.
 
 ---
 
@@ -161,6 +206,8 @@ For each entry:
 - Do NOT create files other than `.aib_memory/context.md`.
 - Do NOT explore or read `.aib_brain/` contents except `.aib_brain/conventions/context-convention.md`.
 - Do NOT install packages, create virtual environments, or run tools.
+- MAY read `.aib_memory/analysis-<request_id>.md` and `.aib_memory/plan-<request_id>.md` for the active request only (needed for enrichment passes in Phase 4b).
+- MUST NOT read analysis or plan files for Closed requests.
 
 ---
 
@@ -168,9 +215,9 @@ For each entry:
 
 - `.aib_memory/context.md` exists and is valid Markdown.
 - It contains the preamble as defined in `context-convention.md`, including the auto-generation notice and timestamp.
-- It contains all mandatory sections in the order specified by `context-convention.md`, using the exact headings.
-- Populated sections have concise, non-empty key-fact summaries sourced from workspace content.
-- Sections with no available source content contain the stub notice as defined in `context-convention.md`.
-- Workspace source artifacts (`scripts/`, `tests/`) are synthesized under the applicable mandatory sections.
+- It contains all 3 mandatory sections in the order specified by `context-convention.md` (`## 1. Product Identity`, `## 2. Statements`, `## 3. Workspace File Inventory`), using the exact headings.
+- Section 1 has concise prose content synthesized from workspace sources.
+- Section 2 contains atomic statements in the correct format with unique indices across all subsections.
+- Section 3 lists all non-excluded workspace files in the required format.
 - No content is derived from excluded directories.
 - No files other than `.aib_memory/context.md` were modified.

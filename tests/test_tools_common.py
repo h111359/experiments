@@ -439,9 +439,6 @@ All tests pass.
 
 #### Dependencies
 None.
-
-#### Risk notes
-None.
 """
 
 

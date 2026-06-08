@@ -13,20 +13,7 @@ Generate `.aib_memory/analysis-<request_id>.md` for the resolved active request,
 
 ---
 
-## 2. Execution Model Summary
-
-This prompt operates as a deterministic 10-step linear workflow. Each step is strictly ordered and must complete before the next begins.
-
-1. **Preflight + State Resolution** — Read workspace instructions, resolve register state, auto-create request if no Active request exists.
-2. **Context check** — Verify `context.md` exists and is non-trivial; trigger `aib-refresh-context.md` if absent or empty.
-3. **Read inputs** — Read `input.md` `## Input` section and attachments to detect user-provided instructions; read `## Options` to set [Questions-expected].
-4. **Read Questions** — If `## Questions` section is present in `input.md` with unanswered Q-blocks, halt. If all answered, continue.
-5. **Generate analysis** — Produce or overwrite `analysis-<request_id>.md` (full replace); identify all Decision Points; leave Requirements Gate Evaluation empty.
-6. **Quality Check** — Evaluate every checklist item from `requirements-analysis-convention.md` against the analysis; record results under Requirements Gate Evaluation; tag unsatisfied items as `ask`.
-7. **Archive Input and Reset** — Invoke `finalize-input.py` to archive `input.md`, move attachments, and reset `input.md` to the seed template.
-8. **Q-block generation** — If Decision Points tagged `ask` exist, generate Q-blocks in `input.md ## Questions` and halt; otherwise continue.
-9. **Plan generation** — Generate or recreate `plan-<request_id>.md` following `plan-convention.md` based on the completed analysis.
-10. **Completion Confirmation** — Output the literal confirmation line `--- I am done with the analysis of <request_id> ---` as the final message.
+## 2. Variables definition
 
 The following internal variables are used for process control and are not persisted:
 
@@ -52,7 +39,7 @@ These constraints apply throughout the entire prompt execution. Individual secti
 
 - **GC-03 — No partial writes on halt:** When execution halts due to any error condition, MUST NOT write any output files. The workspace state must remain unchanged.
   
-- **GC-04 — No closed-request reads:** Files inside `.aib_memory/requests/<folder>/` that belong to a Closed request MUST NOT be read or referenced during any phase of this prompt. This covers all artifact types (request, analysis, implementation, input archives, and any other file). A request folder belongs to a Closed request when its `state` in `requests_register.md` is `Closed`. If in doubt, treat the folder as Closed.
+- **GC-04 — No closed-request reads:** Files inside `.aib_memory/requests/<folder>/` that belong to a Closed request MUST NOT be read or referenced during any phase of this prompt. A request folder belongs to a Closed request when its `state` in `requests_register.md` is `Closed`.
   
 - **GC-05 — No implementation writes:** This prompt MUST NOT create, edit, or delete any file outside `.aib_memory/` except for the tool script invocations explicitly authorized in **Appendix A — Auto-Request Creation Branch**. Source code, test files, CI workflow files, scripts, and all non-AIB-memory artifacts are strictly out of bounds. Discovering that a fix is needed does NOT authorize applying it.
 
@@ -123,8 +110,6 @@ S01.3. Branch on the count:
 
 S01.4. Use the single Active row as the resolved request. The resolved `<request_id>` MUST be used everywhere in this run.
 
-S01.5. Output a short step-completion note in format: `[S01 done] Workspace instructions read and active request resolved.`
-
 
 ### S02. Step 2 — Context Check
 
@@ -133,9 +118,6 @@ S02.1. Check whether `.aib_memory/context.md` is absent or empty (contains only 
 S02.2. If **absent or empty**: execute `.aib_brain/prompts/aib-refresh-context.md` to populate `context.md`. After execution completes, continue to step S03.
 
 S02.3. If **present and non-empty**: continue directly to step S03.
-
-S02.4. Output a short step-completion note in format: `[S02 done] Context check complete; context.md is available.`
-
 
 ### S03. Step 3 — Read Inputs
 
@@ -151,8 +133,6 @@ S03.3. For each file found (excluding `.gitkeep`):
 
 S03.4. Read the `## Options ` section of `.aib_memory/input.md` and determine the value of the `Minimum questions:` and write the value in [Questions-expected].
 
-S03.5. Output a short step-completion note in format: `[S03 done] Inputs read; [Input-detected] and [Questions-expected] values set.`
-
 ### S04. Step 4 — Read Questions
 
 1. Check if `input.md` contains a `## Questions` section with one or more Q-blocks.
@@ -163,11 +143,9 @@ S03.5. Output a short step-completion note in format: `[S03 done] Inputs read; [
    
    - Count the total number of Q-blocks in `input.md ## Questions` and set the number in [Questions-detected]. 
   
-   - Count the number of answered Q-blocks and write in [Questions-answered] the result. A Q-block is answered when at least one checkbox is marked `[x]` OR `Other:`  line has non-empty text after the colon OR the `- Answer:` line has non-empty text after the colon. 
+   - Count the number of answered Q-blocks and write in [Questions-answered] the result. A Q-block is answered when any checkbox is [x], Other:is filled, or- Answer: is non-empty. 
   
    - If [Questions-answered] < [Questions-detected]: output `Note: <[Questions-answered]> of <[Questions-detected]> questions in input.md are unanswered. Answer all questions before re-running analysis. Execution halted.` and HALT. MUST NOT write any output files.
-
-S04.4. Output a short step-completion note in format: `[S04 done] Questions section checked; all Q-blocks answered or no questions present.`
 
 
 ### S05. Step 5 — Generate Analysis
@@ -180,25 +158,39 @@ S04.4. Output a short step-completion note in format: `[S04 done] Questions sect
 > - MUST explicitly list issues and risks found and write them in the analysis file.
 > - If information is insufficient, MUST ask the user wia Q-block question.
 > - The analysis document is a reasoning artifact only; it is NOT an implementation driver.
+> - Never remove already added user inputs in Input Interpretation section - add the new after the existing.
 
+S05.0. Make a backup of `analysis-<request_id>.md`. The current analysis need to be kept for user audit so make a copy of it in the request folde under `.aib_memory\requests` adding timestamp to its name. Only AFTER the current state is copied, make changes of the `analysis-<request_id>.md` file.
 
 S05.1. If both [Input-detected] is False and [Questions-detected] is 0: output `Note: No new instructions found. Execution halted.` and HALT. MUST NOT write any output files.
 
-S05.2. Based on the information in `.aib_memory/input.md` (Input or Questions sections), files in `.aib_memory/attachments`, `analysis-<request_id>.md` if exists and project memory in `.aib_memory/context.md` generate or update `analysis-<request_id>.md` as a full content replacement (overwrite) at `.aib_memory/analysis-<request_id>.md`. Leave the **Requirements Gate Evaluation** sub-heading empty - it will be populated in the next steps.
+S05.2. If [Input-detected] is True:
 
-S05.3. A solution is built from instructions that have exactly one valid implementation path and from others that permit multiple approaches — requiring a deliberate choice. Each such choice point is called a "Decision Point." Ensure that ALL Decision Points are identified in the ### Decision Points section within ## Decision Register of the analysis document.
+   S05.2.1. If `analysis-<request_id>.md` does not exists - generate it as per  `.aib_memory/input.md`, the files in `.aib_memory/attachments` and `.aib_memory/context.md` following `.aib_brain\conventions\analysis-convention.md ` 
 
-S05.4. Output a short step-completion note in format: `[S05 done] Analysis document generated; all Decision Points identified.`
-   
-### S06 Step 6 — Quality Check
+   S05.2.2. If `analysis-<request_id>.md` exists - this means the user has added additional input instructions to be modified already existing analysis. Detect what should be changed in the analysis and change only the affected lines. You should follow `.aib_brain\conventions\analysis-convention.md ` and the structure of the analysis file should not be corrupted. Do not change lines where no need of change and the current content does not contradict to the new input.  
 
-S06.1 Evaluate the generated analysis. Evaluate every checklist item from `requirements-analysis-convention.md` against the active request `analysis-<request_id>.md` — item-by-item.
+S05.3. If [Questions-detected] is more than 0:
 
-S06.2 Record the evaluation result for all items in the `## Research Results` section of the analysis document under a **Requirements Gate Evaluation** sub-heading. 
+   S05.3.1. If `analysis-<request_id>.md` does not exists - this probably means it was manually deleted. Output a note `[S05.3.1] questions detected but no analyis exists.This is unexpected state. Halting.`  and HALT. MUST NOT write any output files.  
 
-S06.3 If any mandatory item cannot be satisfied by a reasonable documented assumption, ad a new decision point in the analysis and tag it with `ask` in the Decision Points section.
+   S05.3.2. If `analysis-<request_id>.md` exists - this means the user has answered to the questions and now the answers should be applied in the analysis. Detect the decision points in which the answers should be reflected in the analysis. Detect if in the other part of the analysis a change should be made accordingly the answers of the questions. Change only the affected lines. You should follow `.aib_brain\conventions\analysis-convention.md ` and the structure of the analysis file should not be corrupted. Do not change lines where no need of change and the current content does not contradict to the answers. 
 
-S06.4. Output a short step-completion note in format: `[S06 done] Quality check complete; Requirements Gate Evaluation recorded in analysis.`
+S05.4. Ensure the **Decision Register** sub-heading is present in the analysis document. The solution described in the plan file will consist of tasks, each containing procedural steps. Each step may have multiple valid execution approaches depending on the provided input. When the differences between valid approaches would produce a significantly different implementation outcome, this is called a **Decision Point**. Identify all Decision Points during this step and record them in the `### Decision Points` section within `## Decision Register` of the analysis document, following `.aib_brain\conventions\analysis-convention.md`. If Decision Points are already registered in the document, check whether additional ones are needed and add them. Do not add Decision Points whose answer can be concluded from the input, attachments, context, or other workspace content.
+
+S05.5. Ensure the **Requirements Gate Evaluation** sub-heading is present in the analysis document. Evaluate the analysis just produced against every item in requirements-analysis-convention.md and write the Requirements Gate Evaluation as the final sub-section of ## Research Results. If any mandatory item cannot be satisfied by a reasonable documented assumption, ad a new decision point in the analysis and tag it with `ask` in the Decision Points section.
+
+### S06. Step 6 — Context Review
+
+S06.1. Using the context.md content already loaded in S02, identify gaps relevant to the active request scope (based on the analysis just generated in S05).
+
+S06.2. For each gap found:
+   - Output a note `[S06] gap: <short-description-of-the-gap>`
+   - First attempt to resolve it by scanning workspace files for the missing information.
+   - If the gap can be resolved - output a note `[S06] gap: <short-description-of-the-gap> - can be resolved from workspace`
+   - If the gap cannot be resolved from workspace sources, add a new Decision Point in the analysis document tagged `ask`, describing what information is missing from `context.md` and why it matters to the request. 
+
+S06.3. If no gaps are found or all gaps were resolved from workspace sources - continue to the next step without adding Decision Points.
 
 ### S07. Step 7 — Archive Input and Reset
 
@@ -211,31 +203,28 @@ S07.1. Invoke `finalize-input.py` to handle the archive + move + reset sequence 
    ```
    where `<request_id>` is the active request ID.
 
-S07.2. Output a short step-completion note in format: `[S07 done] Input archived, attachments moved, and input.md reset to seed template.`
-
-
 ### S08. Step 8 — Q-block Generation
 
 > **Rules:**
 > - Multiple-choice is preferred when bounded options exist.
 > - Use free-text only when the answer space is unbounded (e.g., naming, external URLs, configuration values).
 
-S08.1. If [Questions-expected] is more than the decision points marked as `ask` - change the tag of the most critical decision points marked as `resolve-autonomously` to `ask`. If still the [Questions-expected] number is not reached - write nottice to the user `Note: The minimum questions number can not be reached.`.  
+S08.1. If [Questions-expected] is more than the decision points marked as `ask` - change the tag of the most critical decision points marked as `resolve-autonomously` to `ask`. 
 
 S08.2. For every Decision Point tagged `ask`, generate one Q-block following the instructions in `.aib_brain/conventions/q-block-convention.md`. Q-blocks MUST reference the alternative by name from the Decision Register section when applicable. Write Q-blocks to a `## Questions` section appended to `input.md`.
 
-S08.3. Edit `.aib_memory/input.md` to replace the line `State: analysis_ready` with `State: questions_generated`. Output `Note: New questions generated. Answer them and run again analyze.` and HALT.
+S08.3. Edit `.aib_memory/input.md` to replace the line `State: analysis_ready` with `State: questions_generated`. HALT.
 
 S08.4. If no Decision Point tagged `ask` are found, do NOT write a `## Questions` section. Continue with the next step.
 
-S08.5. Output a short step-completion note in format: `[S08 done] Q-block generation complete; questions written or skipped based on Decision Points.`
-
 ### S09. Step 9 — Plan Generation
 
-S09.1. Generate or recreate `.aib_memory/plan-<request_id>.md` based on `.aib_memory/analysis-<request_id>.md` and project memory in `.aib_memory/context.md`. Follow strictly the format and structure defined in `.aib_brain/conventions/plan-convention.md`
+S09.1. Generate or recreate `.aib_memory/plan-<request_id>.md` based solely on `.aib_memory/analysis-<request_id>.md` and the developer's input archived in the request folder. The plan MUST be self-sufficient: a human engineer or a fresh AI session MUST be able to execute it without consulting `.aib_memory/context.md` or any other file not referenced within the plan itself. Follow strictly the format and structure defined in `.aib_brain/conventions/plan-convention.md`.
 
-S09.2. Output a short step-completion note in format: `[S09 done] Plan document generated or recreated from completed analysis.`
-
+S09.2. Self-sufficiency requirements — the generated plan MUST:
+   - Include in `## Goal` the full background context explaining why the change is needed and which components are affected, so no external file needs to be read to understand the task.
+   - Reference the exact file path in every procedure step that operates on a file. Steps that run terminal commands MUST name the command and its expected output.
+   - Include a mandatory context update task (typically as the final or near-final task in the WBS) that specifies the exact `edit-context.py` invocations with literal `--operation`, `--area`, `--type`, and `--text` arguments for every atomic statement to be inserted or deleted. The implement agent MUST be able to run these commands verbatim without reading `context.md` first. The exact current text of any statement to be deleted MUST be embedded in the plan task procedure steps. During this step, read `.aib_memory/context.md` to identify the exact text of statements that need to change, then embed those exact texts into the plan task procedure steps.
 
 ### S10. Step 10 - Completion Confirmation
 

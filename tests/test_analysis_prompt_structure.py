@@ -564,3 +564,50 @@ class TestAppendixAStructure:
             "aib-analyze.md Step 6 trigger guard must reference 'Appendix A' instead of "
             "'Auto-Request Creation Branch (step 1)'."
         )
+
+
+IMPLEMENT_PROMPT = WORKSPACE_ROOT / ".aib_brain" / "prompts" / "aib-implement.md"
+
+
+class TestPlanSelfSufficiencyAndContextMdProhibition:
+    """Regression tests for R-20260606-1517: plan self-sufficiency and context.md prohibition."""
+
+    def test_implement_does_not_read_context_md_step(self) -> None:
+        """aib-implement.md must not contain a step that reads context.md."""
+        content = IMPLEMENT_PROMPT.read_text(encoding="utf-8")
+        assert "Read `.aib_memory/context.md`" not in content, (
+            "aib-implement.md must not contain a step that reads `.aib_memory/context.md` — "
+            "context.md reads are forbidden during implementation."
+        )
+
+    def test_implement_rules_forbid_context_md_read(self) -> None:
+        """aib-implement.md Rules section must explicitly forbid reading context.md."""
+        content = IMPLEMENT_PROMPT.read_text(encoding="utf-8")
+        assert "MUST NOT read `.aib_memory/context.md`" in content, (
+            "aib-implement.md Rules section must contain 'MUST NOT read "
+            "`.aib_memory/context.md`' to explicitly forbid the read."
+        )
+
+    def test_plan_convention_no_risk_notes(self) -> None:
+        """plan-convention.md must not contain '#### Risk notes' in the task schema."""
+        content = PLAN_CONVENTION.read_text(encoding="utf-8")
+        assert "#### Risk notes" not in content, (
+            "plan-convention.md must not define '#### Risk notes' as a task sub-field — "
+            "risk information belongs in the analysis document."
+        )
+
+    def test_plan_convention_forbids_context_md_read(self) -> None:
+        """plan-convention.md Operational Workflow must forbid reading context.md."""
+        content = PLAN_CONVENTION.read_text(encoding="utf-8")
+        assert "MUST NOT read" in content and "context.md" in content, (
+            "plan-convention.md must contain a prohibition on reading context.md "
+            "during implementation in the Operational Workflow section."
+        )
+
+    def test_analyze_step9_self_sufficient_language(self) -> None:
+        """aib-analyze.md Step 9 must mandate plan self-sufficiency."""
+        content = ANALYSIS_PROMPT.read_text(encoding="utf-8")
+        assert "self-sufficient" in content, (
+            "aib-analyze.md Step 9 must contain 'self-sufficient' to mandate "
+            "that generated plans do not require context.md during implementation."
+        )

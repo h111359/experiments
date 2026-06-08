@@ -22,10 +22,9 @@ This convention applies to every request folder under `.aib_memory/requests/<req
 The file is a Markdown document composed of an ordered sequence of **Entries**. Each Entry documents one implementation increment for the request.
 
 Top‑level layout:
-1. Optional short introduction paragraph (plain text, no headings).
-2. List of .aib_memory/ files taken into consideration
-3. `## Implementation Log` (single section header).
-4. A strictly chronological list of Entries. Newest entries are appended to the end.
+1. List of .aib_memory/ files taken into consideration
+2. `## Implementation Log` (single section header).
+3. A strictly chronological list of Entries. Newest entries are appended to the end.
 
 ### Entry Block Format (Strict)
 Each Entry is a Markdown block with the following exact structure and headings in this exact order:
@@ -33,34 +32,23 @@ Each Entry is a Markdown block with the following exact structure and headings i
 - `### Entry <YYYY-MM-DD HH:MM>`
 - `#### Scope`
 - `#### Changes`
-- `#### Tests`
-- `#### Outcome`
-- `#### Evidence`
-- `#### Notes (Optional)`
 
 **Formatting rules:**
 - Times are local project time in 24h format (`YYYY-MM-DD HH:MM`).
 - Headings MUST be level‑3 for the entry title and level‑4 for all sub‑sections.
-- Lists under `Changes`, `Tests`, and `Evidence` MUST be Markdown bullet lists (`- `).
+- Lists under `Changes` MUST be Markdown bullet lists (`- `).
 - Code, commands, or logs in any section MUST be fenced with triple backticks and a language hint when applicable (e.g., ` ```bash `). Do NOT break the outer document fence.
 
 ### Field Semantics
 - **Scope**: 1–5 sentences summarizing the goal of the change as implemented in this increment. Reference impacted areas/components.
 - **Changes**: Bullet list of concrete modifications (files, modules, documents, data jobs, infra changes). Each bullet SHOULD start with a verb in past tense.
-- **Tests**: Bullet list describing tests executed. Each bullet MUST state type (unit/integration/e2e/perf/security), the target, and pass/fail result. Include minimal evidence pointers if not in `Evidence`.
-- **Outcome**: Short paragraph stating the result (success/partial/failed), residual risks, and follow‑ups.
-- **Evidence**: Bullet list of artifact pointers (paths to screenshots/logs/reports in repo, or inline fenced snippets).
-- **Notes (Optional)**: Free‑form clarifications. Human edits are allowed here.
 
 ## Determinism & Append‑Only Rules (Normative)
 - Entries MUST be appended; existing entries MUST remain bit‑for‑bit unchanged (except authorized typo fixes in `Notes (Optional)`).
 - If a previously appended entry needs correction beyond typos, a new Entry MUST be added describing the correction; do not alter history.
 - Entry timestamps MUST be strictly increasing.
 - Exactly one Entry per `implement` action invocation.
-- If an `implement` action spans multiple commits or steps, consolidate into one Entry for that action and summarize under `Changes` and `Tests`.
-
-## Cross‑Artifact Consistency
-- When available, the Entry SHOULD cross‑reference sections from `analysis.md` using plain text (do not use links). Example: "Aligned with analysis section 4.5".
+- If an `implement` action spans multiple commits or steps, consolidate into one Entry for that action and summarize under `Changes`.
 
 ## Validation Rules (Automation MUST Enforce)
 - File exists and is UTF‑8 encoded text.
@@ -68,43 +56,11 @@ Each Entry is a Markdown block with the following exact structure and headings i
 - Every Entry title matches regex: `^### Entry \d{4}-\d{2}-\d{2} \d{2}:\d{2}$`
 - Sub‑sections exist exactly once per Entry and in the mandated order.
 - Timestamps strictly increase across Entries.
-- No Markdown tables are used inside `Changes`, `Tests`, or `Evidence` (lists only).
+- No Markdown tables are used (lists only).
 - No external hyperlinks are present anywhere in the file (plain text references only).
 
 ## Editing Workflow
 - **Automation (default)**: AIB appends a fully‑formed Entry when `implement` completes.
-- **Human (exceptional)**: May refine `Notes (Optional)` or fix typos without changing structure, headings, or order. Any substantial change requires a new Entry.
-
-## Example (Illustrative)
-> The example below is illustrative; do not pre‑seed real files with it.
-
-### Entry 2026-03-08 19:05
-#### Scope
-Implement initial seeding tool for `.aib_memory` and generate register files.
-
-#### Changes
-- Added `tools/initialize.py` to create memory folders and seed default docs.
-- Created `.aib_memory/requests_register.md`.
-- Updated CI job to run initialization check on clean workspaces.
-
-#### Tests
-- unit: `test_initialize_seeding` — pass
-- integration: run on empty workspace — pass
-- integration: re‑run idempotency — pass
-
-#### Outcome
-Successful initialization. Workspace now reproducible; re‑runs converge with no diffs.
-
-#### Evidence
-- Path: `.aib_memory/requests_register.md`
-- Log snippet:
-  ```text
-  Seeding .aib_memory ... OK
-  Created requests_register.md
-  ```
-
-#### Notes (Optional)
-Next: add validation step for duplicate requirement IDs.
 
 ## Anti‑Patterns (Do Not)
 - Do not reorder or delete Entries.
@@ -119,13 +75,10 @@ Next: add validation step for duplicate requirement IDs.
 - Parsers can rely on:
   - A single `## Implementation Log` header.
   - Entry title regex and fixed sub‑section sequence.
-  - Bullet list structures for `Changes`, `Tests`, `Evidence`.
-- Tools SHOULD treat unknown additional headings as invalid.
+  - Bullet list structures
 
 ## Performance & Size Guidance
-- Keep Entries concise (aim ≤ 200 lines each). If evidence is verbose, store it externally in repo paths and reference under `Evidence`.
+- Keep Entries concise (aim ≤ 200 lines each). 
 
 ## Security & Compliance
 - Do not include secrets, tokens, or full credential strings in any section or snippet.
-- Redact sensitive values in logs with `****`.
-
