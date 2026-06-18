@@ -11,11 +11,10 @@ import sys
 import threading
 import time
 from dataclasses import dataclass
-from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from common import ACTIVE, artifact_name, get_semver, parse_markdown_table, read_text
+from common import artifact_name, get_semver, parse_input_header, read_text, slugify
 
 # Auto-refresh interval used by choose_action() when no key is pressed.
 _REFRESH_TIMEOUT_S: float = 3.0
@@ -115,83 +114,57 @@ def _sanitize_action_id(raw: str) -> str:
     return "".join(c if c.isalnum() or c in "-_" else "-" for c in raw.lower()).strip("-")[:60]
 
 
-def _make_log_path(action_id: str, workspace: Path | None = None) -> Path:
-    """Return the log file path for an action execution.
-
-    The ``workspace`` parameter is used as the base directory for the
-    ``.aib_memory/logs/`` folder.  When *None*, the current working directory
-    is used.
-    """
-    ts = datetime.now().strftime("%Y%m%d-%H%M%S")
-    safe_id = _sanitize_action_id(action_id)
-    log_dir = (workspace or Path.cwd()) / ".aib_memory" / "logs"
-    log_dir.mkdir(parents=True, exist_ok=True)
-    return log_dir / f"aib-action-{ts}-{safe_id}.log"
-
-
-def _stream_pipe(pipe, dest, log_file, prefix, lock):
-    """Read *pipe* line-by-line, writing each line to *dest* and *log_file*."""
+def _stream_pipe(pipe, dest, prefix, lock):
+    """Read *pipe* line-by-line, writing each line to *dest* for live terminal streaming."""
     try:
         for raw_line in iter(pipe.readline, ""):
             line = raw_line.rstrip("\n").rstrip("\r")
             with lock:
                 dest.write(line + "\n")
                 dest.flush()
-                log_file.write(f"{prefix} {line}\n")
-                log_file.flush()
-    except Exception as exc:  # noqa: BLE001
-        with lock:
-            log_file.write(f"[THREAD-ERROR] {type(exc).__name__}: {exc}\n")
-            log_file.flush()
+    except Exception:  # noqa: BLE001 — swallow thread errors silently; live stream is best-effort
+        pass
     finally:
         pipe.close()
 
 
 def _run_and_tee(
     command: list[str],
-    log_path: Path,
     title: str,
     inherit_stdin: bool = False,
 ) -> int:
-    """Run *command* while streaming stdout/stderr to terminal and *log_path*.
+    """Run *command* while streaming stdout/stderr live to the terminal.
 
     Returns the subprocess exit code.
     """
     lock = threading.Lock()
-    with open(log_path, "w", encoding="utf-8") as log_file:
-        log_file.write(f"[START] {datetime.now().isoformat()} — {title}\n")
-        log_file.write(f"[CMD] {' '.join(command)}\n")
-        log_file.flush()
 
-        proc = subprocess.Popen(
-            command,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            stdin=None if inherit_stdin else subprocess.DEVNULL,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-        )
+    proc = subprocess.Popen(
+        command,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        stdin=None if inherit_stdin else subprocess.DEVNULL,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
 
-        stdout_thread = threading.Thread(
-            target=_stream_pipe,
-            args=(proc.stdout, sys.stdout, log_file, "[OUT]", lock),
-            daemon=True,
-        )
-        stderr_thread = threading.Thread(
-            target=_stream_pipe,
-            args=(proc.stderr, sys.stderr, log_file, "[ERR]", lock),
-            daemon=True,
-        )
-        stdout_thread.start()
-        stderr_thread.start()
+    stdout_thread = threading.Thread(
+        target=_stream_pipe,
+        args=(proc.stdout, sys.stdout, "[OUT]", lock),
+        daemon=True,
+    )
+    stderr_thread = threading.Thread(
+        target=_stream_pipe,
+        args=(proc.stderr, sys.stderr, "[ERR]", lock),
+        daemon=True,
+    )
+    stdout_thread.start()
+    stderr_thread.start()
 
-        proc.wait()
-        stdout_thread.join()
-        stderr_thread.join()
-
-        log_file.write(f"[EXIT] {proc.returncode}\n")
-        log_file.flush()
+    proc.wait()
+    stdout_thread.join()
+    stderr_thread.join()
 
     return proc.returncode
 
@@ -230,35 +203,36 @@ class MenuState:
         return bool(self.active_request_id)
 
 
-def _safe_table(path: Path) -> tuple[list[str], list[list[str]]]:
-    if not path.exists():
-        return [], []
-    header, rows = parse_markdown_table(read_text(path))
-    return header, rows
-
-
 def resolve_menu_state(workspace: Path) -> MenuState:
-    register_path = workspace / ".aib_memory" / "requests_register.md"
-    header, rows = _safe_table(register_path)
-    if not header or not rows:
+    """Resolve the active request state from the input.md YAML frontmatter header.
+
+    Args:
+        workspace: The workspace root path.
+
+    Returns:
+        MenuState populated from the YAML header, or a MenuState with all None
+        fields if the header is absent or state is idle.
+    """
+    input_path = workspace / ".aib_memory" / "input.md"
+    if not input_path.exists():
         return MenuState(None, None, None)
 
-    col = {name: idx for idx, name in enumerate(header)}
-    required_cols = {"request_id", "folder", "state"}
-    if not required_cols.issubset(col.keys()):
+    header = parse_input_header(read_text(input_path))
+    if header is None or header["state"] == "idle":
         return MenuState(None, None, None)
 
-    active_rows = [r for r in rows if r[col["state"]] == ACTIVE]
-    if len(active_rows) != 1:
+    request_id = header.get("request_id", "").strip() or None
+    title = header.get("title", "").strip() or None
+    if not request_id or request_id == "~":
         return MenuState(None, None, None)
 
-    active_request_id = active_rows[0][col["request_id"]].strip() or None
-    active_request_folder = active_rows[0][col["folder"]].strip() or None
-    active_request_title = active_rows[0][col["title"]].strip() if "title" in col else None
-    if not active_request_id or not active_request_folder:
-        return MenuState(None, None, None)
+    # Derive folder path using the same slugify convention as create-request.py.
+    folder_rel = None
+    if request_id and title and title != "~":
+        folder_name = f"{request_id}-{slugify(title)}"
+        folder_rel = f".aib_memory/requests/{folder_name}"
 
-    return MenuState(active_request_id, active_request_folder, active_request_title)
+    return MenuState(request_id, folder_rel, title if title != "~" else None)
 
 
 def parse_cli_args() -> argparse.Namespace:
@@ -521,18 +495,14 @@ def run_action(python_exe: str, tools_dir: Path, action: dict[str, Any], workspa
 
     command = build_command(python_exe, tools_dir, action, values)
 
-    workspace = Path(workspace_default)
-    log_path = _make_log_path(action.get("script", title), workspace)
-
     print(f"\n\u25b6 Running {title}... (output appears below)\n")
 
-    exit_code = _run_and_tee(command, log_path, title, inherit_stdin=False)
+    exit_code = _run_and_tee(command, title, inherit_stdin=False)
 
     if exit_code == 0:
         print(f"\nStatus: Success")
     else:
         print(f"\nStatus: Failed (exit code {exit_code})")
-    print(f"Log: {log_path}")
     input("Press Enter to return to menu...")
 
 

@@ -9,9 +9,9 @@ from pathlib import Path
 import pytest
 
 from common import (
-    format_markdown_table,
-    parse_markdown_table,
+    parse_input_header,
     read_text,
+    write_input_header,
     write_text,
 )
 
@@ -19,8 +19,18 @@ from common import (
 # Helpers
 # ---------------------------------------------------------------------------
 
-REGISTER_HEADER = ["request_id", "title", "folder", "state", "created_at", "closed_at"]
 TOOLS_DIR = Path(__file__).resolve().parent.parent / ".aib_brain" / "tools"
+
+INPUT_MD_IDLE = (
+    "---\n"
+    "request_id: ~\n"
+    "title: ~\n"
+    "state: idle\n"
+    "options:\n"
+    "  minimum_questions: 5\n"
+    "---\n\n"
+    "## Input\n\n"
+)
 
 
 def _load_script(name: str):
@@ -32,19 +42,22 @@ def _load_script(name: str):
 
 
 def _make_active_request(workspace: Path, req_id: str = "R-20260101-1000") -> Path:
-    """Register an Active request and create its folder; return the folder Path."""
+    """Register an Active request via YAML header and create its folder; return the folder Path."""
     folder_name = f"{req_id}-test-request"
     folder_rel = f".aib_memory/requests/{folder_name}"
     folder = workspace / folder_rel
     folder.mkdir(parents=True, exist_ok=True)
 
-    reg_path = workspace / ".aib_memory" / "requests_register.md"
-    content = read_text(reg_path)
-    header, rows = parse_markdown_table(content)
-    if not header:
-        header = REGISTER_HEADER
-    rows.append([req_id, "Test Request", folder_rel, "Active", "2026-01-01 10:00:00 +0000", ""])
-    write_text(reg_path, "# Requests Register\n\n" + format_markdown_table(header, rows))
+    input_path = workspace / ".aib_memory" / "input.md"
+    base_content = read_text(input_path) if input_path.exists() else INPUT_MD_IDLE
+    hdr = parse_input_header(base_content) or {
+        "request_id": "~", "title": "~", "state": "idle",
+        "options": {"minimum_questions": 0},
+    }
+    hdr["request_id"] = req_id
+    hdr["title"] = "Test Request"
+    hdr["state"] = "analysis_ready"
+    write_text(input_path, write_input_header(base_content, hdr))
     return folder
 
 
@@ -156,12 +169,9 @@ class TestCloseRequestArtifactPlacement:
         assert not (aib_memory / f"plan-{req_id}.md").exists()
         assert not (aib_memory / f"analysis-{req_id}.md").exists()
 
-        # Request state must be Closed
-        reg = read_text(workspace_dir / ".aib_memory" / "requests_register.md")
-        header, rows = parse_markdown_table(reg)
-        col = {n: i for i, n in enumerate(header)}
-        matching = [r for r in rows if r[col["request_id"]] == req_id]
-        assert matching[0][col["state"]] == "Closed"
+        # Request state must be idle (closed)
+        header = parse_input_header(read_text(workspace_dir / ".aib_memory" / "input.md"))
+        assert header["state"] == "idle"
 
     def test_t7_close_completes_when_no_artifacts_at_root(self, workspace_dir: Path):
         """T7: close-request.py completes successfully when no artifacts exist at .aib_memory/ root."""
@@ -175,8 +185,7 @@ class TestCloseRequestArtifactPlacement:
         rc = _run_close_request(workspace_dir)
 
         assert rc == 0
-        reg = read_text(workspace_dir / ".aib_memory" / "requests_register.md")
-        header, rows = parse_markdown_table(reg)
-        col = {n: i for i, n in enumerate(header)}
-        matching = [r for r in rows if r[col["request_id"]] == req_id]
-        assert matching[0][col["state"]] == "Closed"
+
+        # Request state must be idle (closed)
+        header = parse_input_header(read_text(workspace_dir / ".aib_memory" / "input.md"))
+        assert header["state"] == "idle"

@@ -24,10 +24,15 @@ if str(TOOLS_DIR) not in sys.path:
 # Minimal AIB workspace builder
 # ---------------------------------------------------------------------------
 
-REGISTER_CONTENT = (
-    "# Requests Register\n\n"
-    "| request_id | title | folder | state | created_at | closed_at |\n"
-    "| --- | --- | --- | --- | --- | --- |\n"
+INPUT_MD_IDLE = (
+    "---\n"
+    "request_id: ~\n"
+    "title: ~\n"
+    "state: idle\n"
+    "options:\n"
+    "  minimum_questions: 5\n"
+    "---\n\n"
+    "## Input\n\n"
 )
 
 
@@ -37,9 +42,9 @@ def _seed_workspace(root: Path) -> None:
     (root / ".aib_memory" / "requests").mkdir(parents=True, exist_ok=True)
     (root / ".aib_memory" / "docs").mkdir(parents=True, exist_ok=True)
 
-    # Seed empty requests register
-    register = root / ".aib_memory" / "requests_register.md"
-    register.write_text(REGISTER_CONTENT, encoding="utf-8")
+    # Seed input.md with YAML idle header
+    input_md = root / ".aib_memory" / "input.md"
+    input_md.write_text(INPUT_MD_IDLE, encoding="utf-8")
 
 
 # ---------------------------------------------------------------------------

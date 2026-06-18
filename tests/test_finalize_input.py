@@ -23,30 +23,31 @@ _WORKSPACE_ROOT = _TESTS_DIR.parent
 _TOOLS_DIR = _WORKSPACE_ROOT / ".aib_brain" / "tools"
 _FINALIZE_SCRIPT = _TOOLS_DIR / "finalize-input.py"
 
-# Minimal seed template WITHOUT toggle lines (new format introduced in R-20260511-2019).
+# Minimal seed template in YAML frontmatter format.
 _SEED_TEMPLATE = (
-    "## Status\n"
-    "No active request\n"
-    "State: analysis_ready\n\n"
-    "## Options\n"
-    "- Minimum questions: 0\n\n"
+    "---\n"
+    "request_id: ~\n"
+    "title: ~\n"
+    "state: analysis_ready\n"
+    "options:\n"
+    "  minimum_questions: 5\n"
+    "---\n\n"
     "## Input\n\n"
 )
 
 # A non-stub input.md with meaningful developer content.
+# Uses the same request_id/title as _make_workspace defaults for consistency.
 _NON_STUB_INPUT = (
-    "## Status\n"
-    "R-TEST-0001 \u2014 My Test Request\n"
-    "State: analysis_ready\n\n"
-    "## Options\n"
-    "- Minimum questions: 0\n\n"
+    "---\n"
+    "request_id: R-20260101-1200\n"
+    "title: My Test\n"
+    "state: analysis_ready\n"
+    "options:\n"
+    "  minimum_questions: 5\n"
+    "---\n\n"
     "## Input\n"
     "This is user-provided content that must be archived.\n"
 )
-
-# Register header and separator for building minimal register tables.
-_REGISTER_HEADER = "| request_id | title | folder | state | created_at | closed_at |\n"
-_REGISTER_SEP    = "| --- | --- | --- | --- | --- | --- |\n"
 
 
 # ---------------------------------------------------------------------------
@@ -66,17 +67,21 @@ def _make_workspace(tmp: str, request_id: str = "R-20260101-1200", title: str = 
     (memory / "attachments").mkdir(parents=True, exist_ok=True)
     (memory / "attachments" / ".gitkeep").touch()
 
-    # Build a minimal requests_register.md with one Active row.
     folder_rel = f".aib_memory/requests/{request_id}-my-test"
     (ws / folder_rel).mkdir(parents=True, exist_ok=True)
 
-    register_content = (
-        "# Requests Register\n\n"
-        + _REGISTER_HEADER
-        + _REGISTER_SEP
-        + f"| {request_id} | {title} | {folder_rel} | Active | 2026-01-01 12:00:00 +0000 |  |\n"
+    # Seed input.md with YAML header for the active request.
+    input_content = (
+        "---\n"
+        f"request_id: {request_id}\n"
+        f"title: {title}\n"
+        "state: analysis_ready\n"
+        "options:\n"
+        "  minimum_questions: 5\n"
+        "---\n\n"
+        "## Input\n\n"
     )
-    (memory / "requests_register.md").write_text(register_content, encoding="utf-8")
+    (memory / "input.md").write_text(input_content, encoding="utf-8")
 
     return ws
 
@@ -129,8 +134,15 @@ class TestArchiveBehaviour:
         with tempfile.TemporaryDirectory() as tmp:
             ws = _make_workspace(tmp, request_id="R-20260101-1200", title="My Test")
             # Write stub-equivalent content (seed template with request ID).
-            stub_content = _SEED_TEMPLATE.replace(
-                "No active request", "R-20260101-1200 \u2014 My Test"
+            stub_content = (
+                "---\n"
+                "request_id: R-20260101-1200\n"
+                "title: My Test\n"
+                "state: analysis_ready\n"
+                "options:\n"
+                "  minimum_questions: 5\n"
+                "---\n\n"
+                "## Input\n\n"
             )
             (ws / ".aib_memory" / "input.md").write_text(stub_content, encoding="utf-8")
 
@@ -192,7 +204,7 @@ class TestInputMdReset:
     """Verify that input.md is reset to the seed template with the active request ID."""
 
     def test_input_md_reset_contains_request_id(self):
-        """After run, input.md must contain the active request ID in ## Status."""
+        """After run, input.md must contain the active request ID in the YAML header."""
         with tempfile.TemporaryDirectory() as tmp:
             ws = _make_workspace(tmp, request_id="R-20260101-1200", title="My Test")
             (ws / ".aib_memory" / "input.md").write_text(_NON_STUB_INPUT, encoding="utf-8")
@@ -203,8 +215,7 @@ class TestInputMdReset:
             reset = (ws / ".aib_memory" / "input.md").read_text(encoding="utf-8")
             assert "R-20260101-1200" in reset, "Reset input.md must contain the request ID"
             assert "My Test" in reset, "Reset input.md must contain the request title"
-            assert "## Status" in reset, "Reset input.md must contain ## Status heading"
-            assert "State: analysis_ready" in reset, "Reset input.md must contain State: analysis_ready"
+            assert "state: analysis_ready" in reset, "Reset input.md must contain state: analysis_ready"
 
     def test_input_md_no_toggle_lines(self):
         """After run, input.md must NOT contain either removed toggle line."""
@@ -233,7 +244,7 @@ class TestInputMdReset:
             assert result.returncode == 0, result.stderr
 
             reset = (ws / ".aib_memory" / "input.md").read_text(encoding="utf-8")
-            assert "Minimum questions" in reset, "Reset input.md must contain 'Minimum questions' option."
+            assert "minimum_questions" in reset, "Reset input.md must contain 'minimum_questions' field."
 
 
 # ---------------------------------------------------------------------------
@@ -275,13 +286,15 @@ class TestStubEquivalenceStateVariants:
         with tempfile.TemporaryDirectory() as tmp:
             ws = _make_workspace(tmp, request_id="R-20260101-1200", title="My Test")
 
-            # Write a stub-equivalent input.md with State: questions_generated (different from seed).
+            # Write a stub-equivalent input.md with state: questions_generated (different from seed).
             stub_questions_state = (
-                "## Status\n"
-                "R-20260101-1200 \u2014 My Test\n"
-                "State: questions_generated\n\n"
-                "## Options\n"
-                "- Minimum questions: 0\n\n"
+                "---\n"
+                "request_id: R-20260101-1200\n"
+                "title: My Test\n"
+                "state: questions_generated\n"
+                "options:\n"
+                "  minimum_questions: 5\n"
+                "---\n\n"
                 "## Input\n\n"
             )
             (ws / ".aib_memory" / "input.md").write_text(stub_questions_state, encoding="utf-8")

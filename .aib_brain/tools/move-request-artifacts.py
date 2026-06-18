@@ -14,14 +14,12 @@ import shutil
 from pathlib import Path
 
 from common import (
-    ACTIVE,
     ValidationError,
     artifact_name,
     ensure_workspace,
     parse_args,
-    parse_markdown_table,
-    read_text,
-    requests_register_path,
+    read_input_header,
+    slugify,
 )
 
 # Artifact types that live at .aib_memory/ root while a request is active.
@@ -33,7 +31,7 @@ _ARTIFACT_TYPES = ("plan", "analysis")
 def move_artifacts(workspace: Path) -> None:
     """Move active-request artifacts from .aib_memory/ root to the active request subfolder.
 
-    Reads requests_register.md to resolve the active request folder and request ID.
+    Reads the input.md YAML header to resolve the active request folder and request ID.
     For each artifact type (plan, analysis):
       - Constructs the ID-suffixed source filename (e.g. ``plan-R-20260509-2313.md``).
             - If the source exists at ``.aib_memory/<filename>``, moves it to the request
@@ -46,31 +44,23 @@ def move_artifacts(workspace: Path) -> None:
         workspace: Resolved absolute path to the workspace root.
 
     Raises:
-        ValidationError: If the workspace is invalid, the register is missing,
+        ValidationError: If the workspace is invalid, the input.md header is missing,
                          or no active request is found.
     """
     ensure_workspace(workspace)
 
-    register = requests_register_path(workspace)
-    if not register.exists():
-        raise ValidationError("Missing requests_register.md; run initialize first")
-
-    header, rows = parse_markdown_table(read_text(register))
-    if not header:
-        raise ValidationError("requests_register.md has no valid table")
-
-    col = {name: idx for idx, name in enumerate(header)}
-    active = [r for r in rows if r[col["state"]] == ACTIVE]
-    if len(active) == 0:
+    # Read active request state from input.md YAML header.
+    header = read_input_header(workspace)
+    if header["state"] == "idle":
         raise ValidationError("No active request found; cannot move artifacts")
-    if len(active) > 1:
-        raise ValidationError("Multiple active requests found; resolve register inconsistency")
 
-    folder_rel = active[0][col["folder"]]
+    request_id = header["request_id"].strip()
+    title = header["title"]
+    # Derive folder path using the same slugify convention as create-request.py.
+    folder_name = f"{request_id}-{slugify(title)}"
+    folder_rel = f".aib_memory/requests/{folder_name}"
     dest_folder = workspace / folder_rel
     dest_folder.mkdir(parents=True, exist_ok=True)
-
-    request_id = active[0][col["request_id"]].strip()
     aib_memory = workspace / ".aib_memory"
 
     for artifact_type in _ARTIFACT_TYPES:

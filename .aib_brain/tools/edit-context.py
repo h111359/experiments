@@ -10,18 +10,22 @@ import re
 import sys
 from pathlib import Path
 
-# Valid two-letter area codes
+# Valid area names (must match context-convention.md)
 VALID_AREAS = {
-    "PO", "CM", "DO", "CO", "BP", "FN", "TD", "TS", "NW",
-    "DS", "DF", "PR", "AN", "UI", "SC", "PF", "OP", "DV",
-    "DP", "DR", "OB", "DM",
+    "Project overview", "Change Management", "Domain", "Concepts", "Best Practices",
+    "Functionality", "Technical Design", "Technology Stack", "Networking and Connectivity",
+    "Data structures", "Data flow", "Processes", "Analytics", "User Interface",
+    "Security", "Performance", "Operations", "Development", "Deployment",
+    "Durability", "Observability", "Documentation",
 }
 
 # Ordered area list for consistent section insertion order
 AREA_ORDER = [
-    "PO", "CM", "DO", "CO", "BP", "FN", "TD", "TS", "NW",
-    "DS", "DF", "PR", "AN", "UI", "SC", "PF", "OP", "DV",
-    "DP", "DR", "OB", "DM",
+    "Project overview", "Change Management", "Domain", "Concepts", "Best Practices",
+    "Functionality", "Technical Design", "Technology Stack", "Networking and Connectivity",
+    "Data structures", "Data flow", "Processes", "Analytics", "User Interface",
+    "Security", "Performance", "Operations", "Development", "Deployment",
+    "Durability", "Observability", "Documentation",
 ]
 
 # Valid statement type letters
@@ -36,13 +40,13 @@ H2_PATTERN = re.compile(r"^## .+$")
 
 def _build_area_heading(area: str) -> str:
     """
-    Return the H2 heading string for the given area code.
+    Return the H2 heading string for the given area name.
 
     Args:
-        area: Two-letter area code (e.g. 'FN').
+        area: Area name (e.g. 'Functionality').
 
     Returns:
-        The heading string (e.g. '## FN').
+        The heading string (e.g. '## Functionality').
     """
     return f"## {area}"
 
@@ -309,7 +313,7 @@ def main() -> int:
     parser.add_argument(
         "--area",
         required=True,
-        help="Two-letter area code (e.g. PO, CM, FN).",
+        help="Area name (e.g. Functionality, Project overview, Change Management).",
     )
     parser.add_argument(
         "--type",
@@ -333,8 +337,8 @@ def main() -> int:
     # Validate area code
     if args.area not in VALID_AREAS:
         sys.stderr.write(
-            f"Error: Invalid area code '{args.area}'. "
-            f"Valid codes: {', '.join(sorted(VALID_AREAS))}.\n"
+            f"Error: Invalid area name '{args.area}'. "
+            f"Valid names: {', '.join(sorted(VALID_AREAS))}.\n"
         )
         return 1
 

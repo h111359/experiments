@@ -10,11 +10,13 @@ import re
 import sys
 from pathlib import Path
 
-# Valid two-letter area codes (must match context-convention.md)
+# Valid area names (must match context-convention.md)
 VALID_AREAS = {
-    "PO", "CM", "DO", "CO", "BP", "FN", "TD", "TS", "NW",
-    "DS", "DF", "PR", "AN", "UI", "SC", "PF", "OP", "DV",
-    "DP", "DR", "OB", "DM",
+    "Project overview", "Change Management", "Domain", "Concepts", "Best Practices",
+    "Functionality", "Technical Design", "Technology Stack", "Networking and Connectivity",
+    "Data structures", "Data flow", "Processes", "Analytics", "User Interface",
+    "Security", "Performance", "Operations", "Development", "Deployment",
+    "Durability", "Observability", "Documentation",
 }
 
 # Valid single-letter statement type identifiers
@@ -171,7 +173,7 @@ def check_at_least_one_area_section(content: str) -> tuple[bool, str]:
             if heading_text in VALID_AREAS:
                 return True, ""
 
-    return False, "No valid area section (e.g., ## FN, ## PO) found in the document."
+    return False, "No valid area section (e.g., ## Functionality, ## Project overview) found in the document."
 
 
 def check_area_sections_non_empty(content: str) -> tuple[bool, str]:

@@ -125,33 +125,18 @@ class TestUpgrade:
             subfolders = [d for d in archives_dir.iterdir() if d.is_dir()]
             assert len(subfolders) == 1
 
-    def test_upgrade_archive_includes_logs(self):
-        """Archive includes the logs/ directory."""
-        with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            _make_brain_with_semver(root, "v1.2.8")
-            _run_initialize(root)
-            # Place a file in logs/ to verify it lands in the archive.
-            log_file = root / ".aib_memory" / "logs" / "test.log"
-            log_file.write_text("log content\n", encoding="utf-8")
-            _run_initialize(root, upgrade=True)
-            archives_dir = root / ".aib_memory" / "archives"
-            archive = next(d for d in archives_dir.iterdir() if d.is_dir())
-            assert (archive / "logs" / "test.log").is_file()
-
     def test_upgrade_restores_curated_files(self):
-        """Curated files (instructions.md, requests_register.md) are restored in migrate mode."""
+        """Curated files (instructions.md, input.md) are restored in migrate mode."""
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             _make_brain_with_semver(root, "v1.2.8")
             _run_initialize(root)
-            # Mark curated files with recognizable content.
             (root / ".aib_memory" / "instructions.md").write_text("# My instructions\n", encoding="utf-8")
-            (root / ".aib_memory" / "requests_register.md").write_text("# Custom register\n", encoding="utf-8")
+            (root / ".aib_memory" / "input.md").write_text("# Custom input\n", encoding="utf-8")
             # Non-interactive defaults to migrate, so both files should be restored.
             _run_initialize(root, upgrade=True)
             assert (root / ".aib_memory" / "instructions.md").read_text(encoding="utf-8") == "# My instructions\n"
-            assert (root / ".aib_memory" / "requests_register.md").read_text(encoding="utf-8") == "# Custom register\n"
+            assert (root / ".aib_memory" / "input.md").read_text(encoding="utf-8") == "# Custom input\n"
 
     def test_upgrade_seeds_new_semver(self):
         """After upgrade, .aib_memory/ contains the current brain semver marker."""
@@ -197,14 +182,13 @@ class TestUpgrade:
             # Seed a request subfolder so archive contains requests/.
             (root / ".aib_memory" / "requests" / "R-test-request").mkdir(parents=True, exist_ok=True)
             (root / ".aib_memory" / "requests" / "R-test-request" / "plan.md").write_text("# Test\n", encoding="utf-8")
-            (root / ".aib_memory" / "requests_register.md").write_text("# Custom register\n", encoding="utf-8")
             # Simulate interactive TTY with user choosing archive-only (N).
             with patch("sys.stdin") as mock_stdin, patch("builtins.input", return_value="N"):
                 mock_stdin.isatty.return_value = True
                 _run_initialize(root, upgrade=True)
-            # requests_register.md must NOT be restored (N choice).
-            content = (root / ".aib_memory" / "requests_register.md").read_text(encoding="utf-8")
-            assert "# Custom register" not in content
+            # input.md must be a freshly seeded idle YAML header (not the archive content).
+            content = (root / ".aib_memory" / "input.md").read_text(encoding="utf-8")
+            assert "state: idle" in content
             # requests/ must remain exclusively in the archive.
             archives_dir = root / ".aib_memory" / "archives"
             archive = next(d for d in archives_dir.iterdir() if d.is_dir())
@@ -219,14 +203,13 @@ class TestUpgrade:
             # Seed a request subfolder to verify full content is migrated.
             (root / ".aib_memory" / "requests" / "R-test-request").mkdir(parents=True, exist_ok=True)
             (root / ".aib_memory" / "requests" / "R-test-request" / "plan.md").write_text("# Test\n", encoding="utf-8")
-            (root / ".aib_memory" / "requests_register.md").write_text("# Custom register\n", encoding="utf-8")
             # Simulate interactive TTY with user choosing migrate (Y).
             with patch("sys.stdin") as mock_stdin, patch("builtins.input", return_value="Y"):
                 mock_stdin.isatty.return_value = True
                 _run_initialize(root, upgrade=True)
-            # requests_register.md must be restored in active memory.
-            content = (root / ".aib_memory" / "requests_register.md").read_text(encoding="utf-8")
-            assert "# Custom register" in content
+            # input.md must be restored from archive.
+            content = (root / ".aib_memory" / "input.md").read_text(encoding="utf-8")
+            assert content  # non-empty (restored from archive)
             # requests/ must exist in active memory with its content intact.
             migrated_request = root / ".aib_memory" / "requests" / "R-test-request" / "plan.md"
             assert migrated_request.is_file(), "Migrated request folder must exist in active memory"
@@ -251,12 +234,12 @@ class TestInitialize:
             assert (root / ".aib_memory").is_dir()
             assert (root / ".aib_memory" / "requests").is_dir()
 
-    def test_creates_requests_register(self):
+    def test_does_not_create_requests_register(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             _make_brain_only_workspace(root)
             _run_initialize(root)
-            assert (root / ".aib_memory" / "requests_register.md").is_file()
+            assert not (root / ".aib_memory" / "requests_register.md").is_file()
 
     def test_initialize_does_not_create_references_md(self):
         """references.md register removed in v1.2.12 — initialize must not seed it."""
@@ -274,9 +257,8 @@ class TestInitialize:
             input_path = root / ".aib_memory" / "input.md"
             assert input_path.is_file()
             content = input_path.read_text(encoding="utf-8")
-            assert "## Status" in content
-            assert "State: idle" in content
-            assert "## Options" in content
+            assert "state: idle" in content
+            assert "request_id: ~" in content
             assert "## Input" in content
 
     def test_input_md_has_no_threshold_row(self):
@@ -304,11 +286,11 @@ class TestInitialize:
             root = Path(tmp)
             _make_brain_only_workspace(root)
             _run_initialize(root)
-            # Modify the register to verify it is NOT overwritten on second run
-            reg = root / ".aib_memory" / "requests_register.md"
-            original_mtime = reg.stat().st_mtime
+            # Modify input.md to verify it is NOT overwritten on second run
+            input_md = root / ".aib_memory" / "input.md"
+            original_mtime = input_md.stat().st_mtime
             _run_initialize(root)
-            assert reg.stat().st_mtime == original_mtime
+            assert input_md.stat().st_mtime == original_mtime
 
     def test_missing_aib_brain_fails(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -345,23 +327,6 @@ class TestInitialize:
             instructions_path.write_text("# My directives\n", encoding="utf-8")
             _run_initialize(root)
             assert instructions_path.read_text(encoding="utf-8") == "# My directives\n"
-
-    def test_creates_logs_folder(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            _make_brain_only_workspace(root)
-            _run_initialize(root)
-            assert (root / ".aib_memory" / "logs").is_dir()
-
-    def test_creates_logs_folder_idempotent(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            _make_brain_only_workspace(root)
-            _run_initialize(root)
-            # Second run must not error even when logs/ already exists.
-            rc = _run_initialize(root)
-            assert rc == 0
-            assert (root / ".aib_memory" / "logs").is_dir()
 
     def test_creates_attachments_dir(self):
         """SC-1: initialize.py creates .aib_memory/attachments/ on fresh workspace."""

@@ -8,7 +8,7 @@ import datetime as dt
 import re
 import sys
 from pathlib import Path
-from typing import List, Sequence, Tuple
+from typing import List, Sequence
 
 ACTIVE = "Active"
 CLOSED = "Closed"
@@ -92,76 +92,150 @@ def write_text(path: Path, content: str) -> None:
     path.write_text(content, encoding="utf-8", newline="\n")
 
 
-def parse_markdown_table(content: str) -> Tuple[List[str], List[List[str]]]:
-    lines = [line.strip() for line in content.splitlines() if line.strip()]
-    table_lines = [line for line in lines if line.startswith("|") and line.endswith("|")]
-    if len(table_lines) < 2:
-        return [], []
-
-    header = [cell.strip() for cell in table_lines[0].strip("|").split("|")]
-    rows: List[List[str]] = []
-    for line in table_lines[2:]:
-        cells = [cell.strip() for cell in line.strip("|").split("|")]
-        if len(cells) < len(header):
-            cells += [""] * (len(header) - len(cells))
-        rows.append(cells[: len(header)])
-    return header, rows
-
-
-def format_markdown_table(header: Sequence[str], rows: Sequence[Sequence[str]]) -> str:
-    sep = ["---"] * len(header)
-    out = [
-        "| " + " | ".join(header) + " |",
-        "| " + " | ".join(sep) + " |",
-    ]
-    for row in rows:
-        vals = [str(v).replace("\n", " ").strip() for v in row]
-        if len(vals) < len(header):
-            vals += [""] * (len(header) - len(vals))
-        out.append("| " + " | ".join(vals[: len(header)]) + " |")
-    return "\n".join(out) + "\n"
-
-
-def requests_register_path(workspace: Path) -> Path:
-    return workspace / ".aib_memory" / "requests_register.md"
-
-
 def requests_root(workspace: Path) -> Path:
     return workspace / ".aib_memory" / "requests"
 
 
-def resolve_active_request_or_explicit(workspace: Path, request_id: str | None) -> List[str]:
-    register = requests_register_path(workspace)
-    if not register.exists():
-        raise ValidationError("Missing .aib_memory/requests_register.md; run initialize first")
+def _yaml_quote(value: str) -> str:
+    """Return *value* single-quoted when it contains YAML special characters.
 
-    header, rows = parse_markdown_table(read_text(register))
-    if not header:
-        raise ValidationError("requests_register.md has no valid table")
+    Plain values (null marker ``~`` and values with no YAML-special characters)
+    are returned as-is.  All other strings are wrapped in single quotes with
+    embedded single-quote characters escaped as ``''`` (YAML 1.2 convention).
 
-    col = {name: idx for idx, name in enumerate(header)}
-    for required in ["request_id", "title", "folder", "state", "created_at", "closed_at"]:
-        if required not in col:
-            raise ValidationError(f"requests_register.md missing column: {required}")
+    Args:
+        value: The string value to quote.
 
-    if request_id:
-        matches = [r for r in rows if r[col["request_id"]] == request_id]
-        if not matches:
-            raise ValidationError(f"Request ID not found: {request_id}")
-        return matches[0]
-
-    active = [r for r in rows if r[col["state"]] == ACTIVE]
-    if len(active) == 0:
-        raise ValidationError("No active request found; provide --request-id explicitly")
-    if len(active) > 1:
-        raise ValidationError("Multiple active requests found; resolve register inconsistency")
-    return active[0]
+    Returns:
+        The value unchanged or wrapped in single quotes.
+    """
+    if value == "~":
+        return "~"
+    _YAML_SPECIAL = set(":#{}[]|>&*!,'`\"")
+    if any(c in value for c in _YAML_SPECIAL):
+        return "'" + value.replace("'", "''") + "'"
+    return value
 
 
-def update_requests_register(workspace: Path, rows: Sequence[Sequence[str]]) -> None:
-    header = ["request_id", "title", "folder", "state", "created_at", "closed_at"]
-    text = "# Requests Register\n\n" + format_markdown_table(header, rows)
-    write_text(requests_register_path(workspace), text)
+def parse_input_header(content: str) -> "dict | None":
+    """Parse YAML frontmatter block from *content* (input.md text).
+
+    Supports the fixed AIB header schema only: four top-level keys
+    (``request_id``, ``title``, ``state``) plus one nested dict
+    (``options.minimum_questions``).  No external YAML library required.
+
+    Args:
+        content: Full text of input.md.
+
+    Returns:
+        Dict with keys ``request_id``, ``title``, ``state``, and
+        ``options`` (a nested dict with key ``minimum_questions``).
+        Returns ``None`` when no valid ``---`` frontmatter block is found.
+    """
+    import re as _re
+
+    lines = content.splitlines()
+    if not lines or lines[0].strip() != "---":
+        return None
+    end_idx = -1
+    for i in range(1, len(lines)):
+        if lines[i].strip() == "---":
+            end_idx = i
+            break
+    if end_idx == -1:
+        return None
+
+    header: dict = {
+        "request_id": "~",
+        "title": "~",
+        "state": "idle",
+        "options": {"minimum_questions": 0},
+    }
+    in_options = False
+    for line in lines[1:end_idx]:
+        if line.rstrip() == "options:":
+            in_options = True
+            continue
+        if in_options:
+            m = _re.match(r"^\s+minimum_questions:\s*(\S+)", line)
+            if m:
+                try:
+                    header["options"]["minimum_questions"] = int(m.group(1))
+                except ValueError:
+                    header["options"]["minimum_questions"] = 0
+            continue
+        m = _re.match(r"^(\w+):\s*(.*)", line)
+        if m:
+            key, raw = m.group(1), m.group(2).strip()
+            # Strip surrounding single or double quotes.
+            if len(raw) >= 2:
+                if (raw[0] == "'" and raw[-1] == "'") or (raw[0] == '"' and raw[-1] == '"'):
+                    raw = raw[1:-1].replace("''", "'")
+            header[key] = raw
+    return header
+
+
+def write_input_header(content: str, header: dict) -> str:
+    """Replace the YAML frontmatter block in *content* with *header* and return the result.
+
+    The body of input.md (everything after the closing ``---`` delimiter) is
+    preserved unchanged.  When no frontmatter block exists the new block is
+    prepended to the existing content.
+
+    Args:
+        content: Current full text of input.md.
+        header: Dict with keys ``request_id``, ``title``, ``state``, and
+                ``options`` (nested dict with key ``minimum_questions``).
+
+    Returns:
+        Updated input.md text with the frontmatter block replaced.
+    """
+    lines = content.splitlines(keepends=True)
+    body_start = 0
+    if lines and lines[0].strip() == "---":
+        for i in range(1, len(lines)):
+            if lines[i].strip() == "---":
+                body_start = i + 1
+                break
+    body = "".join(lines[body_start:])
+
+    req_id = _yaml_quote(str(header.get("request_id", "~")))
+    title = _yaml_quote(str(header.get("title", "~")))
+    state = str(header.get("state", "idle"))
+    min_q = int(header.get("options", {}).get("minimum_questions", 0))
+
+    frontmatter = (
+        "---\n"
+        f"request_id: {req_id}\n"
+        f"title: {title}\n"
+        f"state: {state}\n"
+        "options:\n"
+        f"  minimum_questions: {min_q}\n"
+        "---\n"
+    )
+    return frontmatter + body
+
+
+def read_input_header(workspace: Path) -> dict:
+    """Read and parse the YAML frontmatter header from input.md in *workspace*.
+
+    Args:
+        workspace: Resolved absolute path to the workspace root.
+
+    Returns:
+        Parsed header dict (see ``parse_input_header``).
+
+    Raises:
+        ValidationError: When input.md is missing or has no valid YAML header.
+    """
+    input_path = workspace / ".aib_memory" / "input.md"
+    if not input_path.exists():
+        raise ValidationError("input.md not found; run initialize first")
+    content = read_text(input_path)
+    header = parse_input_header(content)
+    if header is None:
+        raise ValidationError("input.md does not contain a valid YAML frontmatter header")
+    return header
 
 
 REQUIRED_PLAN_SECTIONS = [

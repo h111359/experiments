@@ -485,7 +485,7 @@
 
         <h3>Implement (execute scope)</h3>
         <pre><code>Execute .aib_brain/prompts/aib-implement.md</code></pre>
-        <p>Reads <code>plan-&lt;id&gt;.md</code>, applies all code and documentation changes, creates/appends <code>implementation.md</code>, refreshes <code>context.md</code>, and auto-closes the request.</p>
+        <p>Reads <code>plan-&lt;id&gt;.md</code>, applies all code and documentation changes, refreshes <code>context.md</code>, and auto-closes the request.</p>
 
         <h3>Refresh Context</h3>
         <pre><code>Execute .aib_brain/prompts/aib-refresh-context.md</code></pre>
@@ -628,12 +628,10 @@
 .aib_memory/         ← Workspace-specific artifacts (project-scoped)
   archives/          ← Archived snapshots of previous .aib_memory/ states
   attachments/       ← Staging folder for supplementary input files
-  logs/              ← Tool execution and action logs
   requests/          ← Closed request subfolders (plan, analysis, implementation)
   context.md         ← Auto-generated product knowledge document
   input.md           ← Primary user-to-agent communication file
   instructions.md    ← Persistent workspace-level behavioral directives
-  requests_register.md ← Register of all requests with lifecycle state
   vM.m.p             ← Workspace SemVer marker (matched to brain version)</pre>
       </div>
     </div><!-- end Section 9 -->
@@ -674,11 +672,6 @@
               <td>Reasoning artifact with 5 mandatory sections: Overview, Files Read, Input Interpretation, Research Results, Implementation Alternatives. Not read by <code>implement</code>.</td>
             </tr>
             <tr>
-              <td><code>implementation.md</code></td>
-              <td><code>aib-implement.md</code></td>
-              <td>Append-only implementation log. Created from scratch; a new entry is appended on each implementation run.</td>
-            </tr>
-            <tr>
               <td><code>inputs/input-archive-*.md</code></td>
               <td><code>aib-analyze.md</code></td>
               <td>Archived <code>input.md</code> snapshot per analysis run. Never read by any AIB prompt after archiving.</td>
@@ -714,7 +707,6 @@
           <li><span class="glossary-term">Convention File</span> — A file in <code>.aib_brain/conventions/</code> that defines the required structure and validation rules for a specific product doc or coding standard.</li>
           <li><span class="glossary-term">Curated Change Log</span> — <code>logs/next_version_changes.md</code>: append-only Markdown bullet list maintained by the AI agent during implementation; preferred source of <code>Changes:</code> bullets in the next per-version release log; reset to empty by CI after incorporation.</li>
           <li><span class="glossary-term">FR</span> — Functional Requirement.</li>
-          <li><span class="glossary-term">Implementation Log</span> — Request-scoped on-demand record of changes, tests, and outcomes (<code>implementation.md</code>); created from scratch by <code>aib-implement.md</code>.</li>
           <li><span class="glossary-term">Input Archive</span> — File written by <code>aib-analyze.md</code> to <code>&lt;request-folder&gt;/inputs/input-archive-&lt;YYYY-MM-DD_HH-MI-SS&gt;.md</code> preserving the original <code>input.md</code> content for audit; MUST NOT be read by any prompt.</li>
           <li><span class="glossary-term">input.md</span> — Ephemeral primary user-agent communication channel. Seeded by <code>initialize.py</code>; written by the developer; read and processed by <code>aib-analyze.md</code>; reset to seed template after processing.</li>
           <li><span class="glossary-term">instructions.md</span> — Persistent workspace-level behavioral directives file at <code>.aib_memory/instructions.md</code>. Read by every AIB prompt as the first step before executing its main logic. If absent or empty, prompts continue normally.</li>

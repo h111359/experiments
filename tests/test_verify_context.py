@@ -28,12 +28,12 @@ Primary actors are developers and automated agents.
 
 The product is active and in use.
 
-## FN
+## Functionality
 
 - R: System must validate documents.
 - N: Validation runs at prompt execution time.
 
-## PO
+## Project overview
 
 - N: Test project operates in software engineering domain.
 - I: Primary use case is specification-driven development.
@@ -129,7 +129,7 @@ class TestVerifyContextInvalidFormat:
     def test_invalid_area_heading(self, tmp_path: Path) -> None:
         """Invalid H2 area heading (not in VALID_AREAS) should cause failure."""
         content = VALID_CONTEXT.replace(
-            "## FN",
+            "## Functionality",
             "## XX",
         )
         _write_context(tmp_path, content)
@@ -157,7 +157,7 @@ class TestVerifyContextEmptyAreaSection:
         # Add an empty AN section (heading with no statements)
         content = VALID_CONTEXT.replace(
             "## Files",
-            "## AN\n\n## Files",
+            "## Analytics\n\n## Files",
         )
         _write_context(tmp_path, content)
         result = _run_verify(tmp_path)

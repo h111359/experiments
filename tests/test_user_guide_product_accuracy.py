@@ -53,16 +53,6 @@ class TestUserGuideProductAccuracy:
             "README.md annotation must read 'Quick-start overview and workspace guide'"
         )
 
-    def test_sc4_logs_described_as_tool_execution(self):
-        """SC-4: .aib_memory/logs/ must be described as tool execution and action logs."""
-        content = self._content()
-        assert "Version logs and curated change bullets" not in content, (
-            ".aib_memory/logs/ must not be described as 'Version logs and curated change bullets'"
-        )
-        assert "Tool execution and action logs" in content, (
-            ".aib_memory/logs/ must be described as 'Tool execution and action logs'"
-        )
-
     def test_sc5_ci_glossary_no_branch_reference(self):
         """SC-5: CI glossary entry must not contain a branch-specific reference."""
         content = self._content()

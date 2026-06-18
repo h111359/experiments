@@ -118,19 +118,17 @@ When `aib-analyze.md` identifies decision points with multiple valid implementat
   
   - `.aib_brain/` installed in a project folder SHALL NOT be modified by AIB tool scripts. Humans may replace or update `.aib_brain/` explicitly when evolving the framework.
 
-  - The request to AIB shall be defined in file `input.md` in  `.aib_memory/`. In addition, a record shall be added for it in a file `.aib_memory/requests_register.md`.
+  - The request to AIB shall be defined in file `input.md` in `.aib_memory/`. The active request state (request ID, title, state, options) is stored in a YAML frontmatter header at the top of `input.md`.
 
   - During a request, an analysis and plan for implementation will be created.
   
-  -  `implementation.md` file must be generated during request implementation.
-
   - The artifacts of AIB shall be separated by their lifecycle. In `.aib_brain/` folder shall be stored reusable framework assets (prompts, conventions, tools). On upgrade this folder shall be replaceable entirely. In `.aib_memory/` shall be stored project specific artifacts - project-specific requests and iteration artifacts
   
   - All kind of formatting specifications, shared and common definitions, extended context or similar shall be located in `.aib_brain/conventions/` folder in markdown files.
   
   - Scripts to support AIB workflow shall be placed in `.aib_brain/tools/` folder. Python 3.10+ is the prime choice of programming language for the scripts.
   
-  - A file `.aib_memory/requests_register.md` shall contain a list with the requests the user has generated. Each request record shall contain the request ID in format "R-<YYYYMMDD>-<HHmi>", request title, relative path to the request folder and states (Active, Closed). Many Closed requests could coexist. Only one Active request shall exist at a time. No new requests shall be created until the current Active one is closed.
+  - Active request state is tracked in the YAML frontmatter header of `.aib_memory/input.md` (fields: `request_id`, `title`, `state`, `options.minimum_questions`). Only one active request can exist at a time. Closed requests are identifiable from their folder structure under `.aib_memory/requests/`.
   
   - The product knowledge for the workspace is consolidated in `.aib_memory/context.md`, updated by `aib-refresh-context.md` on each execution. 
   
@@ -151,6 +149,7 @@ When `aib-analyze.md` identifies decision points with multiple valid implementat
     - file-inventory.py
     - finalize-input.py
     - initialize.py
+    - input-header.py (CRUD for YAML frontmatter header in input.md)
     - move-request-artifacts.py
     - verify-context.py (validates context.md format: 10 automated checks)
   - README.md
@@ -164,7 +163,6 @@ When `aib-analyze.md` identifies decision points with multiple valid implementat
   - context.md
   - input.md
   - instructions.md
-  - requests_register.md
 logs/
   - next_version_changes.md
   - version_vX.Y.Z_log.md (per-version logs)
@@ -177,6 +175,5 @@ versions/
 | --- | --- | --- |
 | `plan-<id>.md` | `aib-analyze.md` | Self-sufficient execution specification. Contains full background, exact file paths in all procedure steps, and exact `edit-context.py` invocations for context updates. No external file (including `context.md`) is needed to execute the plan. Active copy lives at `.aib_memory/plan-<id>.md`; moved to request subfolder after implementation. |
 | `analysis-<id>.md` | `aib-analyze.md` | Reasoning artifact (not read by `implement`). |
-| `implementation.md` | `aib-implement.md` | Append-only implementation log. |
 | `inputs/input-archive-*.md` | `aib-analyze.md` | Archived `input.md` per analysis run. Never read by prompts after archiving. |
 

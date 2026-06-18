@@ -8,29 +8,44 @@ from pathlib import Path
 
 import pytest
 
-from common import format_markdown_table, parse_markdown_table, read_text, write_text
+from common import parse_input_header, read_text, write_text
 
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
-REGISTER_HEADER = ["request_id", "title", "folder", "state", "created_at", "closed_at"]
+INPUT_MD_IDLE = (
+    "---\n"
+    "request_id: ~\n"
+    "title: ~\n"
+    "state: idle\n"
+    "options:\n"
+    "  minimum_questions: 5\n"
+    "---\n\n"
+    "## Input\n\n"
+)
 
 
-def _make_request(workspace: Path, req_id: str, state: str = "Active") -> Path:
+def _make_request(workspace: Path, req_id: str, state: str = "analysis_ready") -> Path:
+    """Create a request folder and set the input.md YAML header to the given state."""
     folder_name = f"{req_id}-test-request"
     folder_rel = f".aib_memory/requests/{folder_name}"
     folder = workspace / folder_rel
     folder.mkdir(parents=True, exist_ok=True)
 
-    reg_path = workspace / ".aib_memory" / "requests_register.md"
-    content = read_text(reg_path)
-    header, rows = parse_markdown_table(content)
-    if not header:
-        header = REGISTER_HEADER
-    rows.append([req_id, "Test Request", folder_rel, state, "2026-01-01 10:00:00 +0000", ""])
-    write_text(reg_path, "# Requests Register\n\n" + format_markdown_table(header, rows))
+    input_path = workspace / ".aib_memory" / "input.md"
+    # Use idle header as base if file exists, else create fresh.
+    base_content = read_text(input_path) if input_path.exists() else INPUT_MD_IDLE
+    from common import parse_input_header, write_input_header
+    hdr = parse_input_header(base_content) or {
+        "request_id": "~", "title": "~", "state": "idle",
+        "options": {"minimum_questions": 0},
+    }
+    hdr["request_id"] = req_id
+    hdr["title"] = "Test Request"
+    hdr["state"] = state
+    write_text(input_path, write_input_header(base_content, hdr))
 
     # Write a minimal plan.md stub
     plan_md = (
@@ -75,28 +90,25 @@ class TestCloseRequest:
         _make_request(workspace_dir, "R-20260101-1000")
         rc = _run_close_request(workspace_dir)
         assert rc == 0
-        reg_content = read_text(workspace_dir / ".aib_memory" / "requests_register.md")
-        header, rows = parse_markdown_table(reg_content)
-        col = {n: i for i, n in enumerate(header)}
-        matching = [r for r in rows if r[col["request_id"]] == "R-20260101-1000"]
-        assert matching[0][col["state"]] == "Closed"
+        from common import parse_input_header, read_text
+        header = parse_input_header(read_text(workspace_dir / ".aib_memory" / "input.md"))
+        assert header["state"] == "idle"
+        assert header["request_id"] == "~"
 
-    def test_closed_at_is_set(self, workspace_dir: Path):
+    def test_close_resets_title_to_null(self, workspace_dir: Path):
         _make_request(workspace_dir, "R-20260101-1001")
         _run_close_request(workspace_dir)
-        reg = read_text(workspace_dir / ".aib_memory" / "requests_register.md")
-        header, rows = parse_markdown_table(reg)
-        col = {n: i for i, n in enumerate(header)}
-        matching = [r for r in rows if r[col["request_id"]] == "R-20260101-1001"]
-        assert matching[0][col["closed_at"]] != ""
+        from common import parse_input_header, read_text
+        header = parse_input_header(read_text(workspace_dir / ".aib_memory" / "input.md"))
+        assert header["title"] == "~"
 
-    def test_already_closed_request_fails(self, workspace_dir: Path):
-        _make_request(workspace_dir, "R-20260101-1003", state="Closed")
-        rc = _run_close_request(workspace_dir, "R-20260101-1003")
+    def test_already_idle_request_fails(self, workspace_dir: Path):
+        # If state is already idle, close-request.py must exit non-zero.
+        rc = _run_close_request(workspace_dir)
         assert rc != 0
 
     def test_no_active_request_fails(self, workspace_dir: Path):
-        # Register is empty — no rows at all
+        # Register is idle — no active request
         rc = _run_close_request(workspace_dir)
         assert rc != 0
 
@@ -104,35 +116,31 @@ class TestCloseRequest:
         _make_request(workspace_dir, "R-20260101-1004")
         rc = _run_close_request(workspace_dir, "R-20260101-1004")
         assert rc == 0
-        reg = read_text(workspace_dir / ".aib_memory" / "requests_register.md")
-        header, rows = parse_markdown_table(reg)
-        col = {n: i for i, n in enumerate(header)}
-        matching = [r for r in rows if r[col["request_id"]] == "R-20260101-1004"]
-        assert matching[0][col["state"]] == "Closed"
+        from common import parse_input_header, read_text
+        header = parse_input_header(read_text(workspace_dir / ".aib_memory" / "input.md"))
+        assert header["state"] == "idle"
 
-    def test_resets_input_md_when_exists(self, workspace_dir: Path):
-        """After closing, input.md is reset to seed template with 'No active request'."""
+    def test_resets_input_md_to_idle_when_exists(self, workspace_dir: Path):
+        """After closing, input.md YAML header is reset to idle state."""
         _make_request(workspace_dir, "R-20260101-1005")
         input_path = workspace_dir / ".aib_memory" / "input.md"
-        write_text(input_path, "## Status\nR-20260101-1005 \u2014 Test Request\nState: analysis_ready\n\n## Options\n\n## Input\nSome old content\n")
         rc = _run_close_request(workspace_dir)
         assert rc == 0
-        content = read_text(input_path)
-        assert "No active request" in content
-        assert "Question threshold" not in content
-        assert "R-20260101-1005" not in content
-        assert "## Status" in content
-        assert "State: idle" in content
+        from common import parse_input_header, read_text
+        header = parse_input_header(read_text(input_path))
+        assert header is not None
+        assert header["state"] == "idle"
+        assert header["request_id"] == "~"
+        assert "R-20260101-1005" not in read_text(input_path)
 
-    def test_does_not_fail_when_input_md_missing(self, workspace_dir: Path):
-        """Closing a request succeeds silently when input.md does not exist."""
+    def test_fails_when_input_md_missing(self, workspace_dir: Path):
+        """Closing a request fails when input.md does not exist (new behavior: input.md required)."""
         _make_request(workspace_dir, "R-20260101-1006")
         input_path = workspace_dir / ".aib_memory" / "input.md"
         if input_path.exists():
             input_path.unlink()
         rc = _run_close_request(workspace_dir)
-        assert rc == 0
-        assert not input_path.exists()
+        assert rc != 0
 
     def test_warns_when_attachments_nonempty(self, workspace_dir: Path, capsys):
         """SC-5: close-request.py prints a warning (non-blocking) when attachments/ is non-empty."""

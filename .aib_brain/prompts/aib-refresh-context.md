@@ -157,7 +157,7 @@ After synthesis, execute the following enrichment passes to ensure completeness:
 
 ### Pass 1 — Analysis decisions verification
 
-Read `.aib_memory/analysis-<request_id>.md` for the active request (if it exists, check `requests_register.md` for the Active request). Verify all decisions from the Decision Register section are reflected as statements (type D) in the appropriate area subsection of `## 2. Statements`. Add missing decision statements.
+Read `.aib_memory/analysis-<request_id>.md` for the active request (if it exists, read the `request_id` field from the input.md YAML header to identify the active request). Verify all decisions from the Decision Register section are reflected as statements (type D) in the appropriate area subsection of `## 2. Statements`. Add missing decision statements.
 
 ### Pass 2 — Plan results verification
 

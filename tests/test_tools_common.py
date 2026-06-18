@@ -2,9 +2,8 @@
 test_tools_common.py: Comprehensive tests for common.py helpers.
 Relocated from .aib_brain/tools/test_common.py as part of R-20260511-2019 to place
 tool-level unit tests under the standard pytest-discoverable tests/ directory.
-Responsibilities: validate all public helpers in common.py, including table parsing,
-text I/O, slug generation, workspace validation, active-request resolution, and
-register updates.
+Responsibilities: validate all public helpers in common.py, including YAML header
+helpers, text I/O, slug generation, workspace validation, and register updates.
 """
 
 from __future__ import annotations
@@ -23,16 +22,14 @@ from common import (
     CLOSED,
     ValidationError,
     ensure_workspace,
-    format_markdown_table,
     now_compact_request_id,
     now_iso,
-    parse_markdown_table,
+    parse_input_header,
+    read_input_header,
     read_text,
-    requests_register_path,
-    resolve_active_request_or_explicit,
     slugify,
-    update_requests_register,
     validate_plan_md,
+    write_input_header,
     write_text,
 )
 
@@ -49,12 +46,16 @@ _TOOLS_DIR = _WORKSPACE_ROOT / ".aib_brain" / "tools"
 # Helpers
 # ---------------------------------------------------------------------------
 
-REGISTER_HEADER = ["request_id", "title", "folder", "state", "created_at", "closed_at"]
-
-
-def _make_register_table(rows: list[list[str]]) -> str:
-    """Build a Requests Register markdown table string from the given rows."""
-    return "# Requests Register\n\n" + format_markdown_table(REGISTER_HEADER, rows)
+INPUT_MD_IDLE = (
+    "---\n"
+    "request_id: ~\n"
+    "title: ~\n"
+    "state: idle\n"
+    "options:\n"
+    "  minimum_questions: 5\n"
+    "---\n\n"
+    "## Input\n\n"
+)
 
 
 def _setup_workspace(tmp: str) -> Path:
@@ -66,99 +67,121 @@ def _setup_workspace(tmp: str) -> Path:
 
 
 # ---------------------------------------------------------------------------
-# Markdown table parsing
+# YAML header parsing
 # ---------------------------------------------------------------------------
 
-class TestParseMarkdownTable(unittest.TestCase):
-    def test_valid_table(self):
-        md = (
-            "| a | b | c |\n"
-            "| --- | --- | --- |\n"
-            "| 1 | 2 | 3 |\n"
-            "| 4 | 5 | 6 |\n"
+class TestParseInputHeader(unittest.TestCase):
+    def test_valid_idle_header(self):
+        result = parse_input_header(INPUT_MD_IDLE)
+        self.assertIsNotNone(result)
+        self.assertEqual(result["state"], "idle")
+        self.assertEqual(result["request_id"], "~")
+        self.assertEqual(result["title"], "~")
+        self.assertEqual(result["options"]["minimum_questions"], 0)
+
+    def test_valid_active_header(self):
+        content = (
+            "---\n"
+            "request_id: R-20260101-1200\n"
+            "title: My Test Request\n"
+            "state: analysis_ready\n"
+            "options:\n"
+            "  minimum_questions: 3\n"
+            "---\n\n"
+            "## Input\n\n"
         )
-        header, rows = parse_markdown_table(md)
-        self.assertEqual(header, ["a", "b", "c"])
-        self.assertEqual(len(rows), 2)
-        self.assertEqual(rows[0], ["1", "2", "3"])
-        self.assertEqual(rows[1], ["4", "5", "6"])
+        result = parse_input_header(content)
+        self.assertIsNotNone(result)
+        self.assertEqual(result["request_id"], "R-20260101-1200")
+        self.assertEqual(result["title"], "My Test Request")
+        self.assertEqual(result["state"], "analysis_ready")
+        self.assertEqual(result["options"]["minimum_questions"], 3)
 
-    def test_empty_content(self):
-        header, rows = parse_markdown_table("")
-        self.assertEqual(header, [])
-        self.assertEqual(rows, [])
+    def test_returns_none_for_no_frontmatter(self):
+        result = parse_input_header("## Input\n\nSome content.\n")
+        self.assertIsNone(result)
 
-    def test_only_header_no_rows(self):
-        md = "| a | b |\n| --- | --- |\n"
-        header, rows = parse_markdown_table(md)
-        self.assertEqual(header, ["a", "b"])
-        self.assertEqual(rows, [])
+    def test_returns_none_for_unclosed_frontmatter(self):
+        result = parse_input_header("---\nstate: idle\n## Input\n\n")
+        self.assertIsNone(result)
 
-    def test_missing_cells_padded(self):
-        md = (
-            "| a | b | c |\n"
-            "| --- | --- | --- |\n"
-            "| 1 |\n"
+    def test_single_quoted_title(self):
+        content = (
+            "---\n"
+            "request_id: R-20260101-1200\n"
+            "title: 'Title with: colon'\n"
+            "state: idle\n"
+            "options:\n"
+            "  minimum_questions: 5\n"
+            "---\n\n"
         )
-        header, rows = parse_markdown_table(md)
-        self.assertEqual(header, ["a", "b", "c"])
-        self.assertEqual(len(rows), 1)
-        # Row should be padded to match header length
-        self.assertEqual(len(rows[0]), 3)
-
-    def test_extra_cells_truncated(self):
-        md = (
-            "| a | b |\n"
-            "| --- | --- |\n"
-            "| 1 | 2 | 3 | 4 |\n"
-        )
-        header, rows = parse_markdown_table(md)
-        self.assertEqual(len(rows[0]), 2)
-
-    def test_non_table_content_ignored(self):
-        md = (
-            "# Title\n"
-            "Some paragraph.\n"
-            "| h1 | h2 |\n"
-            "| --- | --- |\n"
-            "| v1 | v2 |\n"
-        )
-        header, rows = parse_markdown_table(md)
-        self.assertEqual(header, ["h1", "h2"])
-        self.assertEqual(rows, [["v1", "v2"]])
+        result = parse_input_header(content)
+        self.assertIsNotNone(result)
+        self.assertEqual(result["title"], "Title with: colon")
 
 
-# ---------------------------------------------------------------------------
-# Markdown table formatting
-# ---------------------------------------------------------------------------
+class TestWriteInputHeader(unittest.TestCase):
+    def test_round_trip_idle(self):
+        header = {
+            "request_id": "~", "title": "~", "state": "idle",
+            "options": {"minimum_questions": 0},
+        }
+        result = write_input_header(INPUT_MD_IDLE, header)
+        parsed = parse_input_header(result)
+        self.assertIsNotNone(parsed)
+        self.assertEqual(parsed["state"], "idle")
+        self.assertEqual(parsed["request_id"], "~")
 
-class TestFormatMarkdownTable(unittest.TestCase):
-    def test_round_trip(self):
-        header = ["col1", "col2", "col3"]
-        rows = [["a", "b", "c"], ["d", "e", "f"]]
-        text = format_markdown_table(header, rows)
-        parsed_header, parsed_rows = parse_markdown_table(text)
-        self.assertEqual(parsed_header, header)
-        self.assertEqual(parsed_rows, rows)
+    def test_round_trip_active(self):
+        header = {
+            "request_id": "R-20260101-1200",
+            "title": "My Title",
+            "state": "analysis_ready",
+            "options": {"minimum_questions": 2},
+        }
+        result = write_input_header(INPUT_MD_IDLE, header)
+        parsed = parse_input_header(result)
+        self.assertIsNotNone(parsed)
+        self.assertEqual(parsed["request_id"], "R-20260101-1200")
+        self.assertEqual(parsed["title"], "My Title")
+        self.assertEqual(parsed["state"], "analysis_ready")
+        self.assertEqual(parsed["options"]["minimum_questions"], 2)
 
-    def test_rows_shorter_than_header(self):
-        header = ["a", "b", "c"]
-        rows = [["1"]]
-        text = format_markdown_table(header, rows)
-        self.assertIn("| 1 |  |  |", text)
+    def test_body_preserved(self):
+        content = INPUT_MD_IDLE + "Some existing body content.\n"
+        header = {"request_id": "~", "title": "~", "state": "idle", "options": {"minimum_questions": 0}}
+        result = write_input_header(content, header)
+        self.assertIn("Some existing body content.", result)
 
-    def test_newlines_in_values_replaced(self):
-        header = ["x"]
-        rows = [["line1\nline2"]]
-        text = format_markdown_table(header, rows)
-        self.assertNotIn("\nline2", text)
-        self.assertIn("line1 line2", text)
+    def test_title_with_special_chars_quoted(self):
+        header = {
+            "request_id": "R-001", "title": "Fix: the issue",
+            "state": "idle", "options": {"minimum_questions": 0},
+        }
+        result = write_input_header(INPUT_MD_IDLE, header)
+        self.assertIn("'Fix: the issue'", result)
 
-    def test_empty_rows(self):
-        header = ["a", "b"]
-        text = format_markdown_table(header, [])
-        lines = [l for l in text.strip().splitlines() if l.strip()]
-        self.assertEqual(len(lines), 2)  # header + separator
+
+class TestReadInputHeader(unittest.TestCase):
+    def test_reads_existing_idle_header(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ws = _setup_workspace(tmp)
+            (ws / ".aib_memory" / "input.md").write_text(INPUT_MD_IDLE, encoding="utf-8")
+            header = read_input_header(ws)
+            self.assertEqual(header["state"], "idle")
+
+    def test_raises_when_input_md_missing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ws = _setup_workspace(tmp)
+            with self.assertRaises(ValidationError):
+                read_input_header(ws)
+
+    def test_raises_when_no_frontmatter(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ws = _setup_workspace(tmp)
+            (ws / ".aib_memory" / "input.md").write_text("## Input\n\n", encoding="utf-8")
+            with self.assertRaises(ValidationError):
+                read_input_header(ws)
 
 
 # ---------------------------------------------------------------------------
@@ -262,118 +285,6 @@ class TestReadWriteText(unittest.TestCase):
             write_text(p, "first")
             write_text(p, "second")
             self.assertEqual(read_text(p), "second")
-
-
-# ---------------------------------------------------------------------------
-# Resolve active request or explicit
-# ---------------------------------------------------------------------------
-
-class TestResolveActiveRequestOrExplicit(unittest.TestCase):
-    def _write_register(self, ws: Path, rows: list[list[str]]) -> None:
-        """Write a register table to the workspace."""
-        content = _make_register_table(rows)
-        reg_path = requests_register_path(ws)
-        reg_path.parent.mkdir(parents=True, exist_ok=True)
-        write_text(reg_path, content)
-
-    def test_explicit_id_found(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            ws = _setup_workspace(tmp)
-            self._write_register(ws, [
-                ["R-001", "Title1", "folder1", ACTIVE, "2025-01-01", ""],
-                ["R-002", "Title2", "folder2", CLOSED, "2025-01-02", "2025-01-03"],
-            ])
-            row = resolve_active_request_or_explicit(ws, "R-002")
-            self.assertEqual(row[0], "R-002")
-
-    def test_explicit_id_not_found(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            ws = _setup_workspace(tmp)
-            self._write_register(ws, [
-                ["R-001", "Title1", "folder1", ACTIVE, "2025-01-01", ""],
-            ])
-            with self.assertRaises(ValidationError):
-                resolve_active_request_or_explicit(ws, "R-999")
-
-    def test_single_active_request(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            ws = _setup_workspace(tmp)
-            self._write_register(ws, [
-                ["R-001", "Title1", "folder1", ACTIVE, "2025-01-01", ""],
-                ["R-002", "Title2", "folder2", CLOSED, "2025-01-02", "2025-01-03"],
-            ])
-            row = resolve_active_request_or_explicit(ws, None)
-            self.assertEqual(row[0], "R-001")
-            self.assertEqual(row[3], ACTIVE)
-
-    def test_multiple_active_raises(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            ws = _setup_workspace(tmp)
-            self._write_register(ws, [
-                ["R-001", "A", "f1", ACTIVE, "2025-01-01", ""],
-                ["R-002", "B", "f2", ACTIVE, "2025-01-02", ""],
-            ])
-            with self.assertRaises(ValidationError):
-                resolve_active_request_or_explicit(ws, None)
-
-    def test_no_active_raises(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            ws = _setup_workspace(tmp)
-            self._write_register(ws, [
-                ["R-001", "A", "f1", CLOSED, "2025-01-01", "2025-01-02"],
-            ])
-            with self.assertRaises(ValidationError):
-                resolve_active_request_or_explicit(ws, None)
-
-    def test_missing_register_raises(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            ws = _setup_workspace(tmp)
-            with self.assertRaises(ValidationError):
-                resolve_active_request_or_explicit(ws, None)
-
-
-# ---------------------------------------------------------------------------
-# Update requests register
-# ---------------------------------------------------------------------------
-
-class TestUpdateRequestsRegister(unittest.TestCase):
-    def test_writes_correct_format(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            ws = _setup_workspace(tmp)
-            rows = [["R-001", "My Title", "my-folder", ACTIVE, "2025-01-01", ""]]
-            update_requests_register(ws, rows)
-            content = read_text(requests_register_path(ws))
-            self.assertIn("# Requests Register", content)
-            self.assertIn("R-001", content)
-            self.assertIn("My Title", content)
-            # Verify the file is parseable back
-            header, parsed_rows = parse_markdown_table(content)
-            self.assertEqual(header, REGISTER_HEADER)
-            self.assertEqual(parsed_rows[0][0], "R-001")
-
-
-# ---------------------------------------------------------------------------
-# Initialize idempotency
-# ---------------------------------------------------------------------------
-
-class TestInitializeIdempotency(unittest.TestCase):
-    def test_register_not_overwritten_when_exists(self):
-        """Simulates that a second call to update_requests_register
-        replaces content, but an external tool should check existence first."""
-        with tempfile.TemporaryDirectory() as tmp:
-            ws = _setup_workspace(tmp)
-            reg = requests_register_path(ws)
-            original_content = "# Requests Register\n\nCustom content.\n"
-            reg.parent.mkdir(parents=True, exist_ok=True)
-            write_text(reg, original_content)
-
-            # An idempotent initializer should skip if file already exists
-            if reg.exists():
-                pass  # Do not overwrite
-            else:
-                update_requests_register(ws, [])
-
-            self.assertEqual(read_text(reg), original_content)
 
 
 # ---------------------------------------------------------------------------

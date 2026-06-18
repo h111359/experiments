@@ -354,17 +354,25 @@ class TestAnalysisConventionSectionStructure:
         )
 
     def test_minimum_questions_in_initialize_seed(self) -> None:
-        """initialize.py input_seed must contain 'Minimum questions'."""
+        """initialize.py input_seed must contain 'minimum_questions'."""
         content = INITIALIZE_PY.read_text(encoding="utf-8")
-        assert "Minimum questions" in content, (
-            "initialize.py input_seed must contain 'Minimum questions' option."
+        assert "minimum_questions" in content, (
+            "initialize.py input_seed must contain 'minimum_questions' option."
         )
 
     def test_minimum_questions_in_close_request_seed(self) -> None:
-        """close-request.py input_seed must contain 'Minimum questions'."""
+        """close-request.py input_seed must contain 'minimum_questions'."""
         content = CLOSE_REQUEST_PY.read_text(encoding="utf-8")
-        assert "Minimum questions" in content, (
-            "close-request.py input_seed must contain 'Minimum questions' option."
+        assert "minimum_questions" in content, (
+            "close-request.py input_seed must contain 'minimum_questions' option."
+        )
+
+    def test_files_read_section_absent(self) -> None:
+        """Files Read During This Analysis Run must not appear as a mandatory section."""
+        content = ANALYSIS_CONVENTION.read_text(encoding="utf-8")
+        assert "Files Read During This Analysis Run" not in content, (
+            "analysis-convention.md must not define 'Files Read During This Analysis Run' "
+            "as a mandatory section — this section has been removed from the schema."
         )
 
 

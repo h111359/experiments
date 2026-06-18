@@ -1,22 +1,19 @@
-- Update context-convention.md to mandate token-efficient statement format without hash and area prefix.
-- Remove empty subsection stub notices from context-convention.md; omit sections with no statements.
-- Mandate telegraphic phrasing and developer abbreviations in context.md statements.
-- Replace flat file inventory with indented tree format in context-convention.md.
-- Add aggressive pruning rule to context-convention.md.
-- Add no-negative-space and no-default-documentation rule to context-convention.md.
-- Add Aliases dictionary support to context-convention.md.
-- Add pseudo-code and logic operator notation rule to context-convention.md.
-- Strip all markdown formatting from context.md statements (no backticks, bold, or italic).
-- Remove auto-generated preamble block requirement from context-convention.md.
-- Update verify-context.py to validate new context.md statement format.
-- Update edit-context.py to use text-based line matching for statement addressing.
-- Remove hash-text.py.
-- Regenerate context.md to comply with updated convention.
-- Update tests for context formatting rules and verify-context tool to match new format.
-- Remove context.md read step from aib-implement.md and forbid reading context.md during implementation.
-- Mandate plan self-sufficiency in plan-convention.md: full background, exact file paths, and exact edit-context.py invocations.
-- Update aib-analyze.md Step 9 to require self-sufficient plans with no dependency on context.md.
-- Remove Risk notes sub-field from plan-convention.md task schema.
-- Update README.md plan artifact description to reflect self-sufficient specification.
-- Update context.md to reflect that implement does not read context.md and plans are self-sufficient.
-- Add regression tests for context.md read prohibition and Risk notes removal.
+- Restructure analysis-convention.md: replace five-section schema with six-section schema (Overview, Input Interpretation, Research Results, Proposed Solution, Decision Register, Technical Context for Planner Agent).
+- Remove Files Read During This Analysis Run as a mandatory analysis section.
+- Add Proposed Solution mandatory section to analysis documents with four required subsections (High-Level Concept, Execution Steps, Files to be Modified, Why this approach?).
+- Add Technical Context (For Planner Agent) mandatory section as final analysis section for machine-readable planner input.
+- Add Edge Cases as required subsection of Research Results between AI Agent critique and Requirements Gate Evaluation.
+- Add conditional render rule for Requirements Gate Evaluation: one-line summary when all-PASS, full eight-row table when any non-PASS.
+- Update aib-analyze.md S05.5 with conditional render rule; add S05.6 and S05.7 generation instructions for new analysis sections.
+- Update context.md FN statement from five to six mandatory analysis sections.
+- Add regression test asserting Files Read During This Analysis Run is absent from analysis-convention.md.
+- Replace 2-letter area codes with full English names throughout context subsystem (context-convention.md, verify-context.py, edit-context.py, context.md).
+- Update --area CLI argument of edit-context.py to accept full area names instead of 2-letter codes.
+- Remove incorrect Git runtime dependency claims from context.md.
+- Remove implementation.md generation from create-request.py; update test assertions accordingly. implementation.md is now generated from scratch by aib-implement.md on each implementation run, and serves as an on-demand implementation log instead of a request-scoped static artifact.
+- Remove request_register.md - state is now tracked solely in the input.md YAML header and inferred from request folder names; update all related references and test assertions.
+- Remove .aib_memory/logs/ directory creation from initialize.py; the directory is no longer generated during workspace initialisation.
+- Remove log-file writing from menu.py _run_and_tee and _stream_pipe; live terminal streaming is preserved, file-write code is removed.
+- Remove _make_log_path function from menu.py; execution logs are no longer written to disk.
+- Remove stale logs/ entry from user_guide.html .aib_memory/ directory listing.
+- Remove .aib_memory/logs/aib-action-*.log pattern from .gitignore.

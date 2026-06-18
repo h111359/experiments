@@ -17,7 +17,6 @@ from menu import (
     MenuState,
     _detect_guidance_state,
     _is_context_empty,
-    _make_log_path,
     _run_and_tee,
     _sanitize_action_id,
     build_command,
@@ -74,9 +73,18 @@ class TestResolveMenuState:
     def test_active_request_resolved(self, tmp_path: Path):
         mem = tmp_path / ".aib_memory"
         mem.mkdir(parents=True)
-        reg = mem / "requests_register.md"
         folder = ".aib_memory/requests/R-20260101-1000-test"
-        reg.write_text(_register_with_row("R-20260101-1000", folder, "Active"), encoding="utf-8")
+        (mem / "input.md").write_text(
+            "---\n"
+            "request_id: R-20260101-1000\n"
+            "title: test\n"
+            "state: analysis_ready\n"
+            "options:\n"
+            "  minimum_questions: 5\n"
+            "---\n\n"
+            "## Input\n",
+            encoding="utf-8",
+        )
         state = resolve_menu_state(tmp_path)
         assert state.active_request_id == "R-20260101-1000"
         assert state.active_request_folder == folder
@@ -86,8 +94,17 @@ class TestResolveMenuState:
         mem = tmp_path / ".aib_memory"
         mem.mkdir(parents=True)
         folder_rel = ".aib_memory/requests/R-20260101-1000-test"
-        reg = mem / "requests_register.md"
-        reg.write_text(_register_with_row("R-20260101-1000", folder_rel, "Active"), encoding="utf-8")
+        (mem / "input.md").write_text(
+            "---\n"
+            "request_id: R-20260101-1000\n"
+            "title: test\n"
+            "state: analysis_ready\n"
+            "options:\n"
+            "  minimum_questions: 5\n"
+            "---\n\n"
+            "## Input\n",
+            encoding="utf-8",
+        )
         req_folder = tmp_path / folder_rel
         req_folder.mkdir(parents=True)
         state = resolve_menu_state(tmp_path)
@@ -623,99 +640,26 @@ class TestCheckVersionCompatibility:
 
 
 # ---------------------------------------------------------------------------
-# _make_log_path
-# ---------------------------------------------------------------------------
-
-class TestMakeLogPath:
-    def test_creates_log_in_logs_dir(self, tmp_path: Path):
-        log = _make_log_path("test-action", tmp_path)
-        assert log.parent == tmp_path / ".aib_memory" / "logs"
-        assert log.name.startswith("aib-action-")
-        assert "test-action" in log.name
-        assert log.suffix == ".log"
-
-    def test_creates_logs_directory(self, tmp_path: Path):
-        log = _make_log_path("test-action", tmp_path)
-        assert (tmp_path / ".aib_memory" / "logs").is_dir()
-
-
-# ---------------------------------------------------------------------------
 # _run_and_tee
 # ---------------------------------------------------------------------------
 
 class TestRunAndTee:
-    def test_streams_stdout_to_log_file(self, tmp_path: Path):
-        log_path = tmp_path / "test.log"
-        script = tmp_path / "echo_script.py"
-        script.write_text(
-            'import sys\nfor i in range(3):\n    print(f"line {i}")\n',
-            encoding="utf-8",
-        )
-        exit_code = _run_and_tee(
-            [sys.executable, str(script)],
-            log_path,
-            "test echo",
-            inherit_stdin=False,
-        )
-        assert exit_code == 0
-        content = log_path.read_text(encoding="utf-8")
-        assert "[START]" in content
-        assert "[OUT] line 0" in content
-        assert "[OUT] line 1" in content
-        assert "[OUT] line 2" in content
-        assert "[EXIT] 0" in content
-
-    def test_streams_stderr_to_log_file(self, tmp_path: Path):
-        log_path = tmp_path / "test.log"
-        script = tmp_path / "err_script.py"
-        script.write_text(
-            'import sys\nsys.stderr.write("error line\\n")\nsys.exit(1)\n',
-            encoding="utf-8",
-        )
-        exit_code = _run_and_tee(
-            [sys.executable, str(script)],
-            log_path,
-            "test stderr",
-            inherit_stdin=False,
-        )
-        assert exit_code == 1
-        content = log_path.read_text(encoding="utf-8")
-        assert "[ERR] error line" in content
-        assert "[EXIT] 1" in content
-
     def test_returns_nonzero_exit_code(self, tmp_path: Path):
-        log_path = tmp_path / "test.log"
         script = tmp_path / "fail_script.py"
         script.write_text("import sys; sys.exit(42)\n", encoding="utf-8")
         exit_code = _run_and_tee(
             [sys.executable, str(script)],
-            log_path,
             "test fail",
             inherit_stdin=False,
         )
         assert exit_code == 42
 
-    def test_log_file_contains_command(self, tmp_path: Path):
-        log_path = tmp_path / "test.log"
-        script = tmp_path / "noop.py"
-        script.write_text("pass\n", encoding="utf-8")
-        _run_and_tee(
-            [sys.executable, str(script)],
-            log_path,
-            "test cmd",
-            inherit_stdin=False,
-        )
-        content = log_path.read_text(encoding="utf-8")
-        assert "[CMD]" in content
-
     def test_inherit_stdin_passes_none(self, tmp_path: Path):
-        log_path = tmp_path / "test.log"
         script = tmp_path / "noop.py"
         script.write_text("pass\n", encoding="utf-8")
         with patch("subprocess.Popen", wraps=subprocess.Popen) as mock_popen:
             _run_and_tee(
                 [sys.executable, str(script)],
-                log_path,
                 "test stdin",
                 inherit_stdin=True,
             )
@@ -723,95 +667,16 @@ class TestRunAndTee:
         assert kwargs["stdin"] is None
 
     def test_no_inherit_stdin_passes_devnull(self, tmp_path: Path):
-        log_path = tmp_path / "test.log"
         script = tmp_path / "noop.py"
         script.write_text("pass\n", encoding="utf-8")
         with patch("subprocess.Popen", wraps=subprocess.Popen) as mock_popen:
             _run_and_tee(
                 [sys.executable, str(script)],
-                log_path,
                 "test stdin off",
                 inherit_stdin=False,
             )
         _, kwargs = mock_popen.call_args
         assert kwargs["stdin"] == subprocess.DEVNULL
-
-    def test_utf8_non_ascii_output_logged_correctly(self, tmp_path: Path):
-        """Subprocess emitting multi-byte UTF-8 characters is logged without error."""
-        import threading as _threading
-
-        log_path = tmp_path / "test.log"
-        script = tmp_path / "utf8_script.py"
-        # '→' (U+2192) is 3 bytes in UTF-8 (0xE2 0x86 0x92); 0x86 is undefined in cp1252.
-        script.write_text(
-            'import sys\nsys.stdout.buffer.write("arrow \\u2192\\n".encode("utf-8"))\n',
-            encoding="utf-8",
-        )
-        exit_code = _run_and_tee(
-            [sys.executable, str(script)],
-            log_path,
-            "test utf8 non-ascii",
-            inherit_stdin=False,
-        )
-        assert exit_code == 0
-        content = log_path.read_text(encoding="utf-8")
-        assert "[OUT] arrow \u2192" in content
-        assert "[EXIT] 0" in content
-
-    def test_thread_exception_captured_in_log(self, tmp_path: Path):
-        """A pipe raising UnicodeDecodeError in _stream_pipe writes [THREAD-ERROR] to log."""
-        import threading as _threading
-
-        log_path = tmp_path / "test.log"
-        lock = _threading.Lock()
-
-        class FailingPipe:
-            def readline(self):
-                raise UnicodeDecodeError(
-                    "charmap", b"\x8f", 0, 1, "character maps to <undefined>"
-                )
-
-            def close(self):
-                pass
-
-        with open(log_path, "w", encoding="utf-8") as log_file:
-            menu._stream_pipe(FailingPipe(), sys.stdout, log_file, "[OUT]", lock)
-
-        content = log_path.read_text(encoding="utf-8")
-        assert "[THREAD-ERROR]" in content
-        assert "UnicodeDecodeError" in content
-
-    def test_exit_marker_present_when_thread_fails(self, tmp_path: Path):
-        """[EXIT] is written even when a streaming thread raises an exception."""
-        log_path = tmp_path / "test.log"
-
-        class FailingPipe:
-            def readline(self):
-                raise UnicodeDecodeError(
-                    "charmap", b"\x8f", 0, 1, "character maps to <undefined>"
-                )
-
-            def close(self):
-                pass
-
-        mock_proc = MagicMock()
-        mock_proc.stdout = FailingPipe()
-        mock_proc.stderr = FailingPipe()
-        mock_proc.wait.return_value = 0
-        mock_proc.returncode = 0
-
-        with patch("subprocess.Popen", return_value=mock_proc):
-            exit_code = _run_and_tee(
-                ["copilot", "-p", "test.md"],
-                log_path,
-                "test exit with thread error",
-                inherit_stdin=False,
-            )
-
-        content = log_path.read_text(encoding="utf-8")
-        assert "[THREAD-ERROR]" in content
-        assert "[EXIT]" in content
-        assert exit_code == 0
 
 
 # ---------------------------------------------------------------------------

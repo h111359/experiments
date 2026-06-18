@@ -17,7 +17,6 @@ from common import (
     ValidationError,
     ensure_workspace,
     get_semver,
-    parse_markdown_table,
     print_error_and_exit,
     parse_args,
     write_text,
@@ -45,7 +44,6 @@ def _seed_memory(workspace: Path, brain_dir: Path, memory_root: Path, force: boo
         force: Reserved for future per-file overwrite behaviour.
     """
     (memory_root / "requests").mkdir(parents=True, exist_ok=True)
-    (memory_root / "logs").mkdir(parents=True, exist_ok=True)
 
     # Create the attachments staging folder used by aib-analyze.md as an
     # enriched input channel. A .gitkeep placeholder ensures the empty directory
@@ -57,16 +55,6 @@ def _seed_memory(workspace: Path, brain_dir: Path, memory_root: Path, force: boo
         gitkeep.touch()
         print("Created attachments directory.")
 
-    register_file = memory_root / "requests_register.md"
-    if register_file.exists():
-        print("requests_register.md already exists — skipping overwrite.")
-    else:
-        requests_register = (
-            "# Requests Register\n\n"
-            "| request_id | title | folder | state | created_at | closed_at |\n"
-            "| --- | --- | --- | --- | --- | --- |\n"
-        )
-        write_text(register_file, requests_register)
 
     context_file = memory_root / "context.md"
     if context_file.exists():
@@ -79,11 +67,13 @@ def _seed_memory(workspace: Path, brain_dir: Path, memory_root: Path, force: boo
         print("input.md already exists — skipping overwrite.")
     else:
         input_seed = (
-            "## Status\n"
-            "No active request\n"
-            "State: idle\n\n"
-            "## Options\n"
-            "- Minimum questions: 0\n\n"
+            "---\n"
+            "request_id: ~\n"
+            "title: ~\n"
+            "state: idle\n"
+            "options:\n"
+            "  minimum_questions: 5\n"
+            "---\n\n"
             "## Input\n\n"
         )
         write_text(input_file, input_seed)
@@ -166,7 +156,17 @@ def _warn_about_legacy_references(legacy_path: Path) -> None:
 
     try:
         content = legacy_path.read_text(encoding="utf-8")
-        header, rows = parse_markdown_table(content)
+        # Minimal inline table parser — avoids dependency on removed common helpers.
+        lines = [line.strip() for line in content.splitlines() if line.strip()]
+        table_lines = [line for line in lines if line.startswith("|") and line.endswith("|")]
+        if len(table_lines) < 2:
+            header, rows = [], []
+        else:
+            header = [cell.strip() for cell in table_lines[0].strip("|").split("|")]
+            rows = [
+                [cell.strip() for cell in line.strip("|").split("|")]
+                for line in table_lines[2:]
+            ]
     except Exception:  # noqa: BLE001 — informational helper, never blocks upgrade
         print("WARNING: legacy references.md is not parseable; skipping migration check.")
         return
@@ -282,9 +282,7 @@ def _run_upgrade(workspace: Path, brain_dir: Path, memory_root: Path) -> None:
     # Step 7 — Restore user-curated files from the archive.
     # context.md and instructions.md are always restored; requests-related
     # files are restored only when the user chose to migrate old requests.
-    restore_files = ["context.md", "instructions.md"]
-    if migrate_requests:
-        restore_files += ["requests_register.md"]
+    restore_files = ["context.md", "instructions.md", "input.md"]
     restored: list[str] = []
     for filename in restore_files:
         src = archive_path / filename

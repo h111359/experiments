@@ -54,21 +54,19 @@ class TestCreateRequest:
         folder = workspace_dir / ".aib_memory" / "requests" / "R-20260101-1001-another-request"
         assert not (folder / "request.md").exists()
 
-    def test_successful_creation_does_not_create_implementation_md(self, workspace_dir: Path):
-        _run_create_request(workspace_dir, "Request No Impl", "R-20260101-1007")
-        folder = workspace_dir / ".aib_memory" / "requests" / "R-20260101-1007-request-no-impl"
-        assert not (folder / "implementation.md").exists()
-
     def test_successful_creation_does_not_create_iterations_md(self, workspace_dir: Path):
         _run_create_request(workspace_dir, "Request No Iter", "R-20260101-1002")
         folder = workspace_dir / ".aib_memory" / "requests" / "R-20260101-1002-request-no-iter"
         assert not (folder / "iterations.md").exists()
 
-    def test_successful_creation_updates_register(self, workspace_dir: Path):
+    def test_successful_creation_updates_input_header(self, workspace_dir: Path):
         _run_create_request(workspace_dir, "Register Check", "R-20260101-1003")
-        reg = (workspace_dir / ".aib_memory" / "requests_register.md").read_text(encoding="utf-8")
-        assert "R-20260101-1003" in reg
-        assert "Active" in reg
+        from common import parse_input_header, read_text
+        input_path = workspace_dir / ".aib_memory" / "input.md"
+        header = parse_input_header(read_text(input_path))
+        assert header is not None
+        assert header["request_id"] == "R-20260101-1003"
+        assert header["state"] == "analysis_ready"
 
     def test_missing_title_fails(self, workspace_dir: Path):
         rc = _run_create_request(workspace_dir, "")
@@ -80,17 +78,15 @@ class TestCreateRequest:
         rc2 = _run_create_request(workspace_dir, "Second request", "R-20260101-1005")
         assert rc2 != 0
 
-    def test_missing_register_fails(self, workspace_dir: Path):
-        (workspace_dir / ".aib_memory" / "requests_register.md").unlink()
+    def test_missing_input_md_fails(self, workspace_dir: Path):
+        (workspace_dir / ".aib_memory" / "input.md").unlink()
         rc = _run_create_request(workspace_dir, "Orphan request")
         assert rc != 0
 
-    def test_register_row_has_active_state(self, workspace_dir: Path):
+    def test_input_header_has_analysis_ready_state(self, workspace_dir: Path):
         _run_create_request(workspace_dir, "State Check", "R-20260101-1006")
-        from common import parse_markdown_table, read_text
-        reg_path = workspace_dir / ".aib_memory" / "requests_register.md"
-        header, rows = parse_markdown_table(read_text(reg_path))
-        col = {n: i for i, n in enumerate(header)}
-        active_rows = [r for r in rows if r[col["request_id"]] == "R-20260101-1006"]
-        assert len(active_rows) == 1
-        assert active_rows[0][col["state"]] == "Active"
+        from common import parse_input_header, read_text
+        header = parse_input_header(read_text(workspace_dir / ".aib_memory" / "input.md"))
+        assert header is not None
+        assert header["request_id"] == "R-20260101-1006"
+        assert header["state"] == "analysis_ready"
