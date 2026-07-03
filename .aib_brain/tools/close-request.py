@@ -58,18 +58,18 @@ def main() -> None:
         if header is None:
             raise ValidationError("input.md does not contain a valid YAML frontmatter header")
 
-        if header["state"] == "idle":
+        if header["state"]["status"] == "idle":
             raise ValidationError("No active request found; nothing to close")
 
         # If explicit --request-id given, verify it matches the active request.
         req_id_arg = (args.request_id or "").strip()
-        if req_id_arg and req_id_arg != header["request_id"]:
+        if req_id_arg and req_id_arg != header["state"]["request_id"]:
             raise ValidationError(
-                f"Explicit request ID {req_id_arg!r} does not match active request {header['request_id']!r}"
+                f"Explicit request ID {req_id_arg!r} does not match active request {header['state']['request_id']!r}"
             )
 
-        active_request_id = header["request_id"]
-        active_title = header["title"]
+        active_request_id = header["state"]["request_id"]
+        active_title = header["state"]["title"]
 
         # Move active-request artifacts from .aib_memory/ root to the request subfolder.
         # Safety-net call; if aib-implement.md already ran the move, this is a no-op.
@@ -89,12 +89,20 @@ def main() -> None:
                 "Files were not archived — consider running aib-analyze.md before closing."
             )
 
-        # Reset input.md YAML header to idle state, preserving minimum_questions option.
+        # Reset input.md YAML header to idle state, preserving options.
         idle_header = {
-            "request_id": "~",
-            "title": "~",
-            "state": "idle",
-            "options": {"minimum_questions": header["options"]["minimum_questions"]},
+            "state": {
+                "request_id": "~",
+                "title": "~",
+                "status": "idle",
+                "input_verification_result": None,
+                "context_verification_result": None,
+            },
+            "options": {
+                "minimum_questions": header["options"]["minimum_questions"],
+                "input_verification_enabled": header["options"].get("input_verification_enabled", True),
+                "context_verification_enabled": header["options"].get("context_verification_enabled", True),
+            },
         }
         write_text(input_path, write_input_header(content, idle_header))
 

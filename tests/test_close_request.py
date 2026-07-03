@@ -17,11 +17,16 @@ from common import parse_input_header, read_text, write_text
 
 INPUT_MD_IDLE = (
     "---\n"
-    "request_id: ~\n"
-    "title: ~\n"
-    "state: idle\n"
+    "state:\n"
+    "  request_id: ~\n"
+    "  title: ~\n"
+    "  status: idle\n"
+    "  input_verification_result: null\n"
+    "  context_verification_result: null\n"
     "options:\n"
     "  minimum_questions: 5\n"
+    "  input_verification_enabled: true\n"
+    "  context_verification_enabled: true\n"
     "---\n\n"
     "## Input\n\n"
 )
@@ -39,12 +44,14 @@ def _make_request(workspace: Path, req_id: str, state: str = "analysis_ready") -
     base_content = read_text(input_path) if input_path.exists() else INPUT_MD_IDLE
     from common import parse_input_header, write_input_header
     hdr = parse_input_header(base_content) or {
-        "request_id": "~", "title": "~", "state": "idle",
-        "options": {"minimum_questions": 0},
+        "state": {"request_id": "~", "title": "~", "status": "idle",
+                  "input_verification_result": None, "context_verification_result": None},
+        "options": {"minimum_questions": 0, "input_verification_enabled": True,
+                    "context_verification_enabled": True},
     }
-    hdr["request_id"] = req_id
-    hdr["title"] = "Test Request"
-    hdr["state"] = state
+    hdr["state"]["request_id"] = req_id
+    hdr["state"]["title"] = "Test Request"
+    hdr["state"]["status"] = state
     write_text(input_path, write_input_header(base_content, hdr))
 
     # Write a minimal plan.md stub
@@ -92,15 +99,15 @@ class TestCloseRequest:
         assert rc == 0
         from common import parse_input_header, read_text
         header = parse_input_header(read_text(workspace_dir / ".aib_memory" / "input.md"))
-        assert header["state"] == "idle"
-        assert header["request_id"] == "~"
+        assert header["state"]["status"] == "idle"
+        assert header["state"]["request_id"] == "~"
 
     def test_close_resets_title_to_null(self, workspace_dir: Path):
         _make_request(workspace_dir, "R-20260101-1001")
         _run_close_request(workspace_dir)
         from common import parse_input_header, read_text
         header = parse_input_header(read_text(workspace_dir / ".aib_memory" / "input.md"))
-        assert header["title"] == "~"
+        assert header["state"]["title"] == "~"
 
     def test_already_idle_request_fails(self, workspace_dir: Path):
         # If state is already idle, close-request.py must exit non-zero.
@@ -118,7 +125,7 @@ class TestCloseRequest:
         assert rc == 0
         from common import parse_input_header, read_text
         header = parse_input_header(read_text(workspace_dir / ".aib_memory" / "input.md"))
-        assert header["state"] == "idle"
+        assert header["state"]["status"] == "idle"
 
     def test_resets_input_md_to_idle_when_exists(self, workspace_dir: Path):
         """After closing, input.md YAML header is reset to idle state."""
@@ -129,8 +136,8 @@ class TestCloseRequest:
         from common import parse_input_header, read_text
         header = parse_input_header(read_text(input_path))
         assert header is not None
-        assert header["state"] == "idle"
-        assert header["request_id"] == "~"
+        assert header["state"]["status"] == "idle"
+        assert header["state"]["request_id"] == "~"
         assert "R-20260101-1005" not in read_text(input_path)
 
     def test_fails_when_input_md_missing(self, workspace_dir: Path):

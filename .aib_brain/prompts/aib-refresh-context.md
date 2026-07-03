@@ -22,19 +22,28 @@ Produce or modify `.aib_memory/context.md` — a unified, structured synthesis o
 
 ## Phase 1 — Preflight
 
+Run `python .aib_brain/tools/log-entry.py --workspace . --message "aib-refresh-context Phase 1 started" --general`.
+
 1. Read `.aib_brain/conventions/context-convention.md`. This is the authoritative source for the required section structure, content guidance, formatting rules, and quality gates for `context.md`.
 2. If `.aib_memory/instructions.md` lists additional file paths the developer wants AIB to treat as supplementary product-doc inputs, collect those paths into the supplementary read set. Otherwise the supplementary read set is empty.
 3. If the supplementary read set is not empty, read every file in the supplementary read set.
-4. **Format detection:** Read `.aib_memory/context.md` (if it exists). Determine whether the file is in the new atomic format by checking for the presence of `## 2. Statements` as a section heading and atomic statement lines matching the pattern `- <AREA>-<TYPE>-<HASH>: <text>`. Set internal variable [format-is-atomic] accordingly.
-   - If the file is in the OLD format (12-section prose): treat existing content as informational input alongside workspace files for generating atomic statements. The old content informs synthesis but is not preserved structurally.
-   - If the file is in the NEW format (3-section atomic): existing atomic statements serve as the baseline. Add, modify, or remove statements as needed based on workspace evidence.
-   - If the file does not exist: proceed with full generation in atomic format.
+4. **Format detection:** Read `.aib_memory/context.md` (if it exists). Determine whether the file is in the current format by checking for the presence of the section heading.
+   - If the file has the current section format as per `.aib_brain/conventions/context-convention.md`; use existing statements as baseline and update based on workspace evidence.
+   - If the file does not have the current section format as per `.aib_brain/conventions/context-convention.md`; generate fresh content in the format of the convention.
+   - If the file does not exist: proceed with full generation in the format of the convention.
+5. **Extension relevance check:** For each Reference entry in `## References` of the existing `context.md`, read the `Summary:` line and use AI semantic relevance judgement to determine whether the extension is relevant to the current refresh goal. If relevant, read the full extension file at the `Location:` path and treat its content as additional input context alongside `context.md`.
+
+Run `python .aib_brain/tools/log-entry.py --workspace . --message "aib-refresh-context Phase 1 complete" --general`.
 
 ---
 
 ## Phase 2 — Supplementary read (workspace sources)
 
+Run `python .aib_brain/tools/log-entry.py --workspace . --message "aib-refresh-context Phase 2 started" --general`.
+
 In addition to the supplementary read set, this phase is the **primary synthesis source** (reverse-engineering mode). Apply the traceability and evidence-collection rules from the Reverse-Engineering Evidence Collection section below.
+
+Run `python .aib_brain/tools/log-entry.py --workspace . --message "aib-refresh-context Phase 2 complete" --general`.
 
 1. Build a deterministic file inventory of the workspace root.
    - Include all files and directories.
@@ -51,8 +60,8 @@ In addition to the supplementary read set, this phase is the **primary synthesis
    - For directories containing three or more items that share a repeating naming pattern, apply the grouping rule defined in `context-convention.md` Section 12: provide a single summary bullet for the directory rather than listing individual items.
    - Sort by workspace-relative path ascending.
 2. Read `README.md` (if it exists at workspace root).
-3. Read files under `scripts/` (purpose, inputs, outputs per script).
-4. Read files under `tests/` (test coverage areas, key test targets).
+3. Read script and program code files (purpose, inputs, outputs per script).
+4. Read test files (test coverage areas, key test targets).
 5. Read root configuration files (e.g., `.gitignore`, `pyproject.toml`, `setup.cfg`, `requirements.txt`, `package.json`) if they exist.
 
 ---
@@ -90,11 +99,27 @@ For each mandatory section of `.aib_memory/context.md` synthesized from workspac
 
 ---
 
+## Phase 3 — Cross-Reference
+
+Run `python .aib_brain/tools/log-entry.py --workspace . --message "aib-refresh-context Phase 3 started" --general`.
+
+1. Read files under `tests/` to identify test coverage areas and key test targets that should inform context.md content.
+2. Read any script files under `scripts/` that were not covered in Phase 2.
+3. Note any additional architectural facts, constraints, or decisions discovered in this phase that are relevant to the 6 sections of context.md.
+
+Run `python .aib_brain/tools/log-entry.py --workspace . --message "aib-refresh-context Phase 3 complete" --general`.
+
+---
+
 ## Phase 4 — Synthesis
+
+Run `python .aib_brain/tools/log-entry.py --workspace . --message "aib-refresh-context Phase 4 started" --general`.
 
 Produce or modify the content of `.aib_memory/context.md` as follows.
 
 Apply the formatting rules defined in the `## Formatting Rules` section of `.aib_brain/conventions/context-convention.md`.
+
+Use atomic statement format for each bullet line as specified in context-convention.md.
 
 ### Content currency rule
 
@@ -102,62 +127,31 @@ All content MUST reflect the current state of the product only.
 MUST NOT include version history annotations such as "introduced in vX.Y.Z", "added in vX", "deprecated as of vX", "removed as of", or "(Deprecated)" labels.
 Describe what currently exists and is active; historical change information belongs in changelogs and version logs, not in context.md.
 
-### 4.1 Preamble
+### Non-repeating information rule
 
-Write the preamble exactly as specified in the `context-convention.md` Preamble Format section. Replace the timestamp placeholder with the actual generation timestamp in local project time.
+CLI argument names and function signatures MUST NOT be included in `context.md` because they are derivable by reading the tool scripts directly. High-level tool purpose, behaviour, and architectural facts are retained. All other facts may still be included.
 
-### 4.2 Section 1 — Product Identity
+### 4.1 Context Convention Reference
 
-Write `## 1. Product Identity` with free-form prose content following the Section 1 content guidance in `context-convention.md`. Synthesize from all available workspace sources and supplementary files.
+Refer to the valid sections definition in `context-convention.md` for the required section structure, content guidance, formatting rules, and quality gates.
 
-### 4.3 Section 2 — Statements
+### 4.2 Six-Section Synthesis
 
-Write `## 2. Statements` containing atomic statements organized into the 22 subsections defined in `context-convention.md`.
+Write the content of `.aib_memory/context.md` following the convention defined in `context-convention.md`.
 
-For each subsection area:
-1. Identify all relevant facts, requirements, constraints, decisions, and information from workspace sources that belong to this area.
-2. For each fact, compose a single-sentence atomic statement.
-3. Compute the 8-character hash using `hashlib.sha256(text.encode('utf-8')).hexdigest()[:8]` where `text` is the statement text.
-4. Assign the appropriate statement type letter (N, R, C, E, L, U, A, D, I).
-5. Format as: `- <AREA>-<TYPE>-<HASH>: <text>`
-6. Add optional `{Related to: <id1>, <id2>}` suffix where relationships between statements exist.
-
-When converting from old format:
-- Map content from old `## Domain Knowledge` to areas DO, CO.
-- Map content from old `## Concepts` to area CO.
-- Map content from old `## Constraints & Assumptions` to appropriate areas with type C or A.
-- Map content from old `## Requirements` to area FN with type R.
-- Map content from old `## Architecture & Decisions` to areas TD, TS with types D, I.
-- Map content from old `## Technical Design` to area TD.
-- Map content from old `## Data Architecture` to area DS, DF.
-- Map content from old `## Security & Compliance` to area SC.
-- Map content from old `## Operations` to area OP.
-- Map content from old `## Development Practices` to area DV.
-- Use best judgment for placement when content spans multiple areas.
-
-### 4.4 Section 3 — Workspace File Inventory
-
-Write `## 3. Workspace File Inventory` listing all non-excluded files and directories discovered in Phase 2. Follow the format defined in `context-convention.md` Section 3.
-
-For each entry:
-
-- **File entries:** Write `- \`path\` — description.` where description is one sentence derived from knowledge synthesized in earlier sections or from direct file content read in Phase 2.
-
-- **Directory entries:** Write `- \`dir/\` — description.` for every directory and subdirectory present in the workspace (using a trailing slash). Derive the description from the folder's evident role.
-
-- **Repetitive items:** Apply the grouping rule for directories containing three or more items with repeating naming patterns.
-
-- Sort all entries (files and directories together) ascending by path.
+Run `python .aib_brain/tools/log-entry.py --workspace . --message "aib-refresh-context Phase 4 complete" --general`.
 
 ---
 
-## Phase 4b — Enrichment Verification Passes
+## Phase 5 — Enrichment Verification Passes
+
+Run `python .aib_brain/tools/log-entry.py --workspace . --message "aib-refresh-context Phase 5 started" --general`.
 
 After synthesis, execute the following enrichment passes to ensure completeness:
 
 ### Pass 1 — Analysis decisions verification
 
-Read `.aib_memory/analysis-<request_id>.md` for the active request (if it exists, read the `request_id` field from the input.md YAML header to identify the active request). Verify all decisions from the Decision Register section are reflected as statements (type D) in the appropriate area subsection of `## 2. Statements`. Add missing decision statements.
+Read `.aib_memory/analysis-<request_id>.md` for the active request (if one is active). Verify all decisions from the Decision Register section are reflected as statements in the appropriate section of the current 7-section `context.md` format (Product, Concepts, Requirements, Solution, File Structure, References, or Issues). Add missing statements.
 
 ### Pass 2 — Plan results verification
 
@@ -165,11 +159,23 @@ Read `.aib_memory/plan-<request_id>.md` for the active request (if it exists). V
 
 ### Pass 3 — Modified files verification
 
-Compare workspace file state against context statements. Verify that any new files, removed files, or renamed files since the last context generation are reflected in `## 3. Workspace File Inventory`. Verify that significant functional changes to existing files are reflected as updated or new statements in `## 2. Statements`.
+Compare workspace file state against context statements. Verify that any new files, removed files, or renamed files since the last context generation are reflected in `## File Structure`. Verify that significant functional changes to existing files are reflected as updated or new statements in the appropriate sections.
+
+### Pass 4 — [PLANNED] entry re-evaluation
+
+For each `[PLANNED]` entry currently present in `context.md` (across all sections: Product, Concepts, Requirements, Solution), evaluate whether the feature described by that entry is now present in the current workspace via workspace scan:
+- If the feature is confirmed realized (workspace evidence shows the feature is implemented), remove the `[PLANNED]` prefix from the statement — the entry transitions to a plain untagged statement.
+- If the feature cannot be confirmed as realized, preserve the `[PLANNED]` entry verbatim in the refreshed `context.md`.
+
+Do NOT remove `[PLANNED]` entries automatically; only transition those entries where workspace evidence confirms the described feature is present.
+
+Run `python .aib_brain/tools/log-entry.py --workspace . --message "aib-refresh-context Phase 5 complete" --general`.
 
 ---
 
-## Phase 5 — Write output
+## Phase 6 — Write output
+
+Run `python .aib_brain/tools/log-entry.py --workspace . --message "aib-refresh-context Phase 6 started" --general`.
 
 1. **Statement uniqueness verification pass (MUST complete before writing):** Scan all generated atomic statements in Section 2. For each statement, extract the index (area+type+hash). If any duplicate index is found, resolve by adjusting the statement text (which changes the hash) or removing the duplicate. Only after zero uniqueness violations remain may you proceed to write the file.
 2. Write the complete synthesized content to `.aib_memory/context.md`, replacing any existing content entirely.
@@ -177,25 +183,51 @@ Compare workspace file state against context statements. Verify that any new fil
 4. Do NOT modify any other file.
 5. Confirm at the very end of the conversation with the text "--- I am done with the context update ---" that all your activities are finished
 
+Run `python .aib_brain/tools/log-entry.py --workspace . --message "aib-refresh-context Phase 6 complete" --general`.
+
 ---
 
-## Phase 6 — Post-write Validation
+## Phase 7 — Post-write Validation
+
+Run `python .aib_brain/tools/log-entry.py --workspace . --message "aib-refresh-context Phase 7 started" --general`.
 
 1. Re-read `.aib_memory/context.md` as written.
 2. Extract all level-2 headings from the document in order.
-3. Compare the extracted list against the mandatory section list from `.aib_brain/conventions/context-convention.md` (exact heading text: `## 1. Product Identity`, `## 2. Statements`, `## 3. Workspace File Inventory` — in that order).
+3. Compare the extracted list against the mandatory section list from `.aib_brain/conventions/context-convention.md` (required headings: `## Product`, `## Concepts`, `## Requirements`, `## Solution`, `## File Structure` — in that order; `## References` is optional).
 4. If any heading is non-compliant — wrong name, wrong order, or missing — identify each correction needed.
 5. For each non-compliant section, rewrite it (heading and content) to match the convention; do not alter compliant sections.
-6. Verify all atomic statements in Section 2 have unique indices and match the required format.
+6. Verify all statements in Product, Concepts, and Solution sections use plain-bullet format, and all statements in Requirements use modality-prefixed format.
 7. After all corrections are applied, confirm the written file is compliant.
+
+Run `python .aib_brain/tools/log-entry.py --workspace . --message "aib-refresh-context Phase 7 complete" --general`.
 
 ---
 
-## Phase 7 — Format Verification
+## Phase 8 — Format Verification
+
+Run `python .aib_brain/tools/log-entry.py --workspace . --message "aib-refresh-context Phase 8 started" --general`.
 
 1. Invoke `python .aib_brain/tools/verify-context.py --workspace .` to run automated format checks against the written `context.md`.
 2. If the script exits with code 0 (all checks pass), proceed to completion.
 3. If the script exits with code 1 (one or more checks fail), review the reported failures and correct the deviations in `context.md`. Re-run the verification script until all checks pass.
+
+Run `python .aib_brain/tools/log-entry.py --workspace . --message "aib-refresh-context Phase 8 complete" --general`.
+
+---
+
+## Phase 9 — Update Writable Extensions
+
+Run `python .aib_brain/tools/log-entry.py --workspace . --message "aib-refresh-context Phase 9 started" --general`.
+
+After `context.md` is written and verified, for every Reference entry in `## References` that contains `Update: true`:
+1. Read the extension file at the registered `Location:` path.
+2. Update its content to reflect the current workspace scan findings relevant to the topics covered by that extension's `Summary:`.
+3. Write the updated extension file back to the same path.
+4. Log each updated extension via `log-entry.py --workspace . --message "Extension updated: <location>"`.
+
+If no Reference entries have `Update: true`, skip this phase.
+
+Run `python .aib_brain/tools/log-entry.py --workspace . --message "aib-refresh-context Phase 9 complete" --general`.
 
 ---
 
@@ -206,7 +238,7 @@ Compare workspace file state against context statements. Verify that any new fil
 - Do NOT create files other than `.aib_memory/context.md`.
 - Do NOT explore or read `.aib_brain/` contents except `.aib_brain/conventions/context-convention.md`.
 - Do NOT install packages, create virtual environments, or run tools.
-- MAY read `.aib_memory/analysis-<request_id>.md` and `.aib_memory/plan-<request_id>.md` for the active request only (needed for enrichment passes in Phase 4b).
+- MAY read `.aib_memory/analysis-<request_id>.md` and `.aib_memory/plan-<request_id>.md` for the active request only (needed for enrichment passes in Phase 5 enrichment verification passes).
 - MUST NOT read analysis or plan files for Closed requests.
 
 ---
@@ -215,9 +247,8 @@ Compare workspace file state against context statements. Verify that any new fil
 
 - `.aib_memory/context.md` exists and is valid Markdown.
 - It contains the preamble as defined in `context-convention.md`, including the auto-generation notice and timestamp.
-- It contains all 3 mandatory sections in the order specified by `context-convention.md` (`## 1. Product Identity`, `## 2. Statements`, `## 3. Workspace File Inventory`), using the exact headings.
-- Section 1 has concise prose content synthesized from workspace sources.
-- Section 2 contains atomic statements in the correct format with unique indices across all subsections.
-- Section 3 lists all non-excluded workspace files in the required format.
+- It contains the 5 mandatory sections in the order specified by `context-convention.md` (`## Product`, `## Concepts`, `## Requirements`, `## Solution`, `## File Structure`), using the exact headings.
+- All sections contain appropriate atomic statements in the format required by context-convention.md.
+- `## File Structure` lists all non-excluded workspace files in the required indented-tree format.
 - No content is derived from excluded directories.
 - No files other than `.aib_memory/context.md` were modified.

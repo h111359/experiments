@@ -26,6 +26,7 @@ from menu import (
     render_menu,
     resolve_menu_state,
     validate_param,
+    _show_migration_completion_screen,
 )
 
 
@@ -76,11 +77,16 @@ class TestResolveMenuState:
         folder = ".aib_memory/requests/R-20260101-1000-test"
         (mem / "input.md").write_text(
             "---\n"
-            "request_id: R-20260101-1000\n"
-            "title: test\n"
-            "state: analysis_ready\n"
+            "state:\n"
+            "  request_id: R-20260101-1000\n"
+            "  title: test\n"
+            "  status: analysis_ready\n"
+            "  input_verification_result: null\n"
+            "  context_verification_result: null\n"
             "options:\n"
             "  minimum_questions: 5\n"
+            "  input_verification_enabled: true\n"
+            "  context_verification_enabled: true\n"
             "---\n\n"
             "## Input\n",
             encoding="utf-8",
@@ -96,11 +102,16 @@ class TestResolveMenuState:
         folder_rel = ".aib_memory/requests/R-20260101-1000-test"
         (mem / "input.md").write_text(
             "---\n"
-            "request_id: R-20260101-1000\n"
-            "title: test\n"
-            "state: analysis_ready\n"
+            "state:\n"
+            "  request_id: R-20260101-1000\n"
+            "  title: test\n"
+            "  status: analysis_ready\n"
+            "  input_verification_result: null\n"
+            "  context_verification_result: null\n"
             "options:\n"
             "  minimum_questions: 5\n"
+            "  input_verification_enabled: true\n"
+            "  context_verification_enabled: true\n"
             "---\n\n"
             "## Input\n",
             encoding="utf-8",
@@ -200,9 +211,17 @@ class TestHardCodedActionList:
         assert "move-request-artifacts.py" not in scripts
 
     def test_no_glob_discovery(self, tools_dir: Path):
-        """SC-04: build_script_actions must not return auto-discovered scripts."""
+        """SC-04: build_script_actions must not return auto-discovered scripts.
+
+        The list is hard-coded; verify-input and verify-context have been removed
+        so the list must now be empty — no entries at all.
+        """
         actions = build_script_actions(tools_dir)
-        # Hard-coded list is intentionally empty; no auto-discovered scripts.
+        # verify_input and verify_context are no longer in the menu.
+        action_keys = [a.get("action_key") for a in actions]
+        assert "verify_input" not in action_keys
+        assert "verify_context" not in action_keys
+        # Ensure no unintended auto-discovered scripts are present.
         assert len(actions) == 0
 
     def test_exclude_scripts_not_in_module(self):
@@ -563,7 +582,12 @@ class TestCheckVersionCompatibility:
     """Tests for the semver version-compatibility check introduced in request R-20260427-0858."""
 
     def _make_workspace(self, tmp_path: Path, brain_semver: str | None, memory_semver: str | None) -> Path:
-        """Build a minimal workspace with the specified semver markers."""
+        """Build a minimal workspace with the specified version markers.
+
+        The brain version is encoded as a vMAJOR.MINOR.PATCH empty file in
+        .aib_brain/ (unchanged convention). The memory version is stored in
+        .aib_memory/aib-setup.yaml under the memory_version key.
+        """
         brain_dir = tmp_path / ".aib_brain"
         brain_dir.mkdir(parents=True)
         memory_dir = tmp_path / ".aib_memory"
@@ -571,7 +595,10 @@ class TestCheckVersionCompatibility:
         if brain_semver:
             (brain_dir / brain_semver).touch()
         if memory_semver:
-            (memory_dir / memory_semver).touch()
+            (memory_dir / "aib-setup.yaml").write_text(
+                f"memory_version: {memory_semver}\n",
+                encoding="utf-8",
+            )
         return tmp_path
 
     def test_matching_versions_returns_true(self, tmp_path: Path):
@@ -748,3 +775,39 @@ class TestGuidanceAttachmentsHint:
             "_GUIDANCE_MESSAGES['implementation_ready'] must include a line referencing "
             "'.aib_memory/attachments/'."
         )
+
+
+# ---------------------------------------------------------------------------
+# _show_migration_completion_screen
+# ---------------------------------------------------------------------------
+
+class TestMigrationCompletionScreen:
+    """Tests for the migration-completion screen shown after --upgrade."""
+
+    def _make_workspace(self, tmp_path: Path, compat_value: str) -> Path:
+        """Create a minimal workspace with aib-setup.yaml containing the given compat value."""
+        memory_dir = tmp_path / ".aib_memory"
+        memory_dir.mkdir(parents=True)
+        (memory_dir / "aib-setup.yaml").write_text(
+            f"memory_version_compatibility: {compat_value}\n",
+            encoding="utf-8",
+        )
+        return tmp_path
+
+    def test_confirm_completed_sets_compatible(self, tmp_path: Path):
+        """Choosing '1' sets memory_version_compatibility to compatible and returns True."""
+        workspace = self._make_workspace(tmp_path, "initialized-not-populated")
+        with patch("builtins.input", return_value="1"):
+            result = _show_migration_completion_screen(workspace)
+        assert result is True
+        content = (workspace / ".aib_memory" / "aib-setup.yaml").read_text(encoding="utf-8")
+        assert "memory_version_compatibility: compatible" in content
+
+    def test_exit_returns_false(self, tmp_path: Path):
+        """Choosing '2' returns False and leaves aib-setup.yaml unchanged."""
+        workspace = self._make_workspace(tmp_path, "initialized-not-populated")
+        with patch("builtins.input", return_value="2"):
+            result = _show_migration_completion_screen(workspace)
+        assert result is False
+        content = (workspace / ".aib_memory" / "aib-setup.yaml").read_text(encoding="utf-8")
+        assert "memory_version_compatibility: initialized-not-populated" in content

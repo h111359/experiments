@@ -16,29 +16,29 @@ import pytest
 WORKSPACE_ROOT = Path(__file__).resolve().parent.parent
 SCRIPT_PATH = WORKSPACE_ROOT / ".aib_brain" / "tools" / "verify-context.py"
 
-# Minimal well-formed context.md content for baseline tests (new format)
+# Minimal well-formed context.md content for baseline tests (6-section format)
 VALID_CONTEXT = """\
 # Product Context
 
-## 1. Product Identity
+## Product
 
-Test Product is a minimal framework for testing. It requires Python 3 and Git.
+- AIB is a minimal, model-agnostic framework for specification-driven development.
 
-Primary actors are developers and automated agents.
+## Concepts
 
-The product is active and in use.
+- Convention-over-configuration means all product and code quality rules are captured in convention files.
+- Specification-first development means every change is preceded by analysis and plan.
 
-## Functionality
+## Requirements
 
-- R: System must validate documents.
-- N: Validation runs at prompt execution time.
+- MUST: All changes must be preceded by analysis and plan before code is written.
+- MUST NOT: AI agents must not modify .aib_brain/ assets during implementation.
 
-## Project overview
+## Solution
 
-- N: Test project operates in software engineering domain.
-- I: Primary use case is specification-driven development.
+- AIB tracks active-request state via YAML frontmatter header in input.md.
 
-## Files
+## File Structure
 
 .aib_memory/
   context.md — product context
@@ -85,84 +85,83 @@ class TestVerifyContextPassingCase:
         _write_context(tmp_path, VALID_CONTEXT)
         result = _run_verify(tmp_path)
         assert result.returncode == 0
-        assert "Results: 10/10 checks passed." in result.stdout
+        assert "Results: 12/12 checks passed." in result.stdout
 
     def test_output_contains_ok_markers(self, tmp_path: Path) -> None:
         """Output should contain [OK] markers for each passing check."""
         _write_context(tmp_path, VALID_CONTEXT)
         result = _run_verify(tmp_path)
-        assert "[OK] check_title_and_product_identity" in result.stdout
-        assert "[OK] check_area_headings_valid" in result.stdout
-        assert "[OK] check_statement_format" in result.stdout
+        assert "[OK] check_document_title" in result.stdout
+        assert "[OK] check_all_h2_headings_valid" in result.stdout
+        assert "[OK] check_product_concepts_solution_format" in result.stdout
 
 
 class TestVerifyContextMissingSections:
     """Tests for missing mandatory sections."""
 
-    def test_missing_product_identity(self, tmp_path: Path) -> None:
-        """Missing ## 1. Product Identity should cause failure."""
-        content = VALID_CONTEXT.replace("## 1. Product Identity", "## 1. Overview")
+    def test_missing_product_section(self, tmp_path: Path) -> None:
+        """Missing ## Product section should cause failure."""
+        content = VALID_CONTEXT.replace("## Product", "## Overview")
         _write_context(tmp_path, content)
         result = _run_verify(tmp_path)
         assert result.returncode == 1
-        assert "[FAIL] check_title_and_product_identity" in result.stdout
+        assert "[FAIL] check_product_section_present_and_non_empty" in result.stdout
 
 
-class TestVerifyContextDuplicateIndex:
-    """Tests for duplicate statement text within an area section."""
+class TestVerifyContextRequirementsFormat:
+    """Tests for Requirements section statement format."""
 
-    def test_duplicate_statement_text(self, tmp_path: Path) -> None:
-        """Duplicate statement text within same area should cause failure."""
+    def test_requirements_without_modality_fails(self, tmp_path: Path) -> None:
+        """A Requirements statement without modality prefix should cause failure."""
         content = VALID_CONTEXT.replace(
-            "- R: System must validate documents.",
-            "- R: System must validate documents.\n- N: System must validate documents.",
+            "- MUST: All changes must be preceded by analysis and plan before code is written.",
+            "- All changes must be preceded by analysis and plan before code is written.",
         )
         _write_context(tmp_path, content)
         result = _run_verify(tmp_path)
         assert result.returncode == 1
-        assert "[FAIL] check_statement_uniqueness" in result.stdout
+        assert "[FAIL] check_requirements_format" in result.stdout
 
 
 class TestVerifyContextInvalidFormat:
-    """Tests for invalid statement format."""
+    """Tests for invalid heading and statement format."""
 
     def test_invalid_area_heading(self, tmp_path: Path) -> None:
-        """Invalid H2 area heading (not in VALID_AREAS) should cause failure."""
+        """Invalid H2 area heading (not in VALID_SECTIONS) should cause failure."""
         content = VALID_CONTEXT.replace(
-            "## Functionality",
+            "## Concepts",
             "## XX",
         )
         _write_context(tmp_path, content)
         result = _run_verify(tmp_path)
         assert result.returncode == 1
-        assert "[FAIL] check_area_headings_valid" in result.stdout
+        assert "[FAIL] check_all_h2_headings_valid" in result.stdout
 
-    def test_invalid_type_letter(self, tmp_path: Path) -> None:
-        """Multi-letter type (not a single uppercase letter) should cause failure."""
+    def test_requirements_invalid_format_fails(self, tmp_path: Path) -> None:
+        """A Requirements bullet with type-letter prefix instead of modality should cause failure."""
         content = VALID_CONTEXT.replace(
-            "- R: System must validate documents.",
-            "- RR: System must validate documents.",
+            "- MUST: All changes must be preceded by analysis and plan before code is written.",
+            "- R: All changes must be preceded by analysis and plan before code is written.",
         )
         _write_context(tmp_path, content)
         result = _run_verify(tmp_path)
         assert result.returncode == 1
-        assert "[FAIL] check_statement_format" in result.stdout
+        assert "[FAIL] check_requirements_format" in result.stdout
 
 
-class TestVerifyContextEmptyAreaSection:
-    """Tests for empty area sections."""
+class TestVerifyContextEmptyProductSection:
+    """Tests for empty Product section."""
 
-    def test_empty_area_section_fails(self, tmp_path: Path) -> None:
-        """An area section heading with no statements should cause failure."""
-        # Add an empty AN section (heading with no statements)
+    def test_empty_product_section_fails(self, tmp_path: Path) -> None:
+        """A Product section heading with no statements should cause failure."""
         content = VALID_CONTEXT.replace(
-            "## Files",
-            "## Analytics\n\n## Files",
+            "- AIB is a minimal, model-agnostic framework for specification-driven development.\n",
+            "",
         )
         _write_context(tmp_path, content)
         result = _run_verify(tmp_path)
         assert result.returncode == 1
-        assert "[FAIL] check_area_sections_non_empty" in result.stdout
+        assert "[FAIL] check_product_section_present_and_non_empty" in result.stdout
 
 
 class TestVerifyContextExternalLinks:
@@ -171,13 +170,13 @@ class TestVerifyContextExternalLinks:
     def test_http_url_fails(self, tmp_path: Path) -> None:
         """Presence of http:// URL should cause failure."""
         content = VALID_CONTEXT.replace(
-            "- N: Test project operates in software engineering domain.",
-            "- N: Test project at http://example.com operates in SE domain.",
+            "- Convention-over-configuration means all product and code quality rules are captured in convention files.",
+            "- See documentation at http://example.com for more details.",
         )
         _write_context(tmp_path, content)
         result = _run_verify(tmp_path)
         assert result.returncode == 1
-        assert "[FAIL] check_no_external_hyperlinks" in result.stdout
+        assert "[FAIL] check_no_html_tables_urls" in result.stdout
 
 
 class TestVerifyContextHtmlTags:
@@ -186,13 +185,13 @@ class TestVerifyContextHtmlTags:
     def test_html_tag_fails(self, tmp_path: Path) -> None:
         """Presence of HTML tags (outside backticks) should cause failure."""
         content = VALID_CONTEXT.replace(
-            "- N: Test project operates in software engineering domain.",
-            "- N: Test project uses <strong>bold</strong> formatting.",
+            "- Convention-over-configuration means all product and code quality rules are captured in convention files.",
+            "- Test project uses <strong>bold</strong> formatting.",
         )
         _write_context(tmp_path, content)
         result = _run_verify(tmp_path)
         assert result.returncode == 1
-        assert "[FAIL] check_no_html_tags" in result.stdout
+        assert "[FAIL] check_no_html_tables_urls" in result.stdout
 
 
 class TestVerifyContextFileNotFound:

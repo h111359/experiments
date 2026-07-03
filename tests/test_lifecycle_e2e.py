@@ -50,14 +50,14 @@ class TestLifecycleE2E:
             assert result.returncode == 0, f"initialize failed: {result.stderr}"
             assert (root / ".aib_memory" / "input.md").exists()
             header = _read_input_header(root)
-            assert header["state"] == "idle"
+            assert header["state"]["status"] == "idle"
 
             # Step 2: create-request
             result = _run("create-request.py", root, ["--title", "E2E Test Request", "--request-id", "R-20260101-0001"])
             assert result.returncode == 0, f"create-request failed: {result.stderr}"
             header = _read_input_header(root)
-            assert header["request_id"] == "R-20260101-0001"
-            assert header["state"] == "analysis_ready"
+            assert header["state"]["request_id"] == "R-20260101-0001"
+            assert header["state"]["status"] == "analysis_ready"
             folder_rel = f".aib_memory/requests/R-20260101-0001-e2e-test-request"
             assert not (root / folder_rel / "request.md").exists()
             assert not (root / folder_rel / "iterations.md").exists()
@@ -66,8 +66,8 @@ class TestLifecycleE2E:
             result = _run("close-request.py", root)
             assert result.returncode == 0, f"close-request failed: {result.stderr}"
             header = _read_input_header(root)
-            assert header["state"] == "idle"
-            assert header["request_id"] in (None, "~")
+            assert header["state"]["status"] == "idle"
+            assert header["state"]["request_id"] in (None, "~")
 
     def test_cannot_create_request_while_another_active(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -88,4 +88,4 @@ class TestLifecycleE2E:
             result = _run("close-request.py", root)
             assert result.returncode == 0
             header = _read_input_header(root)
-            assert header["state"] == "idle"
+            assert header["state"]["status"] == "idle"

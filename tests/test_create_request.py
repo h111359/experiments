@@ -65,8 +65,8 @@ class TestCreateRequest:
         input_path = workspace_dir / ".aib_memory" / "input.md"
         header = parse_input_header(read_text(input_path))
         assert header is not None
-        assert header["request_id"] == "R-20260101-1003"
-        assert header["state"] == "analysis_ready"
+        assert header["state"]["request_id"] == "R-20260101-1003"
+        assert header["state"]["status"] == "analysis_ready"
 
     def test_missing_title_fails(self, workspace_dir: Path):
         rc = _run_create_request(workspace_dir, "")
@@ -88,5 +88,5 @@ class TestCreateRequest:
         from common import parse_input_header, read_text
         header = parse_input_header(read_text(workspace_dir / ".aib_memory" / "input.md"))
         assert header is not None
-        assert header["request_id"] == "R-20260101-1006"
-        assert header["state"] == "analysis_ready"
+        assert header["state"]["request_id"] == "R-20260101-1006"
+        assert header["state"]["status"] == "analysis_ready"

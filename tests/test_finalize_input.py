@@ -26,11 +26,16 @@ _FINALIZE_SCRIPT = _TOOLS_DIR / "finalize-input.py"
 # Minimal seed template in YAML frontmatter format.
 _SEED_TEMPLATE = (
     "---\n"
-    "request_id: ~\n"
-    "title: ~\n"
-    "state: analysis_ready\n"
+    "state:\n"
+    "  request_id: ~\n"
+    "  title: ~\n"
+    "  status: analysis_ready\n"
+    "  input_verification_result: null\n"
+    "  context_verification_result: null\n"
     "options:\n"
     "  minimum_questions: 5\n"
+    "  input_verification_enabled: true\n"
+    "  context_verification_enabled: true\n"
     "---\n\n"
     "## Input\n\n"
 )
@@ -39,11 +44,16 @@ _SEED_TEMPLATE = (
 # Uses the same request_id/title as _make_workspace defaults for consistency.
 _NON_STUB_INPUT = (
     "---\n"
-    "request_id: R-20260101-1200\n"
-    "title: My Test\n"
-    "state: analysis_ready\n"
+    "state:\n"
+    "  request_id: R-20260101-1200\n"
+    "  title: My Test\n"
+    "  status: analysis_ready\n"
+    "  input_verification_result: null\n"
+    "  context_verification_result: null\n"
     "options:\n"
     "  minimum_questions: 5\n"
+    "  input_verification_enabled: true\n"
+    "  context_verification_enabled: true\n"
     "---\n\n"
     "## Input\n"
     "This is user-provided content that must be archived.\n"
@@ -73,11 +83,16 @@ def _make_workspace(tmp: str, request_id: str = "R-20260101-1200", title: str = 
     # Seed input.md with YAML header for the active request.
     input_content = (
         "---\n"
-        f"request_id: {request_id}\n"
-        f"title: {title}\n"
-        "state: analysis_ready\n"
+        "state:\n"
+        f"  request_id: {request_id}\n"
+        f"  title: {title}\n"
+        "  status: analysis_ready\n"
+        "  input_verification_result: null\n"
+        "  context_verification_result: null\n"
         "options:\n"
         "  minimum_questions: 5\n"
+        "  input_verification_enabled: true\n"
+        "  context_verification_enabled: true\n"
         "---\n\n"
         "## Input\n\n"
     )
@@ -110,7 +125,7 @@ class TestArchiveBehaviour:
     """Verify that input.md is archived (or not) based on stub-equivalence."""
 
     def test_non_stub_input_is_archived(self):
-        """Non-stub input.md must produce an archive file in <request-folder>/inputs/."""
+        """Non-stub input.md must produce an archive file in the request folder root."""
         with tempfile.TemporaryDirectory() as tmp:
             ws = _make_workspace(tmp, request_id="R-20260101-1200", title="My Test")
             # Write non-stub content to input.md.
@@ -120,9 +135,9 @@ class TestArchiveBehaviour:
             result = _run_finalize(ws, request_id="R-20260101-1200")
             assert result.returncode == 0, result.stderr
 
-            # Exactly one archive file must exist in the request inputs/ folder.
-            inputs_dir = ws / ".aib_memory" / "requests" / "R-20260101-1200-my-test" / "inputs"
-            archive_files = list(inputs_dir.glob("input-archive-*.md"))
+            # Exactly one archive file must exist in the request folder root.
+            request_dir = ws / ".aib_memory" / "requests" / "R-20260101-1200-my-test"
+            archive_files = list(request_dir.glob("input-archive-*.md"))
             assert len(archive_files) == 1, (
                 f"Expected exactly one archive file; found: {[f.name for f in archive_files]}"
             )
@@ -136,11 +151,16 @@ class TestArchiveBehaviour:
             # Write stub-equivalent content (seed template with request ID).
             stub_content = (
                 "---\n"
-                "request_id: R-20260101-1200\n"
-                "title: My Test\n"
-                "state: analysis_ready\n"
+                "state:\n"
+                "  request_id: R-20260101-1200\n"
+                "  title: My Test\n"
+                "  status: analysis_ready\n"
+                "  input_verification_result: null\n"
+                "  context_verification_result: null\n"
                 "options:\n"
                 "  minimum_questions: 5\n"
+                "  input_verification_enabled: true\n"
+                "  context_verification_enabled: true\n"
                 "---\n\n"
                 "## Input\n\n"
             )
@@ -149,8 +169,8 @@ class TestArchiveBehaviour:
             result = _run_finalize(ws, request_id="R-20260101-1200")
             assert result.returncode == 0, result.stderr
 
-            inputs_dir = ws / ".aib_memory" / "requests" / "R-20260101-1200-my-test" / "inputs"
-            archive_files = list(inputs_dir.glob("input-archive-*.md")) if inputs_dir.exists() else []
+            request_dir = ws / ".aib_memory" / "requests" / "R-20260101-1200-my-test"
+            archive_files = list(request_dir.glob("input-archive-*.md"))
             assert len(archive_files) == 0, (
                 f"No archive expected for stub-equivalent input; found: {[f.name for f in archive_files]}"
             )
@@ -161,10 +181,10 @@ class TestArchiveBehaviour:
 # ---------------------------------------------------------------------------
 
 class TestAttachmentMoving:
-    """Verify that non-.gitkeep attachments are relocated to <request-folder>/inputs/."""
+    """Verify that non-.gitkeep attachments are relocated to the request folder root."""
 
     def test_attachments_moved_to_inputs(self):
-        """Non-.gitkeep files in attachments/ must be moved to inputs/."""
+        """Non-.gitkeep files in attachments/ must be moved to the request folder root."""
         with tempfile.TemporaryDirectory() as tmp:
             ws = _make_workspace(tmp, request_id="R-20260101-1200", title="My Test")
             # Place a non-stub input and an attachment file.
@@ -178,8 +198,8 @@ class TestAttachmentMoving:
             # Original attachment must be gone from attachments/.
             assert not attachment.exists(), "Attachment was not moved (still at source)"
 
-            # Moved file must appear in inputs/.
-            dest = ws / ".aib_memory" / "requests" / "R-20260101-1200-my-test" / "inputs" / "spec.txt"
+            # Moved file must appear at the request folder root.
+            dest = ws / ".aib_memory" / "requests" / "R-20260101-1200-my-test" / "spec.txt"
             assert dest.exists(), "Attachment was not found at destination"
             assert dest.read_text(encoding="utf-8") == "attachment content"
 
@@ -215,7 +235,7 @@ class TestInputMdReset:
             reset = (ws / ".aib_memory" / "input.md").read_text(encoding="utf-8")
             assert "R-20260101-1200" in reset, "Reset input.md must contain the request ID"
             assert "My Test" in reset, "Reset input.md must contain the request title"
-            assert "state: analysis_ready" in reset, "Reset input.md must contain state: analysis_ready"
+            assert "status: analysis_ready" in reset, "Reset input.md must contain status: analysis_ready"
 
     def test_input_md_no_toggle_lines(self):
         """After run, input.md must NOT contain either removed toggle line."""
@@ -286,14 +306,19 @@ class TestStubEquivalenceStateVariants:
         with tempfile.TemporaryDirectory() as tmp:
             ws = _make_workspace(tmp, request_id="R-20260101-1200", title="My Test")
 
-            # Write a stub-equivalent input.md with state: questions_generated (different from seed).
+            # Write a stub-equivalent input.md with status: questions_generated (different from seed).
             stub_questions_state = (
                 "---\n"
-                "request_id: R-20260101-1200\n"
-                "title: My Test\n"
-                "state: questions_generated\n"
+                "state:\n"
+                "  request_id: R-20260101-1200\n"
+                "  title: My Test\n"
+                "  status: questions_generated\n"
+                "  input_verification_result: null\n"
+                "  context_verification_result: null\n"
                 "options:\n"
                 "  minimum_questions: 5\n"
+                "  input_verification_enabled: true\n"
+                "  context_verification_enabled: true\n"
                 "---\n\n"
                 "## Input\n\n"
             )
@@ -303,8 +328,8 @@ class TestStubEquivalenceStateVariants:
             assert result.returncode == 0, result.stderr
 
             # Must be treated as stub-equivalent — no archive file should be created.
-            inputs_dir = ws / ".aib_memory" / "requests" / "R-20260101-1200-my-test" / "inputs"
-            archive_files = list(inputs_dir.glob("input-archive-*.md")) if inputs_dir.exists() else []
+            request_dir = ws / ".aib_memory" / "requests" / "R-20260101-1200-my-test"
+            archive_files = list(request_dir.glob("input-archive-*.md"))
             assert len(archive_files) == 0, (
                 f"No archive expected for stub-equivalent input with different State; found: {[f.name for f in archive_files]}"
             )

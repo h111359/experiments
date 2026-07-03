@@ -21,9 +21,5 @@ Changes:
 - Regenerate context.md to comply with updated convention.
 - Update tests for context formatting rules and verify-context tool to match new format.
 - Remove context.md read step from aib-implement.md and forbid reading context.md during implementation.
-- Mandate plan self-sufficiency in plan-convention.md: full background, exact file paths, and exact edit-context.py invocations.
-- Update aib-analyze.md Step 9 to require self-sufficient plans with no dependency on context.md.
 - Remove Risk notes sub-field from plan-convention.md task schema.
-- Update README.md plan artifact description to reflect self-sufficient specification.
-- Update context.md to reflect that implement does not read context.md and plans are self-sufficient.
 - Add regression tests for context.md read prohibition and Risk notes removal.

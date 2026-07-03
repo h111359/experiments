@@ -15,6 +15,25 @@ CLOSED = "Closed"
 
 REQ_ID_PATTERN = re.compile(r"^R-\d{8}-\d{4}$")
 
+# Authoritative seed template for input.md using the nested YAML structure.
+# Both finalize-input.py and initialize.py import this constant so the seed
+# is defined in exactly one place.
+_INPUT_SEED_TEMPLATE = (
+    "---\n"
+    "state:\n"
+    "  request_id: ~\n"
+    "  title: ~\n"
+    "  status: idle\n"
+    "  input_verification_result: null\n"
+    "  context_verification_result: null\n"
+    "options:\n"
+    "  minimum_questions: 5\n"
+    "  input_verification_enabled: true\n"
+    "  context_verification_enabled: true\n"
+    "---\n\n"
+    "## Input\n\n"
+)
+
 
 class ValidationError(RuntimeError):
     """Raised on deterministic validation failures."""
@@ -76,6 +95,90 @@ def get_semver(directory: Path) -> "str | None":
     return None
 
 
+def _parse_flat_yaml_value(content: str, key: str) -> "str | None":
+    """Extract the scalar value for *key* from flat-structure YAML content.
+
+    Handles plain and single/double-quoted values.  Ignores comment lines
+    (starting with ``#``) and blank lines.  Does NOT support nested keys,
+    multi-line values, or anchors — aib-setup.yaml uses flat top-level keys only.
+
+    Args:
+        content: Raw text content of a flat-key YAML file.
+        key: The top-level key to look up.
+
+    Returns:
+        The string value associated with *key*, or ``None`` if not found.
+    """
+    for line in content.splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        # Only match lines that start with the exact key at column 0 (top-level).
+        if not line.startswith(key):
+            continue
+        remainder = line[len(key):]
+        # Require colon immediately after the key name to avoid partial-name matches.
+        if not remainder.startswith(":"):
+            continue
+        value = remainder[1:].strip()
+        # Strip an optional inline comment.
+        if " #" in value:
+            value = value[: value.index(" #")].strip()
+        # Strip surrounding single or double quotes.
+        if len(value) >= 2 and value[0] in ("'", '"') and value[-1] == value[0]:
+            value = value[1:-1]
+        return value if value else None
+    return None
+
+
+def get_setup_option(directory: Path, option: str) -> "str | None":
+    """Return the value of *option* from aib-setup.yaml in *directory*, or None.
+
+    Reads ``aib-setup.yaml`` from *directory* and returns the string value for
+    the named top-level key.  Returns ``None`` when the file does not exist,
+    cannot be read, or the key is absent.
+
+    Args:
+        directory: Filesystem path of the directory containing ``aib-setup.yaml``.
+        option: Top-level YAML key to retrieve (e.g. ``"memory_version"``).
+
+    Returns:
+        The string value for *option*, or ``None`` if not found.
+    """
+    setup_file = directory / "aib-setup.yaml"
+    if not setup_file.is_file():
+        return None
+    try:
+        content = setup_file.read_text(encoding="utf-8")
+    except OSError:
+        return None
+    return _parse_flat_yaml_value(content, option)
+
+
+def set_setup_option(directory: Path, option: str, value: str) -> None:
+    """Set *option* to *value* in aib-setup.yaml in *directory*.
+
+    Reads ``aib-setup.yaml``, replaces any existing line whose key matches
+    *option* with ``option: value``, or appends a new line when the key is
+    absent.  All other keys are preserved unchanged.
+    """
+    setup_file = directory / "aib-setup.yaml"
+    if setup_file.is_file():
+        lines = setup_file.read_text(encoding="utf-8").splitlines(keepends=True)
+    else:
+        lines = []
+    found = False
+    for i, line in enumerate(lines):
+        key_part = line.split(":", 1)[0].rstrip()
+        if key_part == option:
+            lines[i] = f"{option}: {value}\n"
+            found = True
+            break
+    if not found:
+        lines.append(f"{option}: {value}\n")
+    setup_file.write_text("".join(lines), encoding="utf-8", newline="\n")
+
+
 def ensure_workspace(workspace: Path) -> None:
     if not workspace.exists() or not workspace.is_dir():
         raise ValidationError(f"Workspace does not exist: {workspace}")
@@ -120,17 +223,28 @@ def _yaml_quote(value: str) -> str:
 def parse_input_header(content: str) -> "dict | None":
     """Parse YAML frontmatter block from *content* (input.md text).
 
-    Supports the fixed AIB header schema only: four top-level keys
-    (``request_id``, ``title``, ``state``) plus one nested dict
-    (``options.minimum_questions``).  No external YAML library required.
+    Supports the new AIB nested schema with two top-level group keys:
+    - ``state:`` group: ``request_id``, ``title``, ``status`` (the workflow
+      state; values ``idle|analysis_ready|questions_generated``),
+      ``input_verification_result``, ``context_verification_result``.
+    - ``options:`` group: ``minimum_questions``, ``input_verification_enabled``,
+      ``context_verification_enabled``.
+
+    Raises ``ValueError`` when a top-level ``request_id`` key is detected,
+    indicating the old flat format. No auto-migration is performed; the workspace
+    must be re-initialized.
 
     Args:
         content: Full text of input.md.
 
     Returns:
-        Dict with keys ``request_id``, ``title``, ``state``, and
-        ``options`` (a nested dict with key ``minimum_questions``).
-        Returns ``None`` when no valid ``---`` frontmatter block is found.
+        Dict with two top-level keys ``state`` (nested dict) and ``options``
+        (nested dict).  Returns ``None`` when no valid ``---`` frontmatter
+        block is found.
+
+    Raises:
+        ValueError: When the old flat frontmatter format is detected
+            (top-level ``request_id`` key present at the non-indented level).
     """
     import re as _re
 
@@ -145,34 +259,101 @@ def parse_input_header(content: str) -> "dict | None":
     if end_idx == -1:
         return None
 
-    header: dict = {
+    # Detect old flat format: top-level request_id key (no leading whitespace).
+    for line in lines[1:end_idx]:
+        if _re.match(r"^request_id\s*:", line):
+            raise ValueError(
+                "Old flat frontmatter format detected (top-level 'request_id' key present). "
+                "Re-initialize the workspace to migrate to the new nested format."
+            )
+
+    state_block: dict = {
         "request_id": "~",
         "title": "~",
-        "state": "idle",
-        "options": {"minimum_questions": 0},
+        "status": "idle",
+        "input_verification_result": None,
+        "context_verification_result": None,
     }
-    in_options = False
+    options_block: dict = {
+        "minimum_questions": 0,
+        "input_verification_enabled": True,
+        "context_verification_enabled": True,
+    }
+
+    # Track the current top-level group being parsed.
+    current_group: "str | None" = None
     for line in lines[1:end_idx]:
-        if line.rstrip() == "options:":
-            in_options = True
+        # Detect top-level group keys (no leading whitespace, ends with colon only).
+        top_key_match = _re.match(r"^([a-zA-Z_][a-zA-Z0-9_]*):\s*$", line)
+        if top_key_match:
+            current_group = top_key_match.group(1)
             continue
-        if in_options:
-            m = _re.match(r"^\s+minimum_questions:\s*(\S+)", line)
-            if m:
-                try:
-                    header["options"]["minimum_questions"] = int(m.group(1))
-                except ValueError:
-                    header["options"]["minimum_questions"] = 0
-            continue
-        m = _re.match(r"^(\w+):\s*(.*)", line)
-        if m:
-            key, raw = m.group(1), m.group(2).strip()
+
+        # Parse indented sub-keys within the current group.
+        sub_key_match = _re.match(r"^\s+([a-zA-Z_][a-zA-Z0-9_]*):\s*(.*)", line)
+        if sub_key_match and current_group is not None:
+            key = sub_key_match.group(1)
+            raw = sub_key_match.group(2).strip()
             # Strip surrounding single or double quotes.
             if len(raw) >= 2:
                 if (raw[0] == "'" and raw[-1] == "'") or (raw[0] == '"' and raw[-1] == '"'):
                     raw = raw[1:-1].replace("''", "'")
-            header[key] = raw
-    return header
+            if current_group == "state":
+                state_block[key] = raw
+            elif current_group == "options":
+                options_block[key] = raw
+
+    # Convert minimum_questions to int.
+    try:
+        options_block["minimum_questions"] = int(options_block["minimum_questions"])
+    except (ValueError, TypeError):
+        options_block["minimum_questions"] = 0
+
+    # Convert YAML boolean strings to Python bool for enabled flags.
+    for bool_key in ("input_verification_enabled", "context_verification_enabled"):
+        raw_val = options_block.get(bool_key)
+        if raw_val == "true":
+            options_block[bool_key] = True
+        elif raw_val == "false":
+            options_block[bool_key] = False
+        # Already a bool (from defaults) — leave unchanged.
+
+    # Convert YAML null string to Python None for result flags.
+    for result_key in ("input_verification_result", "context_verification_result"):
+        if state_block.get(result_key) == "null":
+            state_block[result_key] = None
+
+    return {"state": state_block, "options": options_block}
+
+
+def _serialize_bool(value: object) -> str:
+    """Serialize a Python bool (or bool-like string) to a YAML boolean literal.
+
+    Args:
+        value: Python ``True``/``False`` or the strings ``"true"``/``"false"``.
+
+    Returns:
+        ``"true"`` or ``"false"``.
+    """
+    if value is True or value == "true":
+        return "true"
+    return "false"
+
+
+def _serialize_result_flag(value: object) -> str:
+    """Serialize a verification result flag to its YAML representation.
+
+    Args:
+        value: Python ``None`` or the strings ``"valid"``/``"invalid"``.
+
+    Returns:
+        ``"null"``, ``"valid"``, or ``"invalid"``.
+    """
+    if value is None or value == "null":
+        return "null"
+    if value in ("valid", "invalid"):
+        return str(value)
+    return "null"
 
 
 def write_input_header(content: str, header: dict) -> str:
@@ -184,8 +365,11 @@ def write_input_header(content: str, header: dict) -> str:
 
     Args:
         content: Current full text of input.md.
-        header: Dict with keys ``request_id``, ``title``, ``state``, and
-                ``options`` (nested dict with key ``minimum_questions``).
+        header: Dict with two top-level keys:
+            - ``state``: nested dict with ``request_id``, ``title``, ``status``,
+              ``input_verification_result``, ``context_verification_result``.
+            - ``options``: nested dict with ``minimum_questions``,
+              ``input_verification_enabled``, ``context_verification_enabled``.
 
     Returns:
         Updated input.md text with the frontmatter block replaced.
@@ -199,18 +383,31 @@ def write_input_header(content: str, header: dict) -> str:
                 break
     body = "".join(lines[body_start:])
 
-    req_id = _yaml_quote(str(header.get("request_id", "~")))
-    title = _yaml_quote(str(header.get("title", "~")))
-    state = str(header.get("state", "idle"))
-    min_q = int(header.get("options", {}).get("minimum_questions", 0))
+    state = header.get("state", {})
+    opts = header.get("options", {})
+
+    req_id = _yaml_quote(str(state.get("request_id", "~")))
+    title = _yaml_quote(str(state.get("title", "~")))
+    status = str(state.get("status", "idle"))
+    input_ver_result = _serialize_result_flag(state.get("input_verification_result", None))
+    ctx_ver_result = _serialize_result_flag(state.get("context_verification_result", None))
+
+    min_q = int(opts.get("minimum_questions", 0))
+    input_ver_enabled = _serialize_bool(opts.get("input_verification_enabled", True))
+    ctx_ver_enabled = _serialize_bool(opts.get("context_verification_enabled", True))
 
     frontmatter = (
         "---\n"
-        f"request_id: {req_id}\n"
-        f"title: {title}\n"
-        f"state: {state}\n"
+        "state:\n"
+        f"  request_id: {req_id}\n"
+        f"  title: {title}\n"
+        f"  status: {status}\n"
+        f"  input_verification_result: {input_ver_result}\n"
+        f"  context_verification_result: {ctx_ver_result}\n"
         "options:\n"
         f"  minimum_questions: {min_q}\n"
+        f"  input_verification_enabled: {input_ver_enabled}\n"
+        f"  context_verification_enabled: {ctx_ver_enabled}\n"
         "---\n"
     )
     return frontmatter + body

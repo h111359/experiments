@@ -38,9 +38,9 @@ def main() -> None:
 
         # Read current header to check for an existing active request.
         header = read_input_header(workspace)
-        if header["state"] != "idle":
+        if header["state"]["status"] != "idle":
             raise ValidationError(
-                f"Cannot create request while another request is active: {header['request_id']}"
+                f"Cannot create request while another request is active: {header['state']['request_id']}"
             )
 
         req_id = args.request_id.strip() if args.request_id else now_compact_request_id()
@@ -57,10 +57,18 @@ def main() -> None:
         input_path = workspace / ".aib_memory" / "input.md"
         content = read_text(input_path)
         new_header = {
-            "request_id": req_id,
-            "title": title,
-            "state": "analysis_ready",
-            "options": {"minimum_questions": header["options"]["minimum_questions"]},
+            "state": {
+                "request_id": req_id,
+                "title": title,
+                "status": "analysis_ready",
+                "input_verification_result": None,
+                "context_verification_result": None,
+            },
+            "options": {
+                "minimum_questions": header["options"]["minimum_questions"],
+                "input_verification_enabled": header["options"].get("input_verification_enabled", True),
+                "context_verification_enabled": header["options"].get("context_verification_enabled", True),
+            },
         }
         write_text(input_path, write_input_header(content, new_header))
 

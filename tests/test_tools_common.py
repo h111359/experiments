@@ -48,11 +48,16 @@ _TOOLS_DIR = _WORKSPACE_ROOT / ".aib_brain" / "tools"
 
 INPUT_MD_IDLE = (
     "---\n"
-    "request_id: ~\n"
-    "title: ~\n"
-    "state: idle\n"
+    "state:\n"
+    "  request_id: ~\n"
+    "  title: ~\n"
+    "  status: idle\n"
+    "  input_verification_result: null\n"
+    "  context_verification_result: null\n"
     "options:\n"
     "  minimum_questions: 5\n"
+    "  input_verification_enabled: true\n"
+    "  context_verification_enabled: true\n"
     "---\n\n"
     "## Input\n\n"
 )
@@ -74,27 +79,32 @@ class TestParseInputHeader(unittest.TestCase):
     def test_valid_idle_header(self):
         result = parse_input_header(INPUT_MD_IDLE)
         self.assertIsNotNone(result)
-        self.assertEqual(result["state"], "idle")
-        self.assertEqual(result["request_id"], "~")
-        self.assertEqual(result["title"], "~")
-        self.assertEqual(result["options"]["minimum_questions"], 0)
+        self.assertEqual(result["state"]["status"], "idle")
+        self.assertEqual(result["state"]["request_id"], "~")
+        self.assertEqual(result["state"]["title"], "~")
+        self.assertEqual(result["options"]["minimum_questions"], 5)
 
     def test_valid_active_header(self):
         content = (
             "---\n"
-            "request_id: R-20260101-1200\n"
-            "title: My Test Request\n"
-            "state: analysis_ready\n"
+            "state:\n"
+            "  request_id: R-20260101-1200\n"
+            "  title: My Test Request\n"
+            "  status: analysis_ready\n"
+            "  input_verification_result: null\n"
+            "  context_verification_result: null\n"
             "options:\n"
             "  minimum_questions: 3\n"
+            "  input_verification_enabled: true\n"
+            "  context_verification_enabled: true\n"
             "---\n\n"
             "## Input\n\n"
         )
         result = parse_input_header(content)
         self.assertIsNotNone(result)
-        self.assertEqual(result["request_id"], "R-20260101-1200")
-        self.assertEqual(result["title"], "My Test Request")
-        self.assertEqual(result["state"], "analysis_ready")
+        self.assertEqual(result["state"]["request_id"], "R-20260101-1200")
+        self.assertEqual(result["state"]["title"], "My Test Request")
+        self.assertEqual(result["state"]["status"], "analysis_ready")
         self.assertEqual(result["options"]["minimum_questions"], 3)
 
     def test_returns_none_for_no_frontmatter(self):
@@ -102,61 +112,101 @@ class TestParseInputHeader(unittest.TestCase):
         self.assertIsNone(result)
 
     def test_returns_none_for_unclosed_frontmatter(self):
-        result = parse_input_header("---\nstate: idle\n## Input\n\n")
+        result = parse_input_header("---\nstate:\n  status: idle\n## Input\n\n")
         self.assertIsNone(result)
 
     def test_single_quoted_title(self):
         content = (
             "---\n"
-            "request_id: R-20260101-1200\n"
-            "title: 'Title with: colon'\n"
-            "state: idle\n"
+            "state:\n"
+            "  request_id: R-20260101-1200\n"
+            "  title: 'Title with: colon'\n"
+            "  status: idle\n"
+            "  input_verification_result: null\n"
+            "  context_verification_result: null\n"
             "options:\n"
             "  minimum_questions: 5\n"
+            "  input_verification_enabled: true\n"
+            "  context_verification_enabled: true\n"
             "---\n\n"
         )
         result = parse_input_header(content)
         self.assertIsNotNone(result)
-        self.assertEqual(result["title"], "Title with: colon")
+        self.assertEqual(result["state"]["title"], "Title with: colon")
+
+    def test_raises_on_old_flat_format(self):
+        old_format = (
+            "---\n"
+            "request_id: R-20260101-1200\n"
+            "title: Old Request\n"
+            "state: analysis_ready\n"
+            "options:\n"
+            "  minimum_questions: 5\n"
+            "---\n\n"
+            "## Input\n\n"
+        )
+        with self.assertRaises(ValueError):
+            parse_input_header(old_format)
+
+    def test_round_trip_nested_structure(self):
+        result = parse_input_header(INPUT_MD_IDLE)
+        self.assertIsNotNone(result)
+        self.assertIn("state", result)
+        self.assertIn("options", result)
+        self.assertIsInstance(result["state"], dict)
+        self.assertIsInstance(result["options"], dict)
+        self.assertIn("status", result["state"])
+        self.assertIn("request_id", result["state"])
 
 
 class TestWriteInputHeader(unittest.TestCase):
     def test_round_trip_idle(self):
         header = {
-            "request_id": "~", "title": "~", "state": "idle",
-            "options": {"minimum_questions": 0},
+            "state": {"request_id": "~", "title": "~", "status": "idle",
+                      "input_verification_result": None, "context_verification_result": None},
+            "options": {"minimum_questions": 0, "input_verification_enabled": True,
+                        "context_verification_enabled": True},
         }
         result = write_input_header(INPUT_MD_IDLE, header)
         parsed = parse_input_header(result)
         self.assertIsNotNone(parsed)
-        self.assertEqual(parsed["state"], "idle")
-        self.assertEqual(parsed["request_id"], "~")
+        self.assertEqual(parsed["state"]["status"], "idle")
+        self.assertEqual(parsed["state"]["request_id"], "~")
 
     def test_round_trip_active(self):
         header = {
-            "request_id": "R-20260101-1200",
-            "title": "My Title",
-            "state": "analysis_ready",
-            "options": {"minimum_questions": 2},
+            "state": {"request_id": "R-20260101-1200", "title": "My Title",
+                      "status": "analysis_ready", "input_verification_result": None,
+                      "context_verification_result": None},
+            "options": {"minimum_questions": 2, "input_verification_enabled": True,
+                        "context_verification_enabled": True},
         }
         result = write_input_header(INPUT_MD_IDLE, header)
         parsed = parse_input_header(result)
         self.assertIsNotNone(parsed)
-        self.assertEqual(parsed["request_id"], "R-20260101-1200")
-        self.assertEqual(parsed["title"], "My Title")
-        self.assertEqual(parsed["state"], "analysis_ready")
+        self.assertEqual(parsed["state"]["request_id"], "R-20260101-1200")
+        self.assertEqual(parsed["state"]["title"], "My Title")
+        self.assertEqual(parsed["state"]["status"], "analysis_ready")
         self.assertEqual(parsed["options"]["minimum_questions"], 2)
 
     def test_body_preserved(self):
         content = INPUT_MD_IDLE + "Some existing body content.\n"
-        header = {"request_id": "~", "title": "~", "state": "idle", "options": {"minimum_questions": 0}}
+        header = {
+            "state": {"request_id": "~", "title": "~", "status": "idle",
+                      "input_verification_result": None, "context_verification_result": None},
+            "options": {"minimum_questions": 0, "input_verification_enabled": True,
+                        "context_verification_enabled": True},
+        }
         result = write_input_header(content, header)
         self.assertIn("Some existing body content.", result)
 
     def test_title_with_special_chars_quoted(self):
         header = {
-            "request_id": "R-001", "title": "Fix: the issue",
-            "state": "idle", "options": {"minimum_questions": 0},
+            "state": {"request_id": "R-001", "title": "Fix: the issue",
+                      "status": "idle", "input_verification_result": None,
+                      "context_verification_result": None},
+            "options": {"minimum_questions": 0, "input_verification_enabled": True,
+                        "context_verification_enabled": True},
         }
         result = write_input_header(INPUT_MD_IDLE, header)
         self.assertIn("'Fix: the issue'", result)
@@ -168,7 +218,7 @@ class TestReadInputHeader(unittest.TestCase):
             ws = _setup_workspace(tmp)
             (ws / ".aib_memory" / "input.md").write_text(INPUT_MD_IDLE, encoding="utf-8")
             header = read_input_header(ws)
-            self.assertEqual(header["state"], "idle")
+            self.assertEqual(header["state"]["status"], "idle")
 
     def test_raises_when_input_md_missing(self):
         with tempfile.TemporaryDirectory() as tmp:

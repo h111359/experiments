@@ -14,7 +14,7 @@ File Location+Naming (normative)
 Document Structure (normative)
 - Top-level sections required exactly once, exact order, all present even if empty: 1) ## Goal 2) ## Constraints 3) ## Success criteria 4) ## Plan.
 - Required headings level: section headings MUST be ##.
-- ## Goal MUST include: target outcome + why/background + impacted components; self-sufficient (no other file needed).
+- ## Goal MUST include: target outcome + why/background + impacted components.
 - ## Constraints MUST include assumptions/limits/boundaries; SHOULD include business+technical+timing constraints; if none -> None.
 - ## Success criteria MUST be measurable; SHOULD map to testability/user acceptance.
 - ## Plan = AI-generated WBS for active iteration.

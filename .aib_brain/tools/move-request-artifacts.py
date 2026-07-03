@@ -51,11 +51,11 @@ def move_artifacts(workspace: Path) -> None:
 
     # Read active request state from input.md YAML header.
     header = read_input_header(workspace)
-    if header["state"] == "idle":
+    if header["state"]["status"] == "idle":
         raise ValidationError("No active request found; cannot move artifacts")
 
-    request_id = header["request_id"].strip()
-    title = header["title"]
+    request_id = header["state"]["request_id"].strip()
+    title = header["state"]["title"]
     # Derive folder path using the same slugify convention as create-request.py.
     folder_name = f"{request_id}-{slugify(title)}"
     folder_rel = f".aib_memory/requests/{folder_name}"
@@ -75,6 +75,17 @@ def move_artifacts(workspace: Path) -> None:
             print(f"Moved: {source.relative_to(workspace)} -> {dest.relative_to(workspace)}")
         else:
             print(f"Skipped (not found): .aib_memory/{filename}")
+
+    # Handle the log file separately — its naming pattern uses an underscore,
+    # which is incompatible with the artifact_name() helper (hyphen convention).
+    log_filename = f"log_{request_id}.md"
+    log_source = aib_memory / log_filename
+    log_dest = dest_folder / log_filename
+    if log_source.exists():
+        shutil.move(str(log_source), str(log_dest))
+        print(f"Moved: {log_source.relative_to(workspace)} -> {log_dest.relative_to(workspace)}")
+    else:
+        print(f"Skipped (not found): .aib_memory/{log_filename}")
 
 
 def main() -> None:

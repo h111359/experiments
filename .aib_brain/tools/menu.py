@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from common import artifact_name, get_semver, parse_input_header, read_text, slugify
+from common import artifact_name, get_semver, get_setup_option, set_setup_option, parse_input_header, read_text, slugify
 
 # Auto-refresh interval used by choose_action() when no key is pressed.
 _REFRESH_TIMEOUT_S: float = 3.0
@@ -23,7 +23,16 @@ _REFRESH_TIMEOUT_S: float = 3.0
 # genuinely useful to the developer from the menu surface are included here.
 # close-request.py is conditionally injected by filter_visible_actions when
 # an active request exists; it is NOT listed here.
-_SCRIPT_ACTIONS: list[dict[str, Any]] = []
+_SCRIPT_ACTIONS: list[dict[str, Any]] = [
+    {
+        "id": "1",
+        "title": "Create Clarify Context",
+        "description": "Generate context compilation file for aib-clarify.md.",
+        "script": "create-clarify-context.py",
+        "destructive": False,
+        "parameters": [],
+    },
+]
 
 # Guidance messages for each detected workspace state.  Two-element lists
 # produce a two-line guidance block; single-element lists produce one line.
@@ -218,11 +227,11 @@ def resolve_menu_state(workspace: Path) -> MenuState:
         return MenuState(None, None, None)
 
     header = parse_input_header(read_text(input_path))
-    if header is None or header["state"] == "idle":
+    if header is None or header["state"]["status"] == "idle":
         return MenuState(None, None, None)
 
-    request_id = header.get("request_id", "").strip() or None
-    title = header.get("title", "").strip() or None
+    request_id = header.get("state", {}).get("request_id", "").strip() or None
+    title = header.get("state", {}).get("title", "").strip() or None
     if not request_id or request_id == "~":
         return MenuState(None, None, None)
 
@@ -260,15 +269,26 @@ def build_script_actions(tools_dir: Path) -> list[dict[str, Any]]:
     return actions
 
 
-def filter_visible_actions(actions: list[dict[str, Any]], state: MenuState) -> list[dict[str, Any]]:
-    """Return visible actions, appending close-request when an active request exists.
+def filter_visible_actions(
+    actions: list[dict[str, Any]],
+    state: MenuState,
+    workspace: Path | None = None,
+) -> list[dict[str, Any]]:
+    """Return visible actions, filtering by enabled flags and appending close-request when active.
 
-    The hard-coded action list contains only scripts that are permanently
-    developer-visible. The close-request action is injected at the end of the
-    list when state.has_active_request is True, disappearing automatically
-    after the request is closed on the next menu refresh.
+    The close-request action is injected at the end of the visible list when
+    ``state.has_active_request`` is ``True``.
+
+    Args:
+        actions: Full list of script actions (from build_script_actions).
+        state: Current resolved menu state.
+        workspace: Optional workspace root path; accepted for API compatibility.
+
+    Returns:
+        Filtered and optionally extended list of visible actions.
     """
-    visible = list(actions)
+    visible: list[dict[str, Any]] = list(actions)
+
     if state.has_active_request:
         # Append a copy so the module-level constant is not mutated.
         close_action = dict(_CLOSE_REQUEST_ACTION)
@@ -680,7 +700,7 @@ def choose_action(tools_dir: Path, workspace: Path) -> dict[str, Any] | None:
 
     while True:
         state = resolve_menu_state(workspace)
-        script_actions = filter_visible_actions(all_script_actions, state)
+        script_actions = filter_visible_actions(all_script_actions, state, workspace)
         total_items = len(script_actions)
         render_menu(state, script_actions, selected, workspace)
         key = get_key(timeout=_REFRESH_TIMEOUT_S)
@@ -715,14 +735,16 @@ def choose_action(tools_dir: Path, workspace: Path) -> dict[str, Any] | None:
 
 
 def check_version_compatibility(workspace: Path, python_exe: str, tools_dir: Path) -> bool:
-    """Check whether .aib_brain/ and .aib_memory/ semver markers match.
+    """Check whether .aib_brain/ and .aib_memory/ versions match.
 
-    When a mismatch (or missing memory semver) is detected, an upgrade prompt
-    is shown. The user can choose to upgrade or skip. If the user upgrades,
-    ``initialize.py --upgrade`` is invoked and this function returns True so
-    the caller continues to the normal menu without requiring a relaunch.
-    When the upgrade fails, the function returns False so the caller exits.
-    When the user skips, or when versions are in sync, the function returns True.
+    Reads the brain version from the ``vMAJOR.MINOR.PATCH`` marker file in
+    ``.aib_brain/`` and the memory version from the ``memory_version`` key in
+    ``.aib_memory/aib-setup.yaml``.  When a mismatch (or missing memory version)
+    is detected, an upgrade prompt is shown. The user can choose to upgrade or
+    skip. If the user upgrades, ``initialize.py --upgrade`` is invoked and this
+    function returns True so the caller continues to the normal menu without
+    requiring a relaunch.  When the upgrade fails, the function returns False so
+    the caller exits.  When the user skips, or when versions are in sync, returns True.
 
     Args:
         workspace: Resolved workspace root path.
@@ -737,7 +759,8 @@ def check_version_compatibility(workspace: Path, python_exe: str, tools_dir: Pat
     memory_dir = workspace / ".aib_memory"
 
     brain_semver = get_semver(brain_dir)
-    memory_semver = get_semver(memory_dir)
+    # Read memory version from aib-setup.yaml rather than a v*.*.* empty marker file.
+    memory_semver = get_setup_option(memory_dir, "memory_version")
 
     # Unknown brain version: cannot compare; warn but do not block.
     if brain_semver is None:
@@ -788,6 +811,35 @@ def check_version_compatibility(workspace: Path, python_exe: str, tools_dir: Pat
         print("  Invalid choice — please enter 1 or 2.")
 
 
+def _show_migration_completion_screen(workspace: Path) -> bool:
+    """Display the migration-completion screen and block until the user confirms or exits.
+
+    Returns True when the developer confirms migration is complete (sets
+    memory_version_compatibility to compatible), False when they choose to exit.
+    """
+    memory_dir = workspace / ".aib_memory"
+    clear_screen()
+    sys.stdout.write(ascii_banner())
+    sys.stdout.flush()
+    print("  -- Migration Completion Required --")
+    print()
+    print("  The AIB memory upgrade is complete, but migration instructions still need to be executed. input.md is prepared with the instructions needed.")
+    print("  Run `Execute .aib_brain/prompts/aib-modify.md` in chat it to reconstruct context.md from the archived legacy memory.")
+    print("  Do not proceed until the migration prompt has completed successfully.")
+    print()
+    print("  [1] Confirm Completed  \u2014 migration prompt has been executed successfully")
+    print("  [2] Exit")
+    while True:
+        choice = input("  Enter choice [1/2]: ").strip()
+        if choice == "1":
+            set_setup_option(memory_dir, "memory_version_compatibility", "compatible")
+            print("  Migration confirmed. Continuing to menu...")
+            return True
+        if choice == "2":
+            return False
+        print("  Invalid choice \u2014 please enter 1 or 2.")
+
+
 def main() -> None:
     """Main entry point: parse arguments, ensure memory is initialized, then run the menu.
 
@@ -808,6 +860,11 @@ def main() -> None:
     if not should_continue:
         # Upgrade failed; exit so the user can retry after resolving the issue.
         return
+
+    compat_state = get_setup_option(workspace / ".aib_memory", "memory_version_compatibility")
+    if compat_state == "initialized-not-populated":
+        if not _show_migration_completion_screen(workspace):
+            return
 
     # Enable ANSI VT processing on Windows once before the first render.
     _enable_ansi_windows()

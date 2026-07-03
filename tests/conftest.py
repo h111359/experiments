@@ -26,11 +26,16 @@ if str(TOOLS_DIR) not in sys.path:
 
 INPUT_MD_IDLE = (
     "---\n"
-    "request_id: ~\n"
-    "title: ~\n"
-    "state: idle\n"
+    "state:\n"
+    "  request_id: ~\n"
+    "  title: ~\n"
+    "  status: idle\n"
+    "  input_verification_result: null\n"
+    "  context_verification_result: null\n"
     "options:\n"
     "  minimum_questions: 5\n"
+    "  input_verification_enabled: true\n"
+    "  context_verification_enabled: true\n"
     "---\n\n"
     "## Input\n\n"
 )

@@ -2,7 +2,7 @@
 verify-context.py: Validate .aib_memory/context.md against context-convention.md rules.
 Part of the AIB tools suite.
 Responsibilities: Run structural and format checks on context.md, report pass/fail per check,
-exit with code 0 if all pass or 1 if any fail.
+write context_verification_result to input.md YAML header, exit with code 0 if all pass or 1 if any fail.
 """
 
 import argparse
@@ -10,20 +10,33 @@ import re
 import sys
 from pathlib import Path
 
-# Valid area names (must match context-convention.md)
-VALID_AREAS = {
-    "Project overview", "Change Management", "Domain", "Concepts", "Best Practices",
-    "Functionality", "Technical Design", "Technology Stack", "Networking and Connectivity",
-    "Data structures", "Data flow", "Processes", "Analytics", "User Interface",
-    "Security", "Performance", "Operations", "Development", "Deployment",
-    "Durability", "Observability", "Documentation",
+from common import parse_input_header, read_text, write_input_header, write_text
+
+# Valid section names (must match context-convention.md)
+VALID_SECTIONS = {
+    "Product",
+    "Concepts",
+    "Requirements",
+    "Solution",
+    "File Structure",
+    "References",
+    "Issues",
 }
 
-# Valid single-letter statement type identifiers
-VALID_TYPES = {"N", "R", "C", "E", "L", "U", "A", "D", "I"}
+# Sections where bullet-statement format is NOT enforced
+NON_STATEMENT_SECTIONS = {"File Structure", "References"}
 
-# Pattern matching an atomic statement line: "- TYPE: text" or "- TYPE-N: text"
-STATEMENT_PATTERN = re.compile(r"^- ([A-Z])(?:-\d+)?: (.+)$")
+# Pattern matching a plain bullet statement (Product, Concepts, Solution, Issues)
+PLAIN_STATEMENT_PATTERN = re.compile(r"^- .+$")
+
+# Pattern matching a [PLANNED]-prefixed plain bullet (Product, Concepts, Solution)
+PLANNED_PLAIN_PATTERN = re.compile(r"^- \[PLANNED\] .+$")
+
+# Pattern matching a modality-prefixed statement (Requirements)
+MODALITY_STATEMENT_PATTERN = re.compile(r"^- (MUST NOT|MUST|OPTIONAL): .+$")
+
+# Pattern matching a [PLANNED]-prefixed modality statement (Requirements)
+PLANNED_MODALITY_PATTERN = re.compile(r"^- \[PLANNED\] (MUST NOT|MUST|OPTIONAL): .+$")
 
 # Pattern matching H2 headings
 H2_PATTERN = re.compile(r"^## .+$")
@@ -39,6 +52,9 @@ URL_PATTERN = re.compile(r"https?://")
 
 # Pattern detecting Markdown table rows (lines starting with |)
 TABLE_PATTERN = re.compile(r"^\|")
+
+# Type-letter prefix pattern (e.g., "- N: text" or "- R: text")
+TYPE_LETTER_PATTERN = re.compile(r"^- [A-Z]: ")
 
 
 def _parse_args() -> argparse.Namespace:
@@ -74,15 +90,16 @@ def _read_context(workspace: Path) -> str:
     return context_path.read_text(encoding="utf-8")
 
 
-def _get_area_sections(lines: list[str]) -> list[tuple[str, int, int]]:
+def _get_section_ranges(lines: list[str]) -> list[tuple[str, int, int]]:
     """
-    Extract all valid area sections from the document.
+    Extract content section ranges from the document, excluding File Structure and References.
 
     Args:
         lines: All lines of context.md.
 
     Returns:
-        List of (area_code, heading_line_index, end_line_index) tuples.
+        List of (section_name, heading_line_index, end_line_index) tuples for
+        Product, Concepts, Requirements, Solution, and Issues sections only.
         end_line_index is the index of the next H2 or end of file.
     """
     sections: list[tuple[str, int, int]] = []
@@ -91,27 +108,24 @@ def _get_area_sections(lines: list[str]) -> list[tuple[str, int, int]]:
     h2_positions: list[tuple[str, int]] = []
     for i, line in enumerate(lines):
         stripped = line.strip()
-        if H2_PATTERN.match(stripped) and not stripped.startswith("### "):
-            heading_text = stripped[3:].strip()  # Remove "## "
+        if H2_PATTERN.match(stripped):
+            heading_text = stripped[3:].strip()
             h2_positions.append((heading_text, i))
 
     for idx, (heading_text, pos) in enumerate(h2_positions):
-        # Determine end: next H2 or end of file
         end = h2_positions[idx + 1][1] if idx + 1 < len(h2_positions) else len(lines)
-
-        # Skip reserved headings
-        if heading_text in ("1. Product Identity", "Files"):
+        # Skip File Structure and References — no bullet-statement format enforcement
+        if heading_text in NON_STATEMENT_SECTIONS:
             continue
-        # Check if it's a valid two-letter area code
-        if heading_text in VALID_AREAS:
+        if heading_text in VALID_SECTIONS:
             sections.append((heading_text, pos, end))
 
     return sections
 
 
-def check_title_and_product_identity(content: str) -> tuple[bool, str]:
+def check_document_title(content: str) -> tuple[bool, str]:
     """
-    Verify document starts with # Product Context and ## 1. Product Identity is present.
+    Verify document starts with '# Product Context'.
 
     Args:
         content: Full text of context.md.
@@ -122,16 +136,12 @@ def check_title_and_product_identity(content: str) -> tuple[bool, str]:
     lines = content.splitlines()
     if not lines or lines[0].strip() != "# Product Context":
         return False, "Document does not start with '# Product Context'."
-
-    if not any(line.strip() == "## 1. Product Identity" for line in lines):
-        return False, "Section '## 1. Product Identity' not found."
-
     return True, ""
 
 
-def check_area_headings_valid(content: str) -> tuple[bool, str]:
+def check_all_h2_headings_valid(content: str) -> tuple[bool, str]:
     """
-    Verify every H2 heading is ## 1. Product Identity, ## Files, or ## VALID_AREA.
+    Verify every H2 heading is one of the 6 valid section names.
 
     Args:
         content: Full text of context.md.
@@ -146,18 +156,17 @@ def check_area_headings_valid(content: str) -> tuple[bool, str]:
         stripped = line.strip()
         if H2_PATTERN.match(stripped):
             heading_text = stripped[3:].strip()
-            if heading_text not in ("1. Product Identity", "Files") and heading_text not in VALID_AREAS:
+            if heading_text not in VALID_SECTIONS:
                 invalid_headings.append(stripped)
 
     if invalid_headings:
         return False, f"Invalid H2 headings found: {invalid_headings[:5]}."
-
     return True, ""
 
 
-def check_at_least_one_area_section(content: str) -> tuple[bool, str]:
+def check_product_section_present_and_non_empty(content: str) -> tuple[bool, str]:
     """
-    Verify at least one valid area section (## VALID_AREA) is present.
+    Verify '## Product' section is present and has at least one non-blank line.
 
     Args:
         content: Full text of context.md.
@@ -166,19 +175,34 @@ def check_at_least_one_area_section(content: str) -> tuple[bool, str]:
         Tuple of (passed, message).
     """
     lines = content.splitlines()
-    for line in lines:
+
+    product_start = None
+    product_end = None
+    for i, line in enumerate(lines):
         stripped = line.strip()
-        if H2_PATTERN.match(stripped):
-            heading_text = stripped[3:].strip()
-            if heading_text in VALID_AREAS:
-                return True, ""
+        if stripped == "## Product":
+            product_start = i
+        elif product_start is not None and H2_PATTERN.match(stripped):
+            product_end = i
+            break
 
-    return False, "No valid area section (e.g., ## Functionality, ## Project overview) found in the document."
+    if product_start is None:
+        return False, "Section '## Product' not found."
+
+    if product_end is None:
+        product_end = len(lines)
+
+    # Check for at least one non-blank line after the heading
+    for i in range(product_start + 1, product_end):
+        if lines[i].strip():
+            return True, ""
+
+    return False, "Section '## Product' is present but empty."
 
 
-def check_area_sections_non_empty(content: str) -> tuple[bool, str]:
+def check_requirements_section_present(content: str) -> tuple[bool, str]:
     """
-    Verify every area section heading has at least one atomic statement line.
+    Verify '## Requirements' section heading is present in the document.
 
     Args:
         content: Full text of context.md.
@@ -187,28 +211,14 @@ def check_area_sections_non_empty(content: str) -> tuple[bool, str]:
         Tuple of (passed, message).
     """
     lines = content.splitlines()
-    area_sections = _get_area_sections(lines)
-
-    empty_areas = []
-    for area_code, start, end in area_sections:
-        has_statement = False
-        for i in range(start + 1, end):
-            stripped = lines[i].strip()
-            if stripped.startswith("- ") and STATEMENT_PATTERN.match(stripped):
-                has_statement = True
-                break
-        if not has_statement:
-            empty_areas.append(area_code)
-
-    if empty_areas:
-        return False, f"Area sections with no atomic statements: {empty_areas}."
-
-    return True, ""
+    if any(line.strip() == "## Requirements" for line in lines):
+        return True, ""
+    return False, "Section '## Requirements' not found."
 
 
-def check_statement_format(content: str) -> tuple[bool, str]:
+def check_solution_section_present(content: str) -> tuple[bool, str]:
     """
-    Verify every bullet line in area sections matches the atomic statement pattern.
+    Verify '## Solution' section heading is present in the document.
 
     Args:
         content: Full text of context.md.
@@ -217,38 +227,76 @@ def check_statement_format(content: str) -> tuple[bool, str]:
         Tuple of (passed, message).
     """
     lines = content.splitlines()
-    area_sections = _get_area_sections(lines)
+    if any(line.strip() == "## Solution" for line in lines):
+        return True, ""
+    return False, "Section '## Solution' not found."
+
+
+def check_file_structure_section_present(content: str) -> tuple[bool, str]:
+    """
+    Verify '## File Structure' section heading is present in the document.
+
+    Args:
+        content: Full text of context.md.
+
+    Returns:
+        Tuple of (passed, message).
+    """
+    lines = content.splitlines()
+    if any(line.strip() == "## File Structure" for line in lines):
+        return True, ""
+    return False, "Section '## File Structure' not found."
+
+
+def check_product_concepts_solution_format(content: str) -> tuple[bool, str]:
+    """
+    Verify every bullet line in Product, Concepts, and Solution sections uses plain format.
+
+    Plain format: '- <text>' or '- [PLANNED] <text>' with no type-letter prefix
+    and no plain modality prefix.
+
+    Args:
+        content: Full text of context.md.
+
+    Returns:
+        Tuple of (passed, message).
+    """
+    lines = content.splitlines()
+    sections = _get_section_ranges(lines)
 
     invalid_lines = []
-    for _area_code, start, end in area_sections:
+    for section_name, start, end in sections:
+        if section_name not in ("Product", "Concepts", "Solution"):
+            continue
         for i in range(start + 1, end):
             stripped = lines[i].strip()
-            # Skip empty lines and headings
             if not stripped or H3_PATTERN.match(stripped):
                 continue
-            # Lines starting with '- ' are statement candidates
             if stripped.startswith("- "):
-                match = STATEMENT_PATTERN.match(stripped)
-                if not match:
-                    invalid_lines.append(f"Line {i + 1}: {stripped[:80]}")
-                else:
-                    stype = match.group(1)
-                    if stype not in VALID_TYPES:
-                        invalid_lines.append(
-                            f"Line {i + 1}: invalid type letter '{stype}'."
-                        )
+                # Allow [PLANNED]-prefixed plain bullets
+                if PLANNED_PLAIN_PATTERN.match(stripped):
+                    continue
+                # Fail if it has a type-letter prefix (e.g., "- N: text")
+                if TYPE_LETTER_PATTERN.match(stripped):
+                    invalid_lines.append(f"Line {i + 1}: type-letter prefix not allowed in '{section_name}': {stripped[:80]}")
+                # Fail if it has a modality prefix (e.g., "- MUST: text")
+                elif MODALITY_STATEMENT_PATTERN.match(stripped):
+                    invalid_lines.append(f"Line {i + 1}: modality prefix not allowed in '{section_name}': {stripped[:80]}")
 
     if invalid_lines:
         report = invalid_lines[:5]
         suffix = f" (and {len(invalid_lines) - 5} more)" if len(invalid_lines) > 5 else ""
         return False, f"Invalid statement lines: {report}{suffix}."
-
     return True, ""
 
 
-def check_statement_uniqueness(content: str) -> tuple[bool, str]:
+def check_requirements_format(content: str) -> tuple[bool, str]:
     """
-    Verify no duplicate statement text within each area section (case-insensitive).
+    Verify every bullet line in the Requirements section uses modality prefix format.
+
+    Expected formats:
+    - '- [MUST|MUST NOT|OPTIONAL]: <text>'
+    - '- [PLANNED] [MUST|MUST NOT|OPTIONAL]: <text>'
 
     Args:
         content: Full text of context.md.
@@ -257,31 +305,36 @@ def check_statement_uniqueness(content: str) -> tuple[bool, str]:
         Tuple of (passed, message).
     """
     lines = content.splitlines()
-    area_sections = _get_area_sections(lines)
+    sections = _get_section_ranges(lines)
 
-    duplicates = []
-    for area_code, start, end in area_sections:
-        seen_texts: dict[str, int] = {}
+    invalid_lines = []
+    for section_name, start, end in sections:
+        if section_name != "Requirements":
+            continue
         for i in range(start + 1, end):
-            match = STATEMENT_PATTERN.match(lines[i].strip())
-            if match:
-                text = match.group(2).strip().lower()
-                if text in seen_texts:
-                    duplicates.append(
-                        f"'{area_code}' area: duplicate text on lines {seen_texts[text]} and {i + 1}"
-                    )
-                else:
-                    seen_texts[text] = i + 1
+            stripped = lines[i].strip()
+            if not stripped or H3_PATTERN.match(stripped):
+                continue
+            if stripped.startswith("- "):
+                # Allow [PLANNED]-prefixed modality bullets
+                if PLANNED_MODALITY_PATTERN.match(stripped):
+                    continue
+                if not MODALITY_STATEMENT_PATTERN.match(stripped):
+                    invalid_lines.append(f"Line {i + 1}: missing modality prefix (MUST/MUST NOT/OPTIONAL): {stripped[:80]}")
 
-    if duplicates:
-        return False, f"Duplicate statement texts: {duplicates[:5]}."
-
+    if invalid_lines:
+        report = invalid_lines[:5]
+        suffix = f" (and {len(invalid_lines) - 5} more)" if len(invalid_lines) > 5 else ""
+        return False, f"Invalid Requirements lines: {report}{suffix}."
     return True, ""
 
 
-def check_no_external_hyperlinks(content: str) -> tuple[bool, str]:
+def check_references_format(content: str) -> tuple[bool, str]:
     """
-    Verify no http:// or https:// strings appear in the file.
+    Verify References section entries have required sub-structure, if the section exists.
+
+    Each entry must have a '###' sub-heading followed within 5 lines by 'Location:' and 'Summary:'.
+    If '## References' is absent, this check passes automatically.
 
     Args:
         content: Full text of context.md.
@@ -290,20 +343,47 @@ def check_no_external_hyperlinks(content: str) -> tuple[bool, str]:
         Tuple of (passed, message).
     """
     lines = content.splitlines()
-    offending = []
+
+    ref_start = None
+    ref_end = None
     for i, line in enumerate(lines):
-        if URL_PATTERN.search(line):
-            offending.append(i + 1)
+        stripped = line.strip()
+        if stripped == "## References":
+            ref_start = i
+        elif ref_start is not None and H2_PATTERN.match(stripped):
+            ref_end = i
+            break
 
-    if offending:
-        return False, f"External URLs found on lines: {offending[:5]}."
+    # References section absent — check passes automatically
+    if ref_start is None:
+        return True, ""
 
+    if ref_end is None:
+        ref_end = len(lines)
+
+    # Find all ### sub-headings in References section
+    invalid_entries = []
+    i = ref_start + 1
+    while i < ref_end:
+        stripped = lines[i].strip()
+        if H3_PATTERN.match(stripped):
+            # Check that Location: and Summary: appear within 5 lines
+            window_end = min(i + 6, ref_end)
+            window = [lines[j].strip() for j in range(i + 1, window_end)]
+            has_location = any("Location:" in w for w in window)
+            has_summary = any("Summary:" in w for w in window)
+            if not has_location or not has_summary:
+                invalid_entries.append(f"Line {i + 1}: References entry '{stripped}' missing Location: or Summary:.")
+        i += 1
+
+    if invalid_entries:
+        return False, f"Malformed References entries: {invalid_entries[:3]}."
     return True, ""
 
 
-def check_no_html_tags(content: str) -> tuple[bool, str]:
+def check_no_html_tables_urls(content: str) -> tuple[bool, str]:
     """
-    Verify no HTML tags appear in the file, excluding template placeholders in backticks.
+    Verify no line contains an HTML tag, a Markdown table row, or a bare URL.
 
     Args:
         content: Full text of context.md.
@@ -311,46 +391,30 @@ def check_no_html_tags(content: str) -> tuple[bool, str]:
     Returns:
         Tuple of (passed, message).
     """
-    lines = content.splitlines()
-    # Pattern to strip inline code spans before checking for HTML
     inline_code_pattern = re.compile(r"`[^`]+`")
     offending = []
+    lines = content.splitlines()
+
     for i, line in enumerate(lines):
         cleaned = inline_code_pattern.sub("", line)
         if HTML_TAG_PATTERN.search(cleaned):
-            offending.append(i + 1)
+            offending.append(f"Line {i + 1}: HTML tag detected.")
+        elif TABLE_PATTERN.match(line.strip()):
+            offending.append(f"Line {i + 1}: Markdown table row detected.")
+        elif URL_PATTERN.search(line):
+            offending.append(f"Line {i + 1}: Bare URL detected.")
 
     if offending:
-        return False, f"HTML tags found on lines: {offending[:5]}."
-
+        return False, f"Formatting violations: {offending[:5]}."
     return True, ""
 
 
-def check_no_tables(content: str) -> tuple[bool, str]:
+def check_issues_format(content: str) -> tuple[bool, str]:
     """
-    Verify no Markdown table syntax appears in the file.
+    Verify all entries in the Issues section are plain bullets, if the section exists.
 
-    Args:
-        content: Full text of context.md.
-
-    Returns:
-        Tuple of (passed, message).
-    """
-    lines = content.splitlines()
-    offending = []
-    for i, line in enumerate(lines):
-        if TABLE_PATTERN.match(line.strip()):
-            offending.append(i + 1)
-
-    if offending:
-        return False, f"Table syntax (|) found on lines: {offending[:5]}."
-
-    return True, ""
-
-
-def check_product_identity_non_empty(content: str) -> tuple[bool, str]:
-    """
-    Verify Section 1 (Product Identity) has substantive prose content.
+    Each entry must match '- <description>' where description is non-empty.
+    If '## Issues' is absent, this check passes automatically.
 
     Args:
         content: Full text of context.md.
@@ -360,51 +424,94 @@ def check_product_identity_non_empty(content: str) -> tuple[bool, str]:
     """
     lines = content.splitlines()
 
-    section1_start = None
-    section1_end = None
+    issues_start = None
+    issues_end = None
     for i, line in enumerate(lines):
         stripped = line.strip()
-        if stripped == "## 1. Product Identity":
-            section1_start = i
-        elif section1_start is not None and H2_PATTERN.match(stripped):
-            section1_end = i
+        if stripped == "## Issues":
+            issues_start = i
+        elif issues_start is not None and H2_PATTERN.match(stripped):
+            issues_end = i
             break
 
-    if section1_start is None:
-        return False, "Section '## 1. Product Identity' not found."
+    # Issues section absent — check passes automatically
+    if issues_start is None:
+        return True, ""
 
-    if section1_end is None:
-        section1_end = len(lines)
+    if issues_end is None:
+        issues_end = len(lines)
 
-    # Count non-empty, non-heading lines in Product Identity
-    content_lines = 0
-    for i in range(section1_start + 1, section1_end):
+    invalid_lines = []
+    for i in range(issues_start + 1, issues_end):
         stripped = lines[i].strip()
-        if stripped and not stripped.startswith("#"):
-            content_lines += 1
+        if not stripped:
+            continue
+        if not PLAIN_STATEMENT_PATTERN.match(stripped):
+            invalid_lines.append(f"Line {i + 1}: Issues entry not a plain bullet: {stripped[:80]}")
 
-    MIN_CONTENT_LINES = 3
-    if content_lines < MIN_CONTENT_LINES:
-        return False, (
-            f"Product Identity has only {content_lines} content lines "
-            f"(minimum {MIN_CONTENT_LINES} required)."
-        )
-
+    if invalid_lines:
+        return False, f"Malformed Issues entries: {invalid_lines[:5]}."
     return True, ""
 
 
-# All checks in execution order (10 checks total)
+def check_references_update_flag(content: str) -> tuple[bool, str]:
+    """
+    Verify all Update: lines in References entries have valid values (true or false).
+
+    If no Reference entry contains an Update: line, this check passes automatically.
+
+    Args:
+        content: Full text of context.md.
+
+    Returns:
+        Tuple of (passed, message).
+    """
+    lines = content.splitlines()
+
+    ref_start = None
+    ref_end = None
+    for i, line in enumerate(lines):
+        stripped = line.strip()
+        if stripped == "## References":
+            ref_start = i
+        elif ref_start is not None and H2_PATTERN.match(stripped):
+            ref_end = i
+            break
+
+    # References section absent — check passes automatically
+    if ref_start is None:
+        return True, ""
+
+    if ref_end is None:
+        ref_end = len(lines)
+
+    invalid_flags = []
+    for i in range(ref_start + 1, ref_end):
+        stripped = lines[i].strip()
+        if stripped.startswith("Update:"):
+            value = stripped[len("Update:"):].strip()
+            if value not in ("true", "false"):
+                invalid_flags.append(f"Line {i + 1}: invalid Update: value '{value}' (must be 'true' or 'false').")
+
+    if invalid_flags:
+        return False, f"Invalid References Update: flags: {invalid_flags[:5]}."
+    return True, ""
+
+
+# All checks in execution order (12 checks total)
 ALL_CHECKS = [
-    ("check_title_and_product_identity", check_title_and_product_identity),
-    ("check_area_headings_valid", check_area_headings_valid),
-    ("check_at_least_one_area_section", check_at_least_one_area_section),
-    ("check_area_sections_non_empty", check_area_sections_non_empty),
-    ("check_statement_format", check_statement_format),
-    ("check_statement_uniqueness", check_statement_uniqueness),
-    ("check_no_external_hyperlinks", check_no_external_hyperlinks),
-    ("check_no_html_tags", check_no_html_tags),
-    ("check_no_tables", check_no_tables),
-    ("check_product_identity_non_empty", check_product_identity_non_empty),
+    ("check_document_title", check_document_title),
+    ("check_all_h2_headings_valid", check_all_h2_headings_valid),
+    ("check_product_section_present_and_non_empty", check_product_section_present_and_non_empty),
+    ("check_requirements_section_present", check_requirements_section_present),
+    ("check_solution_section_present", check_solution_section_present),
+    ("check_file_structure_section_present", check_file_structure_section_present),
+    ("check_product_concepts_solution_format", check_product_concepts_solution_format),
+    ("check_requirements_format", check_requirements_format),
+    ("check_references_format", check_references_format),
+    ("check_no_html_tables_urls", check_no_html_tables_urls),
+    ("check_issues_format", check_issues_format),
+    ("check_references_update_flag", check_references_update_flag),
 ]
 
 
@@ -412,8 +519,9 @@ def main() -> int:
     """
     Entry point for the context.md verification tool.
 
-    Runs all checks sequentially, prints structured results, and returns
-    exit code 0 if all pass or 1 if any fail.
+    Runs all checks sequentially, prints structured results, writes
+    context_verification_result to input.md YAML header, and returns
+    exit code 0 if all pass or 1 if any fail. Runs 12 checks total.
 
     Returns:
         0 on all checks passing, 1 on any failure.
@@ -443,7 +551,36 @@ def main() -> int:
     total = passed + failed
     print(f"Results: {passed}/{total} checks passed.")
 
+    result_value = "valid" if failed == 0 else "invalid"
+    _write_verification_result(workspace, "context_verification_result", result_value)
+
     return 0 if failed == 0 else 1
+
+
+def _write_verification_result(workspace: Path, flag_key: str, result_value: str) -> None:
+    """Write a verification result flag to the input.md YAML header.
+
+    Reads the current input.md, updates the specified flag key, and writes
+    the file back.  Silently skips if input.md is absent or has no valid header.
+
+    Args:
+        workspace: Workspace root path containing .aib_memory/input.md.
+        flag_key: The YAML header key to set (e.g. ``"context_verification_result"``).
+        result_value: The value to write; one of ``"valid"`` or ``"invalid"``.
+    """
+    input_path = workspace / ".aib_memory" / "input.md"
+    print(f"Writing verification result '{result_value}' to {input_path} under key '{flag_key}'...")
+    if not input_path.exists():
+        print(f"Warning: {input_path} not found; skipping verification result write.")
+        return
+    content = read_text(input_path)
+    header = parse_input_header(content)
+    print(f"header: {header}")
+    if header is None:
+        print(f"Warning: {input_path} has no valid YAML header; skipping verification result write.")
+        return
+    header["state"][flag_key] = result_value
+    write_text(input_path, write_input_header(content, header))
 
 
 if __name__ == "__main__":

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 finalize-input.py: Archive input.md (with stub-equivalence guard), move attachment
-files from .aib_memory/attachments/ to the request inputs folder, and reset
+files from .aib_memory/attachments/ to the request folder root, and reset
 input.md to the seed template with the active request ID injected.
 Part of the AIB core tooling layer.
 Responsibilities: stub-equivalence check, conditional input.md archiving,
@@ -17,6 +17,7 @@ from pathlib import Path
 
 from common import (
     ValidationError,
+    _INPUT_SEED_TEMPLATE,
     ensure_workspace,
     parse_input_header,
     read_input_header,
@@ -27,20 +28,8 @@ from common import (
 )
 
 # ---------------------------------------------------------------------------
-# Seed template (YAML frontmatter format)
+# Seed template — imported from common to ensure a single authoritative source.
 # ---------------------------------------------------------------------------
-# This is the canonical reset state written to input.md after finalization.
-# request_id and title are replaced with the real values at runtime.
-_SEED_TEMPLATE = (
-    "---\n"
-    "request_id: ~\n"
-    "title: ~\n"
-    "state: analysis_ready\n"
-    "options:\n"
-    "  minimum_questions: 5\n"
-    "---\n\n"
-    "## Input\n\n"
-)
 
 
 def _parse_args() -> argparse.Namespace:
@@ -96,7 +85,7 @@ def _is_stub_equivalent(content: str) -> bool:
         # No frontmatter — return stripped content.
         return norm.strip()
 
-    return _strip_frontmatter(content) == _strip_frontmatter(_SEED_TEMPLATE)
+    return _strip_frontmatter(content) == _strip_frontmatter(_INPUT_SEED_TEMPLATE)
 
 
 def main() -> None:
@@ -104,10 +93,10 @@ def main() -> None:
 
     Steps performed in order:
     1. Validate workspace and resolve the target request from the register.
-    2. Archive input.md to <request-folder>/inputs/input-archive-<timestamp>.md
+    2. Archive input.md to <request-folder>/input-archive-<timestamp>.md
        when input.md is not stub-equivalent; skip otherwise.
     3. Walk .aib_memory/attachments/ and move every non-.gitkeep file to
-       <request-folder>/inputs/<relative-path>, preserving subdirectory structure.
+       <request-folder>/<relative-path>, preserving subdirectory structure.
     4. Write the seed template to input.md, replacing "No active request" with
        the resolved request ID and title.
 
@@ -123,18 +112,18 @@ def main() -> None:
 
         # Resolve target request from input.md YAML header.
         header = read_input_header(workspace)
-        if header["state"] == "idle":
+        if header["state"]["status"] == "idle":
             raise ValidationError("No active request found in input.md YAML header; cannot finalize")
 
         # If explicit --request-id given, validate it matches.
         req_id_arg = (args.request_id or "").strip()
-        if req_id_arg and req_id_arg != header["request_id"]:
+        if req_id_arg and req_id_arg != header["state"]["request_id"]:
             raise ValidationError(
-                f"Explicit --request-id {req_id_arg!r} does not match active request {header['request_id']!r}"
+                f"Explicit --request-id {req_id_arg!r} does not match active request {header['state']['request_id']!r}"
             )
 
-        request_id = header["request_id"]
-        title = header["title"]
+        request_id = header["state"]["request_id"]
+        title = header["state"]["title"]
         # Derive folder path from request_id and title using the same slugify
         # convention used by create-request.py.
         folder_name = f"{request_id}-{slugify(title)}"
@@ -142,23 +131,20 @@ def main() -> None:
         request_folder = workspace / folder_rel
 
         input_file = workspace / ".aib_memory" / "input.md"
-        # inputs/ is the staging area for archived input.md and moved attachments.
-        inputs_dir = request_folder / "inputs"
 
         # ---- Step 1: Conditionally archive input.md --------------------------
         current_content = read_text(input_file)
         if not _is_stub_equivalent(current_content):
             # Non-stub: preserve the developer's content before overwriting.
-            inputs_dir.mkdir(parents=True, exist_ok=True)
             timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-            archive_path = inputs_dir / f"input-archive-{timestamp}.md"
+            archive_path = request_folder / f"input-archive-{timestamp}.md"
             write_text(archive_path, current_content)
             print(f"Archived input.md -> {archive_path.relative_to(workspace)}")
         else:
             # Stub-equivalent: nothing meaningful to preserve; skip archiving.
             print("input.md is stub-equivalent — archive step skipped.")
 
-        # ---- Step 2: Move attachment files to request inputs/ ----------------
+        # ---- Step 2: Move attachment files to request folder root ----------------
         attachments_dir = workspace / ".aib_memory" / "attachments"
         if attachments_dir.is_dir():
             for src in attachments_dir.rglob("*"):
@@ -166,9 +152,9 @@ def main() -> None:
                 if not src.is_file() or src.name == ".gitkeep":
                     continue
                 # Compute the relative path under attachments/ so subdirectory
-                # structure is preserved under inputs/.
+                # structure is preserved under the request folder root.
                 rel = src.relative_to(attachments_dir)
-                dest = inputs_dir / rel
+                dest = request_folder / rel
                 dest.parent.mkdir(parents=True, exist_ok=True)
                 # Use shutil.move for cross-filesystem compatibility.
                 shutil.move(str(src), str(dest))
@@ -176,14 +162,24 @@ def main() -> None:
 
         # ---- Step 3: Reset input.md to seed template -------------------------
         # Build new header preserving minimum_questions, injecting real request ID and title.
-        reset_header = parse_input_header(_SEED_TEMPLATE) or {
-            "request_id": "~", "title": "~", "state": "analysis_ready",
-            "options": {"minimum_questions": header["options"]["minimum_questions"]},
+        # The seed template uses status: idle; we explicitly set analysis_ready for active requests.
+        reset_header = parse_input_header(_INPUT_SEED_TEMPLATE) or {
+            "state": {
+                "request_id": "~", "title": "~", "status": "analysis_ready",
+                "input_verification_result": None, "context_verification_result": None,
+            },
+            "options": {
+                "minimum_questions": 5,
+                "input_verification_enabled": True,
+                "context_verification_enabled": True,
+            },
         }
-        reset_header["request_id"] = request_id
-        reset_header["title"] = title
+        reset_header["state"]["request_id"] = request_id
+        reset_header["state"]["title"] = title
+        # Keep the request in analysis_ready state after finalization.
+        reset_header["state"]["status"] = "analysis_ready"
         reset_header["options"]["minimum_questions"] = header["options"]["minimum_questions"]
-        reset_content = write_input_header(_SEED_TEMPLATE, reset_header)
+        reset_content = write_input_header(_INPUT_SEED_TEMPLATE, reset_header)
         write_text(input_file, reset_content)
         print(f"Reset input.md - active request: {request_id} - {title}")
 

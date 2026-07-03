@@ -1,8 +1,9 @@
 """
-edit-context.py: CRUD operations for atomic statements in .aib_memory/context.md.
+edit-context.py: CRUD operations for statements in .aib_memory/context.md.
 Part of the AIB tools suite.
-Responsibilities: Select, insert, and delete atomic statements by area section using
-text-based line matching. Statement format: - TYPE: text (no hash, no area prefix).
+Responsibilities: Select, insert, and delete statements by section using
+text-based line matching. Supports Product, Concepts, Requirements, Solution,
+and Issues sections. Supports --planned flag for insert operations.
 """
 
 import argparse
@@ -10,32 +11,32 @@ import re
 import sys
 from pathlib import Path
 
-# Valid area names (must match context-convention.md)
+# Valid content section names for CRUD operations (must match context-convention.md)
 VALID_AREAS = {
-    "Project overview", "Change Management", "Domain", "Concepts", "Best Practices",
-    "Functionality", "Technical Design", "Technology Stack", "Networking and Connectivity",
-    "Data structures", "Data flow", "Processes", "Analytics", "User Interface",
-    "Security", "Performance", "Operations", "Development", "Deployment",
-    "Durability", "Observability", "Documentation",
+    "Product",
+    "Concepts",
+    "Requirements",
+    "Solution",
+    "Issues",
 }
 
 # Ordered area list for consistent section insertion order
 AREA_ORDER = [
-    "Project overview", "Change Management", "Domain", "Concepts", "Best Practices",
-    "Functionality", "Technical Design", "Technology Stack", "Networking and Connectivity",
-    "Data structures", "Data flow", "Processes", "Analytics", "User Interface",
-    "Security", "Performance", "Operations", "Development", "Deployment",
-    "Durability", "Observability", "Documentation",
+    "Product",
+    "Concepts",
+    "Requirements",
+    "Solution",
+    "Issues",
 ]
 
-# Valid statement type letters
-VALID_TYPES = {"N", "R", "C", "E", "L", "U", "A", "D", "I"}
-
-# Pattern matching an atomic statement line: "- TYPE: text" or "- TYPE-N: text"
-STATEMENT_PATTERN = re.compile(r"^- ([A-Z])(?:-\d+)?: (.+)$")
+# Valid modality types for Requirements section inserts
+MODALITY_TYPES = {"MUST", "MUST NOT", "OPTIONAL"}
 
 # Pattern matching H2 headings
 H2_PATTERN = re.compile(r"^## .+$")
+
+# Pattern matching a Requirements modality-prefixed statement
+MODALITY_STATEMENT_PATTERN = re.compile(r"^- (MUST NOT|MUST|OPTIONAL): (.+)$")
 
 
 def _build_area_heading(area: str) -> str:
@@ -43,10 +44,10 @@ def _build_area_heading(area: str) -> str:
     Return the H2 heading string for the given area name.
 
     Args:
-        area: Area name (e.g. 'Functionality').
+        area: Area name (e.g. 'Product').
 
     Returns:
-        The heading string (e.g. '## Functionality').
+        The heading string (e.g. '## Product').
     """
     return f"## {area}"
 
@@ -57,7 +58,7 @@ def _find_area_range(lines: list[str], area: str) -> tuple[int, int]:
 
     Args:
         lines: All lines of context.md.
-        area: The two-letter area code (e.g. 'FN').
+        area: The area name (e.g. 'Product').
 
     Returns:
         Tuple (start, end) where start is the heading line index and end is the
@@ -83,15 +84,42 @@ def _find_area_range(lines: list[str], area: str) -> tuple[int, int]:
     return (start, end)
 
 
+def _get_statement_text(line: str) -> str | None:
+    """
+    Extract the text portion from a statement line, stripping any prefix.
+
+    For Requirements lines (e.g., '- MUST: text'), returns the text after the modality prefix.
+    For plain lines (e.g., '- text'), returns the text after '- '.
+    Returns None if the line is not a statement line.
+
+    Args:
+        line: A single line from context.md (stripped of trailing whitespace).
+
+    Returns:
+        The text portion, or None if the line is not a statement.
+    """
+    stripped = line.strip()
+    if not stripped.startswith("- "):
+        return None
+
+    # Check for modality prefix first (longer match wins)
+    modality_match = MODALITY_STATEMENT_PATTERN.match(stripped)
+    if modality_match:
+        return modality_match.group(2).strip()
+
+    # Plain bullet: text is everything after "- "
+    return stripped[2:].strip()
+
+
 def _find_statement_by_text(lines: list[str], area: str, text_substring: str) -> int:
     """
     Find the line index of the first statement in the area section that contains
-    the given text substring (case-insensitive).
+    the given text substring (case-insensitive, matched against text portion only).
 
     Args:
         lines: All lines of context.md.
-        area: Two-letter area code.
-        text_substring: Substring to search for in statement text.
+        area: Area name.
+        text_substring: Substring to search for in statement text portion.
 
     Returns:
         Line index of the matching statement, or -1 if not found.
@@ -103,8 +131,8 @@ def _find_statement_by_text(lines: list[str], area: str, text_substring: str) ->
     needle = text_substring.lower()
     matches = []
     for i in range(start + 1, end):
-        match = STATEMENT_PATTERN.match(lines[i].rstrip())
-        if match and needle in match.group(2).lower():
+        text = _get_statement_text(lines[i].rstrip())
+        if text is not None and needle in text.lower():
             matches.append(i)
 
     if len(matches) > 1:
@@ -122,29 +150,27 @@ def _insert_area_section(lines: list[str], area: str) -> list[str]:
 
     Area sections are ordered according to AREA_ORDER. The new section is inserted
     after the last existing area section that precedes it in the order, or before
-    the ## Files section if no preceding area section exists.
+    the '## File Structure' section (or end of file) if no preceding area exists.
 
     Args:
         lines: All lines of context.md.
-        area: The two-letter area code to insert.
+        area: The area name to insert.
 
     Returns:
         Modified lines with the new area heading inserted.
     """
     target_order = AREA_ORDER.index(area) if area in AREA_ORDER else len(AREA_ORDER)
 
-    # Find the insertion point: after the last preceding area section's content
-    insert_at = len(lines)  # default: end of file
-
-    # Look for ## Files or end of file as the upper bound
-    files_line = -1
+    # Use '## File Structure' as the upper bound, or end of file
+    insert_at = len(lines)
+    file_structure_line = -1
     for i, line in enumerate(lines):
-        if line.rstrip() == "## Files":
-            files_line = i
+        if line.rstrip() == "## File Structure":
+            file_structure_line = i
             break
 
-    if files_line != -1:
-        insert_at = files_line
+    if file_structure_line != -1:
+        insert_at = file_structure_line
 
     # Walk backwards from insert_at to find the last area section that should precede this one
     last_preceding_end = -1
@@ -158,7 +184,7 @@ def _insert_area_section(lines: list[str], area: str) -> list[str]:
     if last_preceding_end != -1:
         insert_at = last_preceding_end
 
-    # Build insertion: ensure blank line separation
+    # Build insertion with blank line separation
     new_section_lines = []
     if insert_at > 0 and lines[insert_at - 1].strip() != "":
         new_section_lines.append("\n")
@@ -172,10 +198,12 @@ def _validate_uniqueness_in_area(lines: list[str], area: str, new_text: str) -> 
     """
     Check that no existing statement in the area section has identical text (case-insensitive).
 
+    Comparison uses the text portion only (after stripping any modality prefix).
+
     Args:
         lines: All lines of context.md.
-        area: Two-letter area code.
-        new_text: The text of the statement being inserted.
+        area: Area name.
+        new_text: The text of the statement being inserted (without prefix).
 
     Returns:
         True if the text is unique, False if a duplicate exists.
@@ -186,8 +214,8 @@ def _validate_uniqueness_in_area(lines: list[str], area: str, new_text: str) -> 
 
     needle = new_text.strip().lower()
     for i in range(start + 1, end):
-        match = STATEMENT_PATTERN.match(lines[i].rstrip())
-        if match and match.group(2).strip().lower() == needle:
+        text = _get_statement_text(lines[i].rstrip())
+        if text is not None and text.lower() == needle:
             sys.stderr.write(
                 f"Error: Duplicate statement text in '{area}': '{new_text}'\n"
             )
@@ -202,7 +230,7 @@ def operation_select(lines: list[str], area: str, text_substring: str) -> int:
 
     Args:
         lines: All lines of context.md.
-        area: Two-letter area code.
+        area: Area name.
         text_substring: Substring to search for in statement text.
 
     Returns:
@@ -215,26 +243,32 @@ def operation_select(lines: list[str], area: str, text_substring: str) -> int:
         )
         return 1
 
-    match = STATEMENT_PATTERN.match(lines[line_idx].rstrip())
-    if match:
-        print(f"- {match.group(1)}: {match.group(2)}")
+    print(lines[line_idx].rstrip())
     return 0
 
 
 def operation_insert(
     lines: list[str],
     area: str,
-    type_letter: str,
+    modality: str | None,
     text: str,
+    planned: bool = False,
 ) -> tuple[list[str], int]:
     """
-    Insert a new atomic statement in the appropriate area section.
+    Insert a new statement in the appropriate area section.
+
+    For Requirements sections, formats the line as '- MODALITY: text' or
+    '- [PLANNED] MODALITY: text' when planned=True.
+    For other sections, formats the line as '- text' or '- [PLANNED] text'
+    when planned=True. Issues section uses plain '- text' format only
+    (--planned is silently ignored for Issues).
 
     Args:
         lines: All lines of context.md.
-        area: Two-letter area code.
-        type_letter: Single-letter statement type.
+        area: Area name.
+        modality: Modality prefix (MUST/MUST NOT/OPTIONAL) for Requirements; None for others.
         text: Statement text content.
+        planned: When True, prepend '[PLANNED] ' to the statement.
 
     Returns:
         Tuple of (modified lines, exit code). Exit code 0 on success, 1 on failure.
@@ -252,12 +286,20 @@ def operation_insert(
             sys.stderr.write(f"Error: Failed to create section for area '{area}'.\n")
             return (lines, 1)
 
-    # Build the statement line
-    statement = f"- {type_letter}: {text}\n"
+    # Build the statement line based on section type and planned flag
+    if area == "Requirements" and modality:
+        if planned:
+            statement = f"- [PLANNED] {modality}: {text}\n"
+        else:
+            statement = f"- {modality}: {text}\n"
+    elif planned and area != "Issues":
+        # [PLANNED] prefix is meaningful only in Product, Concepts, Solution, Requirements
+        statement = f"- [PLANNED] {text}\n"
+    else:
+        statement = f"- {text}\n"
 
-    # Insert at the end of the section (before the next heading)
+    # Insert at the end of the section, before trailing blank lines
     insert_at = end
-    # Skip backwards over trailing blank lines to insert right before them
     while insert_at > start + 1 and lines[insert_at - 1].strip() == "":
         insert_at -= 1
 
@@ -270,11 +312,11 @@ def operation_insert(
 
 def operation_delete(lines: list[str], area: str, text_substring: str) -> tuple[list[str], int]:
     """
-    Remove the atomic statement matching the text substring in the area section.
+    Remove the statement matching the text substring in the area section.
 
     Args:
         lines: All lines of context.md.
-        area: Two-letter area code.
+        area: Area name.
         text_substring: Substring to search for in statement text.
 
     Returns:
@@ -296,13 +338,13 @@ def main() -> int:
     Entry point for the edit-context tool.
 
     Parses arguments and dispatches to the appropriate CRUD operation on
-    atomic statements in .aib_memory/context.md.
+    statements in .aib_memory/context.md.
 
     Returns:
         0 on success, 1 on error.
     """
     parser = argparse.ArgumentParser(
-        description="CRUD operations for atomic statements in .aib_memory/context.md."
+        description="CRUD operations for statements in .aib_memory/context.md."
     )
     parser.add_argument(
         "--operation",
@@ -313,18 +355,24 @@ def main() -> int:
     parser.add_argument(
         "--area",
         required=True,
-        help="Area name (e.g. Functionality, Project overview, Change Management).",
+        help="Section name (Product, Concepts, Requirements, Solution).",
     )
     parser.add_argument(
         "--type",
         default=None,
-        dest="type_letter",
-        help="Single-letter statement type (N, R, C, E, L, U, A, D, I). Required for insert.",
+        dest="modality",
+        help="Statement modality prefix; required for Requirements inserts (MUST, MUST NOT, OPTIONAL); not used for other sections.",
     )
     parser.add_argument(
         "--text",
         default=None,
         help="Statement text (required for insert and as search substring for select/delete).",
+    )
+    parser.add_argument(
+        "--planned",
+        action="store_true",
+        default=False,
+        help="When set on insert, prepend '[PLANNED] ' to the statement. Ignored for Issues area.",
     )
     parser.add_argument(
         "--workspace",
@@ -334,7 +382,7 @@ def main() -> int:
 
     args = parser.parse_args()
 
-    # Validate area code
+    # Validate area name
     if args.area not in VALID_AREAS:
         sys.stderr.write(
             f"Error: Invalid area name '{args.area}'. "
@@ -347,17 +395,32 @@ def main() -> int:
         sys.stderr.write("Error: --text is required for all operations.\n")
         return 1
 
-    # Validate type letter for insert
+    # Validate modality for insert
     if args.operation == "insert":
-        if not args.type_letter:
-            sys.stderr.write("Error: --type is required for insert operation.\n")
-            return 1
-        if args.type_letter not in VALID_TYPES:
-            sys.stderr.write(
-                f"Error: Invalid type letter '{args.type_letter}'. "
-                f"Valid types: {', '.join(sorted(VALID_TYPES))}.\n"
-            )
-            return 1
+        if args.area == "Requirements":
+            if not args.modality:
+                sys.stderr.write("Error: --type is required for Requirements insert.\n")
+                return 1
+            if args.modality not in MODALITY_TYPES:
+                sys.stderr.write(
+                    f"Error: Invalid modality '{args.modality}'. "
+                    f"Valid values: {', '.join(sorted(MODALITY_TYPES))}.\n"
+                )
+                return 1
+        elif args.area != "Issues":
+            if args.modality:
+                sys.stderr.write(
+                    f"Error: --type is only valid for Requirements inserts; "
+                    f"'{args.area}' does not use modality prefixes.\n"
+                )
+                return 1
+        else:
+            # Issues area: modality is not applicable
+            if args.modality:
+                sys.stderr.write(
+                    "Error: --type is not valid for Issues inserts.\n"
+                )
+                return 1
 
     # Locate context.md
     context_path = Path(args.workspace) / ".aib_memory" / "context.md"
@@ -373,7 +436,7 @@ def main() -> int:
 
     elif args.operation == "insert":
         new_lines, exit_code = operation_insert(
-            lines, args.area, args.type_letter, args.text
+            lines, args.area, args.modality, args.text, planned=args.planned
         )
         if exit_code == 0:
             context_path.write_text("".join(new_lines), encoding="utf-8")

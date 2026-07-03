@@ -56,6 +56,30 @@ def _parse_args() -> argparse.Namespace:
         default=None,
         help="Set options.minimum_questions field (write only).",
     )
+    parser.add_argument(
+        "--input-verification-enabled",
+        default=None,
+        choices=["true", "false"],
+        help="Set input_verification_enabled flag (write only).",
+    )
+    parser.add_argument(
+        "--input-verification-result",
+        default=None,
+        choices=["null", "valid", "invalid"],
+        help="Set input_verification_result flag (write only).",
+    )
+    parser.add_argument(
+        "--context-verification-enabled",
+        default=None,
+        choices=["true", "false"],
+        help="Set context_verification_enabled flag (write only).",
+    )
+    parser.add_argument(
+        "--context-verification-result",
+        default=None,
+        choices=["null", "valid", "invalid"],
+        help="Set context_verification_result flag (write only).",
+    )
     return parser.parse_args()
 
 
@@ -76,32 +100,66 @@ def main() -> None:
             header = parse_input_header(content)
             if header is None:
                 raise ValidationError("input.md does not contain a valid YAML frontmatter header")
-            print(f"request_id={header['request_id']}")
-            print(f"title={header['title']}")
-            print(f"state={header['state']}")
-            print(f"minimum_questions={header['options']['minimum_questions']}")
+            state = header["state"]
+            opts = header["options"]
+            print(f"request_id={state['request_id']}")
+            print(f"title={state['title']}")
+            # Print workflow status as "state=" for backward compatibility with prompt scripts.
+            print(f"state={state['status']}")
+            print(f"minimum_questions={opts['minimum_questions']}")
+            # Convert Python booleans to lowercase string for consistent output.
+            input_ver_enabled = opts.get("input_verification_enabled", True)
+            input_ver_result = state.get("input_verification_result", None)
+            ctx_ver_enabled = opts.get("context_verification_enabled", True)
+            ctx_ver_result = state.get("context_verification_result", None)
+            print(f"input_verification_enabled={str(input_ver_enabled).lower()}")
+            print(f"input_verification_result={input_ver_result if input_ver_result is not None else 'null'}")
+            print(f"context_verification_enabled={str(ctx_ver_enabled).lower()}")
+            print(f"context_verification_result={ctx_ver_result if ctx_ver_result is not None else 'null'}")
 
         elif args.operation == "write":
             header = parse_input_header(content)
             if header is None:
                 raise ValidationError("input.md does not contain a valid YAML frontmatter header")
             if args.request_id is not None:
-                header["request_id"] = args.request_id
+                header["state"]["request_id"] = args.request_id
             if args.title is not None:
-                header["title"] = args.title
+                header["state"]["title"] = args.title
             if args.state is not None:
-                header["state"] = args.state
+                # The CLI flag --state maps to state.status in the nested structure.
+                header["state"]["status"] = args.state
             if args.minimum_questions is not None:
                 header["options"]["minimum_questions"] = args.minimum_questions
+            if args.input_verification_enabled is not None:
+                header["options"]["input_verification_enabled"] = args.input_verification_enabled == "true"
+            if args.input_verification_result is not None:
+                # Store None for "null", otherwise store the string value.
+                header["state"]["input_verification_result"] = (
+                    None if args.input_verification_result == "null" else args.input_verification_result
+                )
+            if args.context_verification_enabled is not None:
+                header["options"]["context_verification_enabled"] = args.context_verification_enabled == "true"
+            if args.context_verification_result is not None:
+                header["state"]["context_verification_result"] = (
+                    None if args.context_verification_result == "null" else args.context_verification_result
+                )
             write_text(input_path, write_input_header(content, header))
-            print(f"Updated input.md header: state={header['state']}")
+            print(f"Updated input.md header: state={header['state']['status']}")
 
         elif args.operation == "reset":
             idle_header = {
-                "request_id": "~",
-                "title": "~",
-                "state": "idle",
-                "options": {"minimum_questions": 0},
+                "state": {
+                    "request_id": "~",
+                    "title": "~",
+                    "status": "idle",
+                    "input_verification_result": None,
+                    "context_verification_result": None,
+                },
+                "options": {
+                    "minimum_questions": 0,
+                    "input_verification_enabled": True,
+                    "context_verification_enabled": True,
+                },
             }
             write_text(input_path, write_input_header(content, idle_header))
             print("Reset input.md header to idle state.")

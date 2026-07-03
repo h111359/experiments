@@ -33,7 +33,6 @@ Sections in exact order:
 4. Proposed Solution [REQ]
 5. Context Update Analysis [REQ]
 6. Decision Register [REQ]
-7. Technical Context (For Planner Agent) [REQ]
 
 ### 4.1 Overview
 For human review+auditability only; implement MUST NOT read/act on it. Fully replace each re-run.
@@ -69,11 +68,9 @@ implement MUST NOT read/act on this section.
 States the AI's chosen approach in plain English before alternatives are presented. Written for human readers; the planner may also consult it.
 Required subsections in fixed order:
   ### High-Level Concept: one or two plain-English sentences stating what will change and why this approach was chosen
-  ### Execution Steps: ordered list of what happens at runtime during implementation; concrete and verifiable
-  ### Files to be Modified: bullet list of files to be touched; use sub-bullets for multi-line responsibilities: `- <path>` then indented `- <responsibility>`
-  ### Why this approach?: brief rationale mapping the proposal to existing project patterns; aimed at junior contributors unfamiliar with the codebase
+  ### Execution Steps: ordered list of implementation tasks; each task uses an `#### Task N: <Name>` header; each action under a task is a single bullet `- <file-or-command>: <description>` targeting exactly one file path or one executable command; cross-file invariants that cannot be expressed as single-target actions are folded as indented sub-notes under the most relevant action bullet; this section is read by aib-analyze.md §S09 when generating the plan.
 When open `ask` Decision Points exist: render best-current-guess content and annotate any field that may change with `> Pending: depends on Decision Point <name>`; fill completely on re-run after all DPs resolved.
-Rules: all four subsections MUST be present even if content is preliminary | MUST NOT be empty | fully regenerated each re-run.
+Rules: all three subsections MUST be present even if content is preliminary | MUST NOT be empty | fully regenerated each re-run.
 NO: [implementation code | copy of Decision Register alternatives | raw file diffs]
 
 ### 4.5 Context Update Analysis
@@ -105,12 +102,6 @@ Structure:
     - Rationale/Resolution
 [no $DPs identified] -> single entry documenting that fact.
 Rules: >= 1 alternative per $DP | [doubt resolve-autonomously vs ask] -> always ask | resolve-autonomously MUST cite concrete source (exact text+file path) | update resolution after human answer | MUST NOT be empty | fully replaced each re-run.
-
-### 4.7 Technical Context (For Planner Agent) [REQ]
-Dense, terse, machine-readable section consumed by aib-analyze.md §S09 when generating the self-sufficient plan. Human readers may skip.
-Content: free-form bullet list with no fixed sub-headings; cover file touch map, cross-file invariants, edge-case index, and order-of-operations for the implement step.
-Rules: MUST be present and non-empty | bullet list only (no sub-headings enforced) | terse technical language; no need for plain English | fully regenerated each re-run.
-NO: [prose narrative | duplicate of Proposed Solution rationale | human-readability formatting]
 
 ## 5. Formatting
 - Headings: ## or ### consistent with this convention

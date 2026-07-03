@@ -23,11 +23,16 @@ TOOLS_DIR = Path(__file__).resolve().parent.parent / ".aib_brain" / "tools"
 
 INPUT_MD_IDLE = (
     "---\n"
-    "request_id: ~\n"
-    "title: ~\n"
-    "state: idle\n"
+    "state:\n"
+    "  request_id: ~\n"
+    "  title: ~\n"
+    "  status: idle\n"
+    "  input_verification_result: null\n"
+    "  context_verification_result: null\n"
     "options:\n"
     "  minimum_questions: 5\n"
+    "  input_verification_enabled: true\n"
+    "  context_verification_enabled: true\n"
     "---\n\n"
     "## Input\n\n"
 )
@@ -51,12 +56,14 @@ def _make_active_request(workspace: Path, req_id: str = "R-20260101-1000") -> Pa
     input_path = workspace / ".aib_memory" / "input.md"
     base_content = read_text(input_path) if input_path.exists() else INPUT_MD_IDLE
     hdr = parse_input_header(base_content) or {
-        "request_id": "~", "title": "~", "state": "idle",
-        "options": {"minimum_questions": 0},
+        "state": {"request_id": "~", "title": "~", "status": "idle",
+                  "input_verification_result": None, "context_verification_result": None},
+        "options": {"minimum_questions": 0, "input_verification_enabled": True,
+                    "context_verification_enabled": True},
     }
-    hdr["request_id"] = req_id
-    hdr["title"] = "Test Request"
-    hdr["state"] = "analysis_ready"
+    hdr["state"]["request_id"] = req_id
+    hdr["state"]["title"] = "Test Request"
+    hdr["state"]["status"] = "analysis_ready"
     write_text(input_path, write_input_header(base_content, hdr))
     return folder
 
@@ -171,7 +178,7 @@ class TestCloseRequestArtifactPlacement:
 
         # Request state must be idle (closed)
         header = parse_input_header(read_text(workspace_dir / ".aib_memory" / "input.md"))
-        assert header["state"] == "idle"
+        assert header["state"]["status"] == "idle"
 
     def test_t7_close_completes_when_no_artifacts_at_root(self, workspace_dir: Path):
         """T7: close-request.py completes successfully when no artifacts exist at .aib_memory/ root."""
@@ -188,4 +195,4 @@ class TestCloseRequestArtifactPlacement:
 
         # Request state must be idle (closed)
         header = parse_input_header(read_text(workspace_dir / ".aib_memory" / "input.md"))
-        assert header["state"] == "idle"
+        assert header["state"]["status"] == "idle"
