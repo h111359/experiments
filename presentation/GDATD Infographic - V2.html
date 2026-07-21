@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>GDATD Overview</title>
+
+<style>
+  html,
+  body{
+    width:100%;
+    height:100%;
+    overflow:hidden;
+  }
+
+  body{
+    margin:0;
+    font-family:"Unity", "Segoe UI", Arial, sans-serif;
+    background:#f4f5f7;
+    color:#222;
+  }
+
+  #fit-stage{
+    width:100vw;
+    height:100vh;
+    overflow:hidden;
+  }
+
+  #fit-content{
+    width:100%;
+    transform-origin:top left;
+    will-change:transform;
+  }
+
+  /* ===== HEADER ===== */
+  header{
+    background:#fff;
+    padding:18px 32px;
+    display:flex;
+    align-items:center;
+    gap:20px;
+    border-bottom:1px solid #ddd;
+  }
+
+  header img{
+    height:36px;
+  }
+
+  header h1{
+    font-size:34px;
+    font-weight:800;
+    margin:0;
+  }
+
+  /* ===== MAIN GRID ===== */
+  main{
+    width:100%;
+    padding:30px clamp(8px, 1vw, 20px);
+    max-width:none;
+    box-sizing:border-box;
+    margin:auto;
+  }
+
+  .grid{
+    display:grid;
+    grid-template-columns: 1fr 1fr 1fr 1fr;
+    gap:24px;
+  }
+
+  /* Vertical separators between the three main column groups */
+  .left-area,
+  #initiatives-card,
+  #team-card,
+  #tech-stack{
+    position:relative;
+  }
+
+  .left-area::after,
+  #initiatives-card::after,
+  #team-card::after,
+  #tech-stack::before{
+    content:"";
+    position:absolute;
+    top:0;
+    width:1px;
+    height:100%;
+    background:#e3e3e3;
+    pointer-events:none;
+  }
+
+  .left-area::after,
+  #initiatives-card::after,
+  #team-card::after{
+    right:-12px;
+  }
+
+  #tech-stack::before{
+    left:-12px;
+  }
+
+  #team-card::before{
+    content:"";
+    position:absolute;
+    top:0;
+    right:-8px;
+    width:1px;
+    height:100%;
+    background:#e3e3e3;
+    pointer-events:none;
+  }
+
+  /* ===== CARD ===== */
+  .card{
+    background:#fff;
+    border-radius:14px;
+    box-shadow:0 4px 12px rgba(0,0,0,.08);
+    overflow:hidden;
+  }
+
+  .fixed-card{
+    display:flex;
+    flex-direction:column;
+  }
+
+  #what-card{
+    position:relative;
+    overflow:hidden;
+  }
+
+  #what-card::before{
+    content:"";
+    position:absolute;
+    top:0;
+    left:0;
+    width:1px;
+    height:100%;
+    background:#d9d9d9;
+    pointer-events:none;
+    z-index:2;
+  }
+
+  .card-header{
+    background:#e41d24;
+    color:#fff;
+    padding:14px 18px;
+    height:84px;
+    box-sizing:border-box;
+    font-weight:700;
+    display:flex;
+    align-items:center;
+    gap:12px;
+    font-size:18px;
+  }
+
+  .icon{
+    width:34px;
+    height:34px;
+    background:#c4161c;
+    border-radius:10px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
+
+  .icon svg{
+    width:18px;
+    height:18px;
+    stroke:#fff;
+    fill:none;
+    stroke-width:2;
+  }
+
+  .card-body{
+    padding:18px 20px 20px;
+  }
+
+  .sub-cards{
+    display:grid;
+    gap:12px;
+  }
+
+  .sub-card{
+    border:1px solid #e3e3e3;
+    border-radius:10px;
+    background:#fafafa;
+    padding:12px;
+  }
+
+  .sub-card-title{
+    font-weight:700;
+    margin:0 0 8px;
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+
+  .fixed-card .card-body{
+    flex:1;
+    overflow:hidden;
+  }
+
+  ul{
+    padding:0;
+    margin:0;
+    list-style:none;
+  }
+
+  li{
+    margin-bottom:10px;
+    line-height:1.4;
+    font-size:16px;
+    display:flex;
+    gap:10px;
+    align-items:flex-start;
+  }
+
+  .li-icon{
+    width:22px;
+    flex:0 0 22px;
+    display:inline-flex;
+    justify-content:center;
+    line-height:1.2;
+  }
+
+  /* ===== STACK LEFT COLUMN ===== */
+  .left-area{
+    grid-column:1 / span 2;
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:20px;
+    align-content:start;
+  }
+
+  #leadership-card{
+    grid-column:1 / span 2;
+  }
+
+  .stack{
+    display:grid;
+    gap:20px;
+  }
+
+  .tech-stack{
+    display:grid;
+    gap:20px;
+  }
+
+  .split-sync{
+    display:flex;
+    flex-direction:column;
+  }
+
+  .split-sync .card-body{
+    flex:1;
+    overflow:hidden;
+  }
+
+  /* ===== LEADERS ===== */
+  .leaders{
+    display:grid;
+    gap:12px;
+  }
+
+  .leader{
+    display:flex;
+    gap:12px;
+    align-items:center;
+    border:1px solid #ddd;
+    padding:10px;
+    border-radius:10px;
+  }
+
+  .avatar{
+    width:38px;
+    height:38px;
+    border-radius:50%;
+    background:#f0f0f0;
+    object-fit:cover;
+    display:block;
+  }
+
+  .leader-name{
+    font-weight:700;
+  }
+  .leader-role{
+    font-size:14px;
+    color:#666;
+  }
+
+  /* ===== FOOTER ===== */
+  footer{
+    width:100%;
+    max-width:none;
+    margin:6px auto 18px;
+    padding:0 clamp(8px, 1vw, 20px);
+    box-sizing:border-box;
+    font-size:14px;
+    color:#555;
+    font-style:italic;
+    text-align:right;
+  }
+
+  footer a{
+    display:inline-block;
+    transform:translate(-50px, -20px);
+  }
+</style>
+</head>
+
+<body>
+
+<div id="fit-stage">
+<div id="fit-content">
+
+<header>
+  <img src="https://upload.wikimedia.org/wikipedia/commons/c/ce/Coca-Cola_logo.svg" alt="Coca-Cola">
+  <h1>Global Data and Analytics Technology Delivery Team (GDATD)</h1>
+</header>
+
+<main>
+  <section class="grid">
+
+    <div class="left-area" id="left-area">
+
+      <!-- Team Snapshot -->
+      <div class="card fixed-card" id="team-card">
+        <div class="card-header">
+          <div class="icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" role="img" aria-label="Team icon">
+              <circle cx="12" cy="8" r="3"></circle>
+              <path d="M7 18c0-2.6 2.2-4 5-4s5 1.4 5 4"></path>
+              <circle cx="5" cy="10" r="2"></circle>
+              <path d="M2 18c0-1.7 1.3-2.8 3.1-3.2"></path>
+              <circle cx="19" cy="10" r="2"></circle>
+              <path d="M22 18c0-1.7-1.3-2.8-3.1-3.2"></path>
+            </svg>
+          </div>
+          Team Snapshot
+        </div>
+        <div class="card-body">
+          <ul>
+            <li><span class="li-icon" aria-hidden="true">🎯</span><span><strong>Mission:</strong> Deliver end-to-end high quality data & analytics products and future-ready platforms enabling business growth.</span></li>
+            <li><span class="li-icon" aria-hidden="true">📍</span><span><strong>Location:</strong> Sofia, Bulgaria - Global Delivery Center.</span></li>
+            <li><span class="li-icon" aria-hidden="true">👥</span><span><strong>Team Size:</strong> 24 FTE.</span></li>
+            <li><span class="li-icon" aria-hidden="true">🧩</span><span><strong>Roles:</strong> Data & Analytics Architects, Data Engineers, Data Analysts, Agile Project Managers.</span></li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- WHAT WE DO -->
+      <div class="card fixed-card" id="what-card">
+        <div class="card-header">
+          <div class="icon">⚙️</div>
+          What We Do
+        </div>
+        <div class="card-body">
+          <ul>
+            <li><span class="li-icon" aria-hidden="true">🔎</span><span>Translate business needs into scalable data & analytics solutions.</span></li>
+            <li><span class="li-icon" aria-hidden="true">🏗️</span><span>Design, build, run, improve global data products.</span></li>
+            <li><span class="li-icon" aria-hidden="true">🛡️</span><span>Focus on quality, security, enterprise architecture.</span></li>
+            <li><span class="li-icon" aria-hidden="true">🧠</span><span>Product Technical Enterprise Ownership.</span></li>
+            <li><span class="li-icon" aria-hidden="true">🤖</span><span>DevOPS and AI-driven development.</span></li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- Leadership -->
+      <div class="card fixed-card" id="leadership-card">
+        <div class="card-header">
+          <div class="icon">👔</div>
+          Leadership
+        </div>
+        <div class="card-body leaders">
+          <div class="leader">
+            <img class="avatar" src="HHristov_202404_07.jpg" alt="Hristo Hristov">
+            <div>
+              <div class="leader-name">Hristo Hristov</div>
+              <div class="leader-role">Director, GDATD Team Leader</div>
+            </div>
+          </div>
+          <div class="leader">
+            <img class="avatar" src="Image (1).jpg" alt="Kiril Rusev">
+            <div>
+              <div class="leader-name">Kiril Rusev</div>
+              <div class="leader-role">Director Global Data & Analytics Engineering</div>
+            </div>
+          </div>
+          <div class="leader">
+            <img class="avatar" src="DSCF1397.jpg" alt="Miroslav Dimitrov">
+            <div>
+              <div class="leader-name">Miroslav Dimitrov</div>
+              <div class="leader-role">Director Global CCL Data & Analytics Technologies</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- INITIATIVES -->
+    <div class="card" id="initiatives-card">
+      <div class="card-header">
+        <div class="icon">🌍</div>
+        Key Global Initiatives & Products
+      </div>
+      <div class="card-body">
+        <div class="sub-cards">
+          <div class="sub-card">
+            <p class="sub-card-title"><span aria-hidden="true">📊</span><span>NSR Platform</span></p>
+            <p>Global bottler volume & revenue data.</p>
+          </div>
+
+          <div class="sub-card">
+            <p class="sub-card-title"><span aria-hidden="true">💹</span><span>FinHub and TFS</span></p>
+            <p>Finance hub and AI-driven forecasting across 180+ markets.</p>
+          </div>
+
+          <div class="sub-card">
+            <p class="sub-card-title">Customer & Commercial Analytics Solutions</p>
+            <ul>
+              <li><span class="li-icon" aria-hidden="true">🛒</span><span>Carrefour</span></li>
+              <li><span class="li-icon" aria-hidden="true">🚇</span><span>Metro</span></li>
+              <li><span class="li-icon" aria-hidden="true">🍽️</span><span>QSRP</span></li>
+              <li><span class="li-icon" aria-hidden="true">🧊</span><span>CuDa</span></li>
+              <li><span class="li-icon" aria-hidden="true">✅</span><span>RED Certification</span></li>
+              <li><span class="li-icon" aria-hidden="true">📝</span><span>Metro Surveys</span></li>
+              <li><span class="li-icon" aria-hidden="true">📋</span><span>Sodexo Surveys</span></li>
+              <li><span class="li-icon" aria-hidden="true">🧮</span><span>RGM Template Generator</span></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tech-stack" id="tech-stack">
+      <!-- TECHNOLOGY -->
+      <div class="card split-sync" id="tech-card">
+        <div class="card-header">
+          <div class="icon">💻</div>
+          Technology & Engineering Excellence
+        </div>
+        <div class="card-body">
+          <ul>
+            <li><span class="li-icon" aria-hidden="true">☁️</span><span>Azure data & analytics: Synapse, Data Factory, SQL, Storage</span></li>
+            <li><span class="li-icon" aria-hidden="true">🔗</span><span>Automation & integration: Functions, Logic Apps</span></li>
+            <li><span class="li-icon" aria-hidden="true">🛠️</span><span>Development tools: Azure DevOps, GitHub, AI-driven development</span></li>
+            <li><span class="li-icon" aria-hidden="true">📐</span><span>Analytics & languages: Power BI, Python, SQL, DAX</span></li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- BUSINESS IMPACT -->
+      <div class="card split-sync" id="business-card">
+        <div class="card-header">
+          <div class="icon">📈</div>
+          Business Impact & Achievements
+        </div>
+        <div class="card-body">
+          <ul>
+            <li><span class="li-icon" aria-hidden="true">🚀</span><span>NSR 2.0</span></li>
+            <li><span class="li-icon" aria-hidden="true">🌐</span><span>WebUI Migration</span></li>
+            <li><span class="li-icon" aria-hidden="true">🧪</span><span>Data Quality Framework</span></li>
+            <li><span class="li-icon" aria-hidden="true">🇯🇵</span><span>Japan in NSR</span></li>
+            <li><span class="li-icon" aria-hidden="true">📣</span><span>RED & Metro Surveys Applications</span></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+  </section>
+</main>
+
+<footer>
+  <a href="https://groups.coca-cola.com/sites/Technology-Services/SitePages/Global-Data-Technologies-Delivery-Team.aspx" target="_blank" rel="noopener noreferrer">For more information, check the GDATD page on Connect.</a>
+</footer>
+
+</div>
+</div>
+
+<script>
+  function fitToViewport() {
+    const stage = document.getElementById('fit-stage');
+    const content = document.getElementById('fit-content');
+    if (!stage || !content) return;
+
+    content.style.transform = 'scale(1)';
+    content.style.marginLeft = '0px';
+    content.style.marginTop = '0px';
+
+    const contentWidth = content.scrollWidth;
+    const contentHeight = content.scrollHeight;
+    if (!contentWidth || !contentHeight) return;
+
+    const scale = Math.min(
+      stage.clientWidth / contentWidth,
+      stage.clientHeight / contentHeight,
+      1
+    );
+
+    content.style.transform = `scale(${scale})`;
+
+    const scaledWidth = contentWidth * scale;
+    const scaledHeight = contentHeight * scale;
+    const leftOffset = Math.max((stage.clientWidth - scaledWidth) / 2, 0);
+    const topOffset = Math.max((stage.clientHeight - scaledHeight) / 2, 0);
+
+    content.style.marginLeft = `${leftOffset}px`;
+    content.style.marginTop = `${topOffset}px`;
+  }
+
+  function syncCardHeights() {
+    const initiativesCard = document.getElementById('initiatives-card');
+    const leftArea = document.getElementById('left-area');
+    const teamCard = document.getElementById('team-card');
+    const leadershipCard = document.getElementById('leadership-card');
+    const whatCard = document.getElementById('what-card');
+    const techCard = document.getElementById('tech-card');
+    const businessCard = document.getElementById('business-card');
+    const techStack = document.getElementById('tech-stack');
+    if (!initiativesCard || !leftArea || !teamCard || !leadershipCard || !whatCard || !techCard || !businessCard || !techStack) return;
+
+    teamCard.style.height = 'auto';
+    leadershipCard.style.height = 'auto';
+    whatCard.style.height = 'auto';
+    techCard.style.height = 'auto';
+    businessCard.style.height = 'auto';
+
+    const targetHeight = initiativesCard.offsetHeight;
+
+    const leftGap = parseFloat(getComputedStyle(leftArea).gap) || 20;
+    const leadershipNatural = leadershipCard.offsetHeight;
+    const teamTarget = Math.max(targetHeight - leadershipNatural - leftGap, 0);
+
+    teamCard.style.height = teamTarget + 'px';
+    whatCard.style.height = teamTarget + 'px';
+    leftArea.style.height = targetHeight + 'px';
+
+    const stackGap = parseFloat(getComputedStyle(techStack).gap) || 20;
+    techStack.style.height = targetHeight + 'px';
+
+    const techNatural = techCard.offsetHeight;
+    const businessNatural = businessCard.offsetHeight;
+    const available = Math.max(targetHeight - stackGap, 0);
+    const naturalTotal = Math.max(techNatural + businessNatural, 1);
+
+    const techHeight = Math.round((techNatural / naturalTotal) * available);
+    const businessHeight = Math.max(available - techHeight, 0);
+
+    techCard.style.height = techHeight + 'px';
+    businessCard.style.height = businessHeight + 'px';
+
+    fitToViewport();
+  }
+
+  window.addEventListener('load', () => {
+    syncCardHeights();
+    fitToViewport();
+  });
+
+  window.addEventListener('resize', () => {
+    syncCardHeights();
+    fitToViewport();
+  });
+</script>
+
+</body>
+</html>

@@ -1,0 +1,376 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="800" viewBox="0 0 1400 800" role="img" aria-label="GDATD team infographic">
+  <metadata>
+    GDATD infographic (Jan 2026). Icon-first layout, minimal text.
+    NOTE: SVGRepo icons cannot be embedded automatically from this environment because svgrepo.com is returning HTTP 429 (Too Many Requests).
+    If you provide SVGRepo icon URLs/IDs (or paste the full SVG snippets), placeholders can be replaced 1:1 while keeping the no-transform rule.
+  </metadata>
+
+  <defs>
+    <style>
+      :root {
+        --bg: #0b1220;
+        --panel: #0f1b34;
+        --panel2: #101f3d;
+        --stroke: rgba(255,255,255,0.14);
+        --text: rgba(255,255,255,0.92);
+        --muted: rgba(255,255,255,0.72);
+        --faint: rgba(255,255,255,0.58);
+        --accent: #60a5fa;
+        --accent2: #34d399;
+        --accent3: #f59e0b;
+        --danger: #fb7185;
+      }
+
+      .bg { fill: var(--bg); }
+      .title { font: 700 36px/1.2 ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial; fill: var(--text); letter-spacing: 0.2px; }
+      .subtitle { font: 500 16px/1.3 ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial; fill: var(--muted); }
+      .kpi { font: 700 22px/1.1 ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial; fill: var(--text); }
+      .kpiLabel { font: 500 12px/1.3 ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial; fill: var(--faint); letter-spacing: 0.3px; }
+      .h { font: 700 14px/1.2 ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial; fill: var(--text); letter-spacing: 0.4px; }
+      .t { font: 500 12px/1.35 ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial; fill: var(--muted); }
+      .tiny { font: 500 11px/1.35 ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial; fill: var(--faint); }
+
+      .panel { fill: var(--panel); stroke: var(--stroke); stroke-width: 1; }
+      .panel2 { fill: var(--panel2); stroke: var(--stroke); stroke-width: 1; }
+      .chip { fill: rgba(255,255,255,0.06); stroke: rgba(255,255,255,0.10); stroke-width: 1; }
+
+      .iconStroke { fill: none; stroke: rgba(255,255,255,0.86); stroke-width: 2.3; stroke-linecap: round; stroke-linejoin: round; }
+      .iconFill { fill: rgba(255,255,255,0.86); }
+      .accentFill { fill: rgba(96,165,250,0.95); }
+      .accentStroke { stroke: rgba(96,165,250,0.95); }
+      .good { fill: rgba(52,211,153,0.95); }
+      .warn { fill: rgba(245,158,11,0.95); }
+      .bad { fill: rgba(251,113,133,0.95); }
+
+      .divider { stroke: rgba(255,255,255,0.10); stroke-width: 1; }
+      .arrow { stroke: rgba(255,255,255,0.35); stroke-width: 2; fill: none; marker-end: url(#arrowHead); }
+    </style>
+
+    <linearGradient id="glow" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#60a5fa" stop-opacity="0.25"/>
+      <stop offset="1" stop-color="#34d399" stop-opacity="0.12"/>
+    </linearGradient>
+
+    <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="10" stdDeviation="14" flood-color="#000" flood-opacity="0.45"/>
+    </filter>
+
+    <marker id="arrowHead" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="rgba(255,255,255,0.35)"/>
+    </marker>
+  </defs>
+
+  <!-- Background -->
+  <rect class="bg" x="0" y="0" width="1400" height="800"/>
+  <rect x="0" y="0" width="1400" height="800" fill="url(#glow)" opacity="0.55"/>
+
+  <!-- Header -->
+  <g filter="url(#softShadow)">
+    <rect class="panel" x="40" y="28" width="1320" height="92" rx="18"/>
+  </g>
+
+  <!-- Header content (absolute coordinates) -->
+  <!-- Simple "G" monogram icon -->
+  <circle cx="98" cy="85" r="22" fill="rgba(96,165,250,0.16)" stroke="rgba(96,165,250,0.55)" stroke-width="2"/>
+  <path d="M 106 85 H 98 V 77" class="iconStroke accentStroke"/>
+  <path d="M 98 69 A 16 16 0 1 0 114 85" class="iconStroke accentStroke"/>
+
+  <text x="140" y="87" class="title">GDATD</text>
+  <text x="140" y="111" class="subtitle">Global Data &amp; Analytics Technologies Delivery • End-to-end ownership of data &amp; analytics products</text>
+
+  <text x="1020" y="77" class="kpi">24</text>
+  <text x="1020" y="97" class="kpiLabel">TEAM</text>
+  <text x="1110" y="77" class="kpi">18</text>
+  <text x="1110" y="97" class="kpiLabel">DATA ENG</text>
+  <text x="1210" y="77" class="kpi">3</text>
+  <text x="1210" y="97" class="kpiLabel">ANALYSTS</text>
+  <text x="1290" y="77" class="kpi">Sofia</text>
+  <text x="1290" y="97" class="kpiLabel">GDC</text>
+
+  <!-- Left column: Identity / DevOps / Tech -->
+  <g>
+    <g filter="url(#softShadow)">
+      <rect class="panel" x="40" y="140" width="430" height="250" rx="18"/>
+    </g>
+    <text x="70" y="175" class="h">WHY WE EXIST</text>
+
+    <!-- Mission icon (compass/target placeholder) -->
+    <circle cx="92" cy="217" r="18" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.18)" stroke-width="1.5"/>
+    <circle cx="92" cy="217" r="9" fill="none" stroke="rgba(96,165,250,0.85)" stroke-width="2"/>
+    <path d="M 92 205 L 96 217 L 92 229 L 88 217 Z" fill="rgba(96,165,250,0.85)"/>
+    <text x="120" y="220" class="t">End-to-end product ownership</text>
+    <text x="120" y="242" class="tiny">Architecture • Engineering • Ops • Service • Improvement</text>
+
+    <!-- Principles chips -->
+    <rect class="chip" x="70" y="262" width="120" height="28" rx="14"/>
+    <text x="84" y="281" class="tiny">Ownership</text>
+
+    <rect class="chip" x="200" y="262" width="110" height="28" rx="14"/>
+    <text x="216" y="281" class="tiny">Inclusion</text>
+
+    <rect class="chip" x="320" y="262" width="150" height="28" rx="14"/>
+    <text x="336" y="281" class="tiny">Continuous improve</text>
+
+    <rect class="chip" x="70" y="300" width="90" height="28" rx="14"/>
+    <text x="84" y="319" class="tiny">Agile</text>
+
+    <rect class="chip" x="170" y="300" width="110" height="28" rx="14"/>
+    <text x="184" y="319" class="tiny">DevOps</text>
+
+    <!-- Strategy chips (from strategy.md) -->
+    <rect class="chip" x="70" y="338" width="126" height="28" rx="14"/>
+    <circle cx="86" cy="352" r="6" fill="rgba(96,165,250,0.35)" stroke="rgba(96,165,250,0.75)" stroke-width="2"/>
+    <path d="M 83 352 H 89" class="iconStroke accentStroke"/>
+    <path d="M 86 349 V 355" class="iconStroke accentStroke"/>
+    <text x="98" y="357" class="tiny">Catalogue</text>
+
+    <rect class="chip" x="204" y="338" width="110" height="28" rx="14"/>
+    <rect x="218" y="345" width="14" height="14" rx="3" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.16)"/>
+    <path d="M 221 349 H 229" class="iconStroke"/>
+    <path d="M 221 353 H 227" class="iconStroke"/>
+    <text x="238" y="357" class="tiny">AI Docs</text>
+
+    <rect class="chip" x="322" y="338" width="148" height="28" rx="14"/>
+    <path d="M 340 358 V 348" class="iconStroke"/>
+    <path d="M 340 348 C 340 342 350 340 356 345" class="iconStroke"/>
+    <path d="M 356 345 C 362 350 374 350 380 345" class="iconStroke"/>
+    <path d="M 380 345 C 386 340 396 342 396 348 V 358" class="iconStroke"/>
+    <text x="410" y="357" class="tiny">Internal know-how</text>
+  </g>
+
+  <g>
+    <g filter="url(#softShadow)">
+      <rect class="panel" x="40" y="410" width="430" height="210" rx="18"/>
+    </g>
+    <text x="70" y="445" class="h">HOW WE OPERATE</text>
+
+    <!-- DevOps loop (placeholder icons) -->
+    <circle cx="140" cy="525" r="52" fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.14)" stroke-width="1.5"/>
+    <path d="M 140 479 A 46 46 0 0 1 183 507" class="iconStroke"/>
+    <path d="M 184 505 L 186 521 L 170 515" class="iconStroke"/>
+    <path d="M 196 543 A 46 46 0 0 1 158 575" class="iconStroke"/>
+    <path d="M 160 577 L 144 583 L 148 565" class="iconStroke"/>
+    <path d="M 124 577 A 46 46 0 0 1 84 543" class="iconStroke"/>
+    <path d="M 84 545 L 82 529 L 98 535" class="iconStroke"/>
+    <path d="M 84 507 A 46 46 0 0 1 124 479" class="iconStroke"/>
+    <path d="M 122 479 L 136 475 L 132 491" class="iconStroke"/>
+
+    <circle cx="140" cy="525" r="18" fill="rgba(96,165,250,0.25)" stroke="rgba(96,165,250,0.55)" stroke-width="2"/>
+    <path d="M 132 525 H 148" class="iconStroke accentStroke"/>
+
+    <text x="214" y="491" class="t">Single team covers:</text>
+    <circle cx="224" cy="515" r="5" class="good"/>
+    <text x="238" y="519" class="t">Dev</text>
+    <circle cx="274" cy="515" r="5" class="good"/>
+    <text x="288" y="519" class="t">Ops</text>
+    <circle cx="324" cy="515" r="5" class="good"/>
+    <text x="338" y="519" class="t">Prod</text>
+    <circle cx="384" cy="515" r="5" class="good"/>
+    <text x="398" y="519" class="t">Service</text>
+
+    <text x="214" y="551" class="tiny">Faster incidents • Higher quality • Knowledge retained</text>
+  </g>
+
+  <g>
+    <g filter="url(#softShadow)">
+      <rect class="panel" x="40" y="640" width="430" height="120" rx="18"/>
+    </g>
+    <text x="70" y="675" class="h">TECH FOOTPRINT</text>
+
+    <!-- Keep everything inside y=640..760 -->
+    <!-- Azure cloud -->
+    <path d="M 98 704 C 98 696 105 689 114 689 C 120 689 126 692 129 697 C 130 697 131 697 132 697 C 141 697 148 704 148 712 C 148 720 142 726 134 726 H 106 C 99 726 93 720 93 713 C 93 709 95 706 98 704 Z" fill="rgba(96,165,250,0.24)" stroke="rgba(96,165,250,0.70)" stroke-width="2"/>
+    <text x="165" y="710" class="t">Azure: Synapse • ADF • Databricks • Functions • SQL • Storage</text>
+
+    <!-- Languages -->
+    <rect x="70" y="728" width="26" height="18" rx="4" fill="rgba(255,255,255,0.08)" stroke="rgba(255,255,255,0.14)"/>
+    <path d="M 78 734 L 74 737 L 78 740" class="iconStroke"/>
+    <path d="M 88 734 L 92 737 L 88 740" class="iconStroke"/>
+    <text x="165" y="742" class="t">Languages: Python • SQL • DAX • JavaScript • C#</text>
+
+    <!-- BI + Toolchain -->
+    <rect x="70" y="744" width="26" height="18" rx="4" fill="rgba(255,255,255,0.08)" stroke="rgba(255,255,255,0.14)"/>
+    <path d="M 75 757 L 79 753 L 83 755 L 90 748" fill="none" stroke="rgba(52,211,153,0.95)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="165" y="758" class="t">Power BI • Admin/Web UIs • GitHub/DevOps toolchain</text>
+  </g>
+
+  <!-- Center column: Value chain / Capabilities -->
+  <g>
+    <g filter="url(#softShadow)">
+      <rect class="panel" x="490" y="140" width="450" height="360" rx="18"/>
+    </g>
+    <text x="520" y="175" class="h">WHAT WE BUILD (DATA VALUE CHAIN)</text>
+
+    <!-- Pipeline row -->
+    <!-- Pipeline row (absolute coordinates) -->
+    <!-- Sources -->
+    <rect class="panel2" x="520" y="205" width="120" height="88" rx="16"/>
+    <path d="M 548 243 H 612" class="iconStroke"/>
+    <path d="M 548 258 H 602" class="iconStroke"/>
+    <path d="M 548 228 H 598" class="iconStroke"/>
+    <circle cx="546" cy="228" r="2.5" class="accentFill"/>
+    <circle cx="546" cy="243" r="2.5" class="accentFill"/>
+    <circle cx="546" cy="258" r="2.5" class="accentFill"/>
+    <text x="536" y="283" class="tiny">Ingest</text>
+
+    <path class="arrow" d="M 652 249 H 688"/>
+
+    <!-- Quality -->
+    <rect class="panel2" x="700" y="205" width="120" height="88" rx="16"/>
+    <path d="M 760 227 L 784 237 V 253 C 784 269 772 281 760 287 C 748 281 736 269 736 253 V 237 Z" fill="rgba(52,211,153,0.18)" stroke="rgba(52,211,153,0.85)" stroke-width="2"/>
+    <path d="M 748 257 L 756 265 L 772 249" fill="none" stroke="rgba(52,211,153,0.95)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="716" y="283" class="tiny">Quality</text>
+
+    <path class="arrow" d="M 832 249 H 868"/>
+
+    <!-- Enrich -->
+    <rect class="panel2" x="880" y="205" width="120" height="88" rx="16"/>
+    <path d="M 920 235 H 968" class="iconStroke"/>
+    <path d="M 920 235 L 930 227" class="iconStroke"/>
+    <path d="M 920 235 L 930 243" class="iconStroke"/>
+    <path d="M 968 261 H 920" class="iconStroke"/>
+    <path d="M 968 261 L 958 253" class="iconStroke"/>
+    <path d="M 968 261 L 958 269" class="iconStroke"/>
+    <circle cx="920" cy="235" r="4" class="warn"/>
+    <circle cx="968" cy="261" r="4" class="warn"/>
+    <text x="896" y="283" class="tiny">Enrich</text>
+
+    <!-- Modeling / Serve -->
+    <!-- Modeling / Serve (absolute coordinates) -->
+    <rect class="panel2" x="520" y="312" width="200" height="122" rx="16"/>
+    <text x="536" y="342" class="t">Model</text>
+    <rect x="536" y="390" width="52" height="30" rx="8" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.12)"/>
+    <rect x="598" y="374" width="52" height="46" rx="8" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.12)"/>
+    <rect x="660" y="356" width="52" height="64" rx="8" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.12)"/>
+    <path d="M 562 390 V 376 H 624 V 374" fill="none" stroke="rgba(96,165,250,0.70)" stroke-width="2" stroke-linecap="round"/>
+    <path d="M 624 374 V 366 H 686" fill="none" stroke="rgba(96,165,250,0.70)" stroke-width="2" stroke-linecap="round"/>
+    <text x="536" y="418" class="tiny">Star schema • cubes • semantic layers</text>
+
+    <rect class="panel2" x="740" y="312" width="210" height="122" rx="16"/>
+    <text x="756" y="342" class="t">Serve</text>
+    <rect x="756" y="358" width="64" height="48" rx="10" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.12)"/>
+    <path d="M 766 394 V 384" class="iconStroke"/>
+    <path d="M 780 394 V 376" class="iconStroke"/>
+    <path d="M 794 394 V 388" class="iconStroke"/>
+    <path d="M 808 394 V 372" class="iconStroke"/>
+
+    <rect x="842" y="358" width="92" height="48" rx="10" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.12)"/>
+    <path d="M 856 374 H 922" class="iconStroke"/>
+    <path d="M 856 388 H 906" class="iconStroke"/>
+    <text x="756" y="418" class="tiny">Power BI dashboards • admin/web UIs</text>
+  </g>
+
+  <!-- Right column: Portfolio / Impact / Roadmap -->
+  <g>
+    <g filter="url(#softShadow)">
+      <rect class="panel" x="960" y="140" width="400" height="250" rx="18"/>
+    </g>
+    <text x="990" y="175" class="h">PRODUCT PORTFOLIO</text>
+
+    <!-- Icon grid with tiny labels -->
+    <!-- Icon grid with tiny labels (absolute coordinates) -->
+    <!-- NSR -->
+    <rect class="chip" x="990" y="198" width="116" height="56" rx="14"/>
+    <ellipse cx="1020" cy="220" rx="16" ry="6" fill="rgba(96,165,250,0.25)" stroke="rgba(96,165,250,0.70)" stroke-width="2"/>
+    <path d="M 1004 220 V 238 C 1004 242 1012 246 1020 246 C 1028 246 1036 242 1036 238 V 220" fill="rgba(96,165,250,0.15)" stroke="rgba(96,165,250,0.70)" stroke-width="2"/>
+    <path d="M 1004 230 C 1004 234 1012 238 1020 238 C 1028 238 1036 234 1036 230" fill="none" stroke="rgba(96,165,250,0.55)" stroke-width="2"/>
+    <text x="1046" y="232" class="t">NSR</text>
+
+    <!-- UDP -->
+    <rect class="chip" x="1114" y="198" width="116" height="56" rx="14"/>
+    <rect x="1130" y="216" width="28" height="22" rx="6" fill="rgba(52,211,153,0.18)" stroke="rgba(52,211,153,0.85)" stroke-width="2"/>
+    <path d="M 1136 240 V 246" class="iconStroke"/>
+    <path d="M 1152 240 V 246" class="iconStroke"/>
+    <text x="1170" y="232" class="t">UDP</text>
+
+    <!-- DX -->
+    <rect class="chip" x="1238" y="198" width="116" height="56" rx="14"/>
+    <circle cx="1268" cy="228" r="10" fill="rgba(245,158,11,0.20)" stroke="rgba(245,158,11,0.95)" stroke-width="2"/>
+    <path d="M 1268 220 V 216" class="iconStroke"/>
+    <path d="M 1268 240 V 244" class="iconStroke"/>
+    <path d="M 1260 228 H 1256" class="iconStroke"/>
+    <path d="M 1280 228 H 1284" class="iconStroke"/>
+    <path d="M 1262 222 L 1259 219" class="iconStroke"/>
+    <path d="M 1274 234 L 1277 237" class="iconStroke"/>
+    <path d="M 1274 222 L 1277 219" class="iconStroke"/>
+    <path d="M 1262 234 L 1259 237" class="iconStroke"/>
+    <text x="1294" y="232" class="t">DX</text>
+
+    <!-- CuDa -->
+    <rect class="chip" x="990" y="266" width="116" height="56" rx="14"/>
+    <path d="M 1008 308 V 292" class="iconStroke"/>
+    <path d="M 1018 308 V 288" class="iconStroke"/>
+    <path d="M 1028 308 V 296" class="iconStroke"/>
+    <path d="M 1008 308 H 1032" class="iconStroke"/>
+    <circle cx="1030" cy="290" r="3" class="accentFill"/>
+    <text x="1046" y="300" class="t">CuDa</text>
+
+    <!-- Metro -->
+    <rect class="chip" x="1114" y="266" width="116" height="56" rx="14"/>
+    <rect x="1136" y="282" width="18" height="30" rx="4" fill="rgba(96,165,250,0.12)" stroke="rgba(96,165,250,0.70)" stroke-width="2"/>
+    <circle cx="1145" cy="306" r="1.7" class="iconFill"/>
+    <text x="1170" y="300" class="t">Metro</text>
+
+    <!-- RED -->
+    <rect class="chip" x="1238" y="266" width="116" height="56" rx="14"/>
+    <rect x="1256" y="284" width="26" height="28" rx="6" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.14)"/>
+    <path d="M 1260 294 L 1264 298 L 1270 290" fill="none" stroke="rgba(52,211,153,0.95)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M 1260 304 H 1274" class="iconStroke"/>
+    <text x="1294" y="300" class="t">RED</text>
+
+    <text x="990" y="346" class="tiny">Also: Coke&amp;GO • BEACH→UDP Extract • Smart OPEX • Sodexo Surveys</text>
+  </g>
+
+  <g>
+    <g filter="url(#softShadow)">
+      <rect class="panel" x="960" y="410" width="400" height="210" rx="18"/>
+    </g>
+    <text x="990" y="445" class="h">IMPACT (HIGHLIGHTS)</text>
+
+    <!-- impact bullets as icon + minimal text (absolute coordinates) -->
+    <circle cx="1004" cy="480" r="8" class="good"/>
+    <path d="M 1000 480 L 1003 483 L 1009 477" fill="none" stroke="#0b1220" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="1024" y="484" class="t">NSR 2.0 Go-Live &amp; stabilization (2023)</text>
+
+    <circle cx="1004" cy="510" r="8" class="accentFill"/>
+    <text x="1024" y="514" class="t">Automation &amp; batching; self-healing patterns (2024)</text>
+
+    <circle cx="1004" cy="540" r="8" class="warn"/>
+    <text x="1024" y="544" class="t">80% service requests automated via web/API</text>
+
+    <circle cx="1004" cy="570" r="8" class="good"/>
+    <text x="1024" y="574" class="t">Governance enablement: anomaly detection &amp; steward tools</text>
+
+    <circle cx="1004" cy="600" r="8" class="accentFill"/>
+    <text x="1024" y="604" class="t">Partner data exchange + dashboards (Metro, Sodexo, CuDa)</text>
+  </g>
+
+  <g>
+    <g filter="url(#softShadow)">
+      <rect class="panel" x="960" y="640" width="400" height="120" rx="18"/>
+    </g>
+    <text x="990" y="675" class="h">2025+ FOCUS</text>
+
+    <!-- Focus chips (absolute coordinates) -->
+    <rect class="chip" x="990" y="698" width="118" height="36" rx="18"/>
+    <text x="1004" y="721" class="t">NSR Web</text>
+
+    <rect class="chip" x="1118" y="698" width="118" height="36" rx="18"/>
+    <text x="1132" y="721" class="t">Japan mig</text>
+
+    <rect class="chip" x="1240" y="698" width="120" height="36" rx="18"/>
+    <text x="1254" y="721" class="t">RED Assess</text>
+
+    <rect class="chip" x="990" y="744" width="170" height="36" rx="18"/>
+    <text x="1004" y="767" class="t">Metro Survey launch</text>
+
+    <rect class="chip" x="1170" y="744" width="190" height="36" rx="18"/>
+    <text x="1184" y="767" class="t">DX rule engine expansion</text>
+  </g>
+
+  <!-- Footer -->
+  <line x1="40" y1="790" x2="1360" y2="790" class="divider"/>
+  <text x="40" y="778" class="tiny">GDATD • Executive snapshot • Mostly-icon infographic • Jan 2026</text>
+  <text x="1360" y="778" class="tiny" text-anchor="end">Owned products • Azure-first • DevOps model</text>
+</svg>

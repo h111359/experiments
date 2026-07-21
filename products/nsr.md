@@ -1,0 +1,3 @@
+NSR (Net Sales Revenue) Platform
+Product Description
+The Net Sales Revenue (NSR) platform is a comprehensive system used by TCCC to collect both volume and revenue data from bottlers (System NSR), streamlining the consolidation of large volumes of master data for easier cross-country and cross-bottler reporting. NSR incorporates standardized raw data ingestion from various ERP systems, ensuring data completeness, accuracy, and simplified maintenance of master data. The platform aims to enhance efficiency and utility by addressing functional and technical challenges, such as improving concurrency, data democratization, and modernizing the orchestration engine.
