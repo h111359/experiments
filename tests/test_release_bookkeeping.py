@@ -10,6 +10,7 @@ import importlib.util
 import os
 import subprocess
 import sys
+import zipfile
 from pathlib import Path
 
 import pytest
@@ -120,6 +121,46 @@ def test_read_curated_entries_parses_bullets(tmp_path: Path) -> None:
     ]
 
 
+def test_create_brain_zip_accepts_clean_framework_tree(tmp_path: Path) -> None:
+    """A clean framework tree must still produce the expected versioned archive."""
+    mod = _load_release_bookkeeping()
+    brain = tmp_path / ".aib_brain"
+    brain.mkdir()
+    (brain / "README.md").write_text("clean\n", encoding="utf-8")
+    versions = tmp_path / "versions"
+
+    zip_path = mod._create_brain_zip(brain, versions, "v1.0.1")
+
+    assert zip_path.is_file()
+    with zipfile.ZipFile(zip_path) as archive:
+        assert archive.namelist() == [".aib_brain/README.md"]
+
+
+def test_create_brain_zip_rejects_sorted_bytecode_offenders(tmp_path: Path) -> None:
+    """Validation must list every offender in sorted order and leave no zip."""
+    mod = _load_release_bookkeeping()
+    brain = tmp_path / ".aib_brain"
+    cache_dir = brain / "z_package" / "__pycache__"
+    cache_dir.mkdir(parents=True)
+    (brain / "a.pyc").write_bytes(b"root bytecode")
+    (cache_dir / "module.pyc").write_bytes(b"nested bytecode")
+    versions = tmp_path / "versions"
+
+    with pytest.raises(mod.ReleaseBookkeepingError) as error:
+        mod._create_brain_zip(brain, versions, "v1.0.1")
+
+    message = str(error.value)
+    expected_paths = [
+        ".aib_brain/a.pyc",
+        ".aib_brain/z_package/__pycache__",
+        ".aib_brain/z_package/__pycache__/module.pyc",
+    ]
+    positions = [message.index(path) for path in expected_paths]
+    assert positions == sorted(positions)
+    assert not versions.exists()
+    assert not list(tmp_path.rglob("*.zip"))
+
+
 # ---------------------------------------------------------------------------
 # End-to-end script tests
 # ---------------------------------------------------------------------------
@@ -163,6 +204,27 @@ def test_fallback_to_commit_subjects_when_curated_missing(repo: Path) -> None:
     assert log_path.exists()
     content = log_path.read_text(encoding="utf-8")
     assert "- only commit subject" in content
+
+
+def test_contaminated_framework_returns_nonzero_without_archive(repo: Path) -> None:
+    """The CLI must reject a contaminated framework and create no partial zip."""
+    cache_dir = repo / ".aib_brain" / "z_package" / "__pycache__"
+    cache_dir.mkdir(parents=True)
+    (repo / ".aib_brain" / "a.pyc").write_bytes(b"root bytecode")
+    (cache_dir / "module.pyc").write_bytes(b"nested bytecode")
+
+    result = _run_script(repo)
+
+    assert result.returncode != 0
+    expected_paths = [
+        ".aib_brain/a.pyc",
+        ".aib_brain/z_package/__pycache__",
+        ".aib_brain/z_package/__pycache__/module.pyc",
+    ]
+    positions = [result.stderr.index(path) for path in expected_paths]
+    assert positions == sorted(positions)
+    versions = repo / "versions"
+    assert not versions.exists() or not list(versions.glob("*.zip"))
 
 
 def test_fallback_to_commit_subjects_when_curated_empty(repo: Path) -> None:

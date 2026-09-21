@@ -168,3 +168,27 @@ The AI Automation Agent MUST ensure:
 - Deeply nested logic (more than three levels of indentation) SHOULD be refactored into named helper functions with explanatory docstrings.
 - Error handling MUST be explicit; silent exception catching (bare `except`, `catch (Exception e)`) is PROHIBITED unless the rationale is documented in a comment.
 - Variable and function names MUST be descriptive and unambiguous. Single-letter names are permitted only as loop counters in well-understood idiomatic patterns.
+
+---
+
+## 12. `.aib_brain/` Write Protection
+
+Every path below `.aib_brain/` is framework-owned and MUST be treated as protected from writes by ordinary AIB workflows. A protected path MAY be created, modified, moved, or deleted only during:
+
+- AIB installation.
+- AIB upgrade.
+- A framework-maintenance request that the developer explicitly authorized to change `.aib_brain/`.
+
+Framework-maintenance authorization MUST originate in the current developer's `input.md` `## Input` text or current chat message. Authorization is semantic rather than phrase-bound; a statement equivalent to `This request explicitly authorizes changes under .aib_brain/.` is sufficient. Analysis, plan, prompt, or generated implementation text MUST NOT self-authorize protected writes. The analysis MUST copy the developer's authorization statement verbatim and identify its source in `## Overview` under `### Authorization`, or record `Not authorized`. The plan MUST propagate the same verbatim statement and source in `## Constraints`.
+
+An implementation driven by a plan MUST verify that user-sourced authorization is present in the plan before writing a protected path. Direct execution workflows MUST establish the same authorization from the current Input or chat before writing a protected path.
+
+When `.aib_brain/` instructions prescribe creation of a task-specific helper inside the repository, the helper MUST be placed under `.aib_memory/scratch/`. AIB does not prescribe a destination or authorization policy for long-lived host-project tooling. Generated artifacts, caches, and task outputs MUST NOT be written below `.aib_brain/`. Python commands prescribed by AIB prompts MUST use `python -B` or `python3 -B`, and AIB-managed Python process trees MUST set `PYTHONDONTWRITEBYTECODE=1`. This policy MUST NOT depend on or modify the host workspace `.gitignore` and MUST NOT relocate bytecode caches into another repository directory.
+
+Every writing workflow MUST carry the concise protection block defined by this section and inspect the paths it touched during its current run before finalization or request closure. If any touched `.aib_brain/**` path lacks the required authorization, the workflow MUST halt without finalizing, closing, or automatically reverting changes and MUST report:
+
+`ERROR: Unauthorized .aib_brain/ changes detected. Execution halted.`
+
+The error MUST be followed by the exact touched protected paths in deterministic sorted order. Existing protected-path changes that the current workflow did not touch MUST be preserved and MUST NOT be attributed to the current run.
+
+This protection applies across AIB writing workflows. It defines no generic write policy for host-project directories outside `.aib_brain/`.

@@ -48,8 +48,7 @@ Synchronise `.aib_memory/context.md` with an external specification file. Auto-c
 
 ### Phase 1 — Preflight
 
-Run `python .aib_brain/tools/log-entry.py --workspace . --message "aib-sync-spec Phase 1 started"`.
-If log-entry.py exits non-zero (no active request yet), suppress the error and proceed.
+Run `python -B .aib_brain/tools/log-entry.py --workspace . --message "aib-sync-spec Phase 1 started"`.
 
 1. Read `.aib_memory/instructions.md`. If present and non-empty, observe its content as persistent workspace-level instructions throughout execution.
 
@@ -58,45 +57,45 @@ If log-entry.py exits non-zero (no active request yet), suppress the error and p
 3. Read `.aib_memory/context.md`. If absent, halt with:
    `ERROR: context.md not found. Run aib-refresh-context.md first. Execution halted.`
 
-4. **Extension relevance check:** For each Reference entry in `## References` of `context.md`, read the `Summary:` and use AI semantic relevance judgement to determine whether the extension is relevant to the spec synchronisation. If relevant, read the full extension file at the `Location:` path and treat its content as additional input context.
+4. Execute `.aib_brain/prompts/aib-context-read.md` with the specification-synchronization goal and treat its returned extension contents as supplementary context. Do not independently parse or load Reference entries.
 
-5. Read `.aib_memory/input.md` YAML header via `python .aib_brain/tools/input-header.py --workspace . --operation read`.
+5. Read `.aib_memory/input.md` YAML header via `python -B .aib_brain/tools/input-header.py --workspace . --operation read`.
    - If `## Input` is empty or contains only whitespace, halt with:
      `ERROR: No spec file path provided in input.md ## Input. Add the path and re-run.`
    - Set `[SpecPath]` to the content of `## Input` (trimmed).
    - If `status == idle`: invoke `.aib_brain/prompts/aib-create-request.md` to auto-create an AIB request. After creation completes, re-read the YAML header to resolve the `request_id`.
 
-Run `python .aib_brain/tools/log-entry.py --workspace . --message "aib-sync-spec Phase 1 complete"`.
+Run `python -B .aib_brain/tools/log-entry.py --workspace . --message "aib-sync-spec Phase 1 complete"`.
 
 ---
 
 ### Phase 2 — Spec Read
 
-Run `python .aib_brain/tools/log-entry.py --workspace . --message "aib-sync-spec Phase 2 started"`.
+Run `python -B .aib_brain/tools/log-entry.py --workspace . --message "aib-sync-spec Phase 2 started"`.
 
 1. Read the full content of the file at `[SpecPath]`. If the file does not exist or cannot be read, halt with:
    `ERROR: Spec file not found or unreadable at path: [SpecPath]. Execution halted.`
 
-Run `python .aib_brain/tools/log-entry.py --workspace . --message "aib-sync-spec Phase 2 complete"`.
+Run `python -B .aib_brain/tools/log-entry.py --workspace . --message "aib-sync-spec Phase 2 complete"`.
 
 ---
 
 ### Phase 3 — Sentence-Level Extraction
 
-Run `python .aib_brain/tools/log-entry.py --workspace . --message "aib-sync-spec Phase 3 started"`.
+Run `python -B .aib_brain/tools/log-entry.py --workspace . --message "aib-sync-spec Phase 3 started"`.
 
 1. Split the spec content into individual sentences (sentence boundary detection).
 2. For each sentence, evaluate whether it contains a product-relevant statement that could be mapped to a `context.md` section (Product, Concepts, Requirements, Solution).
 3. Discard sentences that are purely structural (headings, metadata, formatting) with no product content.
 4. Retain all product-relevant sentences for contradiction detection and classification.
 
-Run `python .aib_brain/tools/log-entry.py --workspace . --message "aib-sync-spec Phase 3 complete"`.
+Run `python -B .aib_brain/tools/log-entry.py --workspace . --message "aib-sync-spec Phase 3 complete"`.
 
 ---
 
 ### Phase 4 — Contradiction Detection
 
-Run `python .aib_brain/tools/log-entry.py --workspace . --message "aib-sync-spec Phase 4 started"`.
+Run `python -B .aib_brain/tools/log-entry.py --workspace . --message "aib-sync-spec Phase 4 started"`.
 
 1. For each retained sentence, compare against existing `context.md` statements.
 2. A **contradiction** exists when the extracted sentence directly conflicts with an existing statement (not merely when it is new or supplementary).
@@ -105,13 +104,13 @@ Run `python .aib_brain/tools/log-entry.py --workspace . --message "aib-sync-spec
    - **Future-intent:** AI judges the sentence describes a feature not yet present in the workspace → add to `[NonContradictoryFuture]`.
    - **Current-state fact:** AI judges the sentence describes a currently implemented fact → add to `[NonContradictoryCurrent]`.
 
-Run `python .aib_brain/tools/log-entry.py --workspace . --message "aib-sync-spec Phase 4 complete"`.
+Run `python -B .aib_brain/tools/log-entry.py --workspace . --message "aib-sync-spec Phase 4 complete"`.
 
 ---
 
 ### Phase 5 — Q-block Generation (first run with contradictions)
 
-Run `python .aib_brain/tools/log-entry.py --workspace . --message "aib-sync-spec Phase 5 started"`.
+Run `python -B .aib_brain/tools/log-entry.py --workspace . --message "aib-sync-spec Phase 5 started"`.
 
 If `[ContradictionList]` is non-empty AND `input.md` YAML header `status != questions_generated`:
 
@@ -124,12 +123,12 @@ If `[ContradictionList]` is non-empty AND `input.md` YAML header `status != ques
      - `[ ] Merge both (describe merge intent in Answer: field)`
      - `[ ] Skip (do not update context.md for this item)`
 
-2. Run `python .aib_brain/tools/input-header.py --workspace . --operation write --state questions_generated`.
+2. Run `python -B .aib_brain/tools/input-header.py --workspace . --operation write --state questions_generated`.
 
 3. Halt with:
    `Note: [N] contradiction(s) detected between spec and context.md. Q-blocks written to input.md ## Questions. Answer all questions and re-run aib-sync-spec.md to apply non-contradictory items and resolve contradictions.`
 
-Run `python .aib_brain/tools/log-entry.py --workspace . --message "aib-sync-spec Phase 5 Q-blocks generated"`.
+Run `python -B .aib_brain/tools/log-entry.py --workspace . --message "aib-sync-spec Phase 5 Q-blocks generated"`.
 
 If `[ContradictionList]` is empty OR `status == questions_generated` (answers provided), proceed to Phase 6.
 
@@ -140,44 +139,49 @@ If `[ContradictionList]` is empty OR `status == questions_generated` (answers pr
 > **Precondition:** All Q-blocks in `input.md ## Questions` must be answered before this phase executes. If any Q-block is unanswered, halt with:
 > `ERROR: Unanswered Q-blocks in input.md ## Questions. Answer all questions and re-run.`
 
-Run `python .aib_brain/tools/log-entry.py --workspace . --message "aib-sync-spec Phase 6 started"`.
+Run `python -B .aib_brain/tools/log-entry.py --workspace . --message "aib-sync-spec Phase 6 started"`.
 
 1. **Apply non-contradictory future-intent items:** For each sentence in `[NonContradictoryFuture]`, determine the best-fit `context.md` section (Product, Concepts, Requirements, Solution) and run:
-   `python .aib_brain/tools/edit-context.py --operation insert --area <section> --planned --text "<statement>" --workspace .`
+   `python -B .aib_brain/tools/edit-context.py --operation insert --area <section> --planned --text "<statement>" --workspace .`
    If the call exits non-zero, halt immediately.
 
 2. **Apply non-contradictory current-state items:** For each sentence in `[NonContradictoryCurrent]`, determine the best-fit `context.md` section and run:
-   `python .aib_brain/tools/edit-context.py --operation insert --area <section> --text "<statement>" --workspace .`
+   `python -B .aib_brain/tools/edit-context.py --operation insert --area <section> --text "<statement>" --workspace .`
    If the call exits non-zero, halt immediately. (Duplicate statements are silently skipped by `edit-context.py`.)
 
 3. **Apply contradiction resolutions:** For each answered contradiction Q-block:
    - If `Keep existing`: no action.
    - If `Adopt spec version`: delete the existing statement and insert the spec version.
-     - `python .aib_brain/tools/edit-context.py --operation delete --area <section> --text "<existing statement>" --workspace .`
-     - `python .aib_brain/tools/edit-context.py --operation insert --area <section> --text "<spec statement>" --workspace .`
+     - `python -B .aib_brain/tools/edit-context.py --operation delete --area <section> --text "<existing statement>" --workspace .`
+     - `python -B .aib_brain/tools/edit-context.py --operation insert --area <section> --text "<spec statement>" --workspace .`
    - If `Merge both`: insert a merged statement (preserving both intents) and optionally delete the old one.
    - If `Skip`: no action.
 
-4. After all edits, run `python .aib_brain/tools/verify-context.py --workspace .`. If it exits with code 1, correct deviations before proceeding.
+4. After all edits, run `python -B .aib_brain/tools/verify-context.py --workspace .`. If it exits with code 1, correct deviations before proceeding.
 
-Run `python .aib_brain/tools/log-entry.py --workspace . --message "aib-sync-spec Phase 6 complete"`.
+Run `python -B .aib_brain/tools/log-entry.py --workspace . --message "aib-sync-spec Phase 6 complete"`.
 
 ---
 
 ### Phase 7 — Completion
 
-Run `python .aib_brain/tools/log-entry.py --workspace . --message "aib-sync-spec Phase 7 started"`.
+Run `python -B .aib_brain/tools/log-entry.py --workspace . --message "aib-sync-spec Phase 7 started"`.
 
-1. Run `python .aib_brain/tools/finalize-input.py --workspace .` to archive `input.md` and reset to seed template.
+1. Run `python -B .aib_brain/tools/finalize-input.py --workspace .` to archive `input.md` and reset to seed template.
 2. Output a completion summary: number of `[PLANNED]` entries added, number of plain entries added, number of contradiction resolutions applied.
 
-Run `python .aib_brain/tools/log-entry.py --workspace . --message "aib-sync-spec Phase 7 complete"`.
+Run `python -B .aib_brain/tools/log-entry.py --workspace . --message "aib-sync-spec Phase 7 complete"`.
 
 ---
 
 ## Safety
 
 - The only permitted write targets are `.aib_memory/context.md` and `.aib_memory/input.md`.
-- MUST NOT modify any file under `.aib_brain/`.
 - MUST NOT create files outside `.aib_memory/`.
 - All `edit-context.py` invocations that exit non-zero cause an immediate halt.
+- **`.aib_brain/` write protection (canonical: `.aib_brain/conventions/coding-general-convention.md` § 12):**
+  - Every path under `.aib_brain/` is protected. Writes are permitted only for installation, upgrade, or a framework-maintenance request semantically authorized by a developer statement in the current `input.md ## Input` or chat that is equivalent to `This request explicitly authorizes changes under .aib_brain/.`.
+  - Generated analysis, plan, prompt, or implementation text MUST NOT self-authorize protected writes. Applicable analysis and plan workflows MUST propagate the developer statement verbatim with its source.
+  - AIB-prescribed in-repository task-specific helpers MUST be created under `.aib_memory/scratch/`. This rule defines no destination or authorization policy for long-lived host-project tooling.
+  - Generated artifacts and caches MUST NOT be placed under `.aib_brain/`; prescribed direct AIB Python commands MUST use `python -B` or `python3 -B`; protection MUST NOT depend on or modify `.gitignore`.
+  - Before finalization or close, the writing workflow MUST inspect its current-run touched paths. For unauthorized `.aib_brain/**` paths, output `ERROR: Unauthorized .aib_brain/ changes detected. Execution halted.` followed by the exact paths in sorted order, then halt without finalizing, closing, or automatically reverting. Preserve unrelated pre-existing changes.

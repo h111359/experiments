@@ -22,6 +22,8 @@ Document Structure (normative)
   ### Task <N>: <Task Name>
   #### Intent
   <single-sentence goal and artifacts changed/produced>
+  #### Outputs
+  <exact file paths or command outputs produced by the task>
   #### Procedure
   <step 1>
   <blank line>
@@ -66,7 +68,7 @@ Valid plan.md requires all:
 - ## Amends section MUST NOT exist in plan.md; use input.md for amendments.
 Operational Workflow (normative)
 - aib-analyze.md generates plan from input.md + Q&A answers.
-- implement MUST treat plan as authoritative; MUST NOT alter plan; MUST NOT read .aib_memory/context.md; all execution context MUST be in plan.
+- implement MUST treat the plan as the authoritative implementation directive and MUST NOT alter it. It MUST read `.aib_memory/context.md` as supplementary workspace context, but that context MUST NOT expand, override, or replace the plan’s scope or tasks. All request-specific execution directives MUST be self-contained in the plan.
 Change Control (normative)
 - Update this convention before generating new plan files.
 - Existing plans SHOULD NOT be auto-rewritten when convention changes.

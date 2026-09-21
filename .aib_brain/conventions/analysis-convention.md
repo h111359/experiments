@@ -13,6 +13,7 @@ NO: [use $AD as exec spec]
 Applies to: analysis-$RID.md only.
 Target: analysis-$RID.md | Location: $AM (active) or $ARQ (archived)
 Out of scope: plan, questionnaire, impl records (own conventions or removed).
+This convention is authoritative for analysis-document content. [q-block-convention.md](q-block-convention.md) is authoritative for Q-block formatting in both analysis questionnaires and clarification questions; its multiple-choice recommendation requirement applies to those Q-blocks. See section 4.6 for the distinction from neutral analysis alternatives.
 Keywords MUST/MUST NOT/SHALL/SHOULD/MAY per BCP 14 (RFC 2119/8174).
 
 ## 3. File Naming, Location & Write Behavior
@@ -56,7 +57,6 @@ Rules: present in every run (first+re-run) | faithfully represent dev intent (en
 Primary AI reasoning artifact. Documents full analytical thinking.
 Required:
 - Workspace pattern-scan: impacted components, cross-ref issues, relevant prior solutions
-- Industry knowledge: best practices+external benchmarking; min 3 findings from established frameworks/OSS communities/industry lit; each with applicability assessment
 - AI Agent critique: bullet-list review of ALL issues in req itself + every file read this run; not limited to current scope; each issue = 1 bullet regardless of scope relation
   Issue types: [misalignment | inconsistencies | logical errors | redundancies | misplaced content | unclear wording | broken cross-refs | format drift | other quality concerns]
 - Edge Cases: dedicated `### Edge Cases` subsection required; position: after AI Agent critique, before Requirements Gate Evaluation; list all edge cases identified during analysis (first-run vs re-run semantics, empty states, boundary conditions, cross-file invariant violations, migration concerns)
@@ -70,7 +70,7 @@ Required subsections in fixed order:
   ### High-Level Concept: one or two plain-English sentences stating what will change and why this approach was chosen
   ### Execution Steps: ordered list of implementation tasks; each task uses an `#### Task N: <Name>` header; each action under a task is a single bullet `- <file-or-command>: <description>` targeting exactly one file path or one executable command; cross-file invariants that cannot be expressed as single-target actions are folded as indented sub-notes under the most relevant action bullet; this section is read by aib-analyze.md §S09 when generating the plan.
 When open `ask` Decision Points exist: render best-current-guess content and annotate any field that may change with `> Pending: depends on Decision Point <name>`; fill completely on re-run after all DPs resolved.
-Rules: all three subsections MUST be present even if content is preliminary | MUST NOT be empty | fully regenerated each re-run.
+Rules: all subsections MUST be present even if content is preliminary | MUST NOT be empty | fully regenerated each re-run.
 NO: [implementation code | copy of Decision Register alternatives | raw file diffs]
 
 ### 4.5 Context Update Analysis
@@ -92,7 +92,9 @@ Required per $DP:
 - Resolution classification:
   - resolve-autonomously: ONLY when developer's input.md ## Input OR named specific section of workspace convention file explicitly+unambiguously resolves it; rationale MUST quote/cite exact source text+file path
     NO: [external benchmarking | industry best practices | AI judgment as justification]
-  - ask: Q-block raised for dev input; AI MUST NOT express preference or steer toward any option; present choices neutrally
+  - ask: developer input is required. While the Decision Point is unresolved, AI MUST present all alternatives neutrally in the analysis document and MUST NOT identify a preferred option.
+    - The corresponding multiple-choice Q-block in `.aib_memory/input.md` MUST follow [q-block-convention.md](q-block-convention.md), including its requirement to mark exactly one option as recommended and place it first. This recommendation belongs in the Q-block; it MUST NOT alter or mark a preferred option among the neutral alternatives recorded in the analysis Decision Register.
+    - A Q-block recommendation MUST NOT be treated as a user answer or as resolution of the associated Decision Point. Options remain unchecked until answered by the user; existing answer handling and resolution classifications continue to apply.
   - resolved-by-user: user already decided
 - Resolution outcome: retain only chosen alternative; discard non-chosen from final doc
 Structure:

@@ -34,7 +34,6 @@ Apply the following rules:
 
 
 ## Directive (MUST): README maintenance
-## Directive: README maintenance
 
 After each execution of the implementation prompt `.aib_brain/prompts/aib-implement.md` make a review of `.aib_brain/README.md` reflecting if needed the changes made in the current request. Modification of `.aib_brain/README.md` is allowed exception from the rule no `.aib_brain` files to be changed.
 

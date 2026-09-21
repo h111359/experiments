@@ -32,6 +32,16 @@ MINIMAL_CONCEPTS = "## Concepts\n- Test concept.\n\n"
 MINIMAL_REQUIREMENTS = "## Requirements\n- MUST: Test requirement.\n\n"
 MINIMAL_SOLUTION = "## Solution\n- Test solution.\n\n"
 MINIMAL_FILE_STRUCTURE = "## File Structure\n.aib_brain/ - brain folder\n\n"
+MANAGED_REFERENCES = textwrap.dedent("""\
+    ## References
+    ### Context Data Model
+    Location: .aib_memory/context-data-model.md
+    Summary: Logical, physical, and analytical schemas, entities, and relationships discovered in the workspace.
+    Convention: .aib_brain/conventions/context-data-model-convention.md
+    Prompt: .aib_brain/prompts/aib-refresh-context-data-model.md
+    Read: no
+    Update: yes
+""")
 
 
 def _build_minimal(extra: str = "") -> str:
@@ -43,6 +53,7 @@ def _build_minimal(extra: str = "") -> str:
         + MINIMAL_REQUIREMENTS
         + MINIMAL_SOLUTION
         + MINIMAL_FILE_STRUCTURE
+        + MANAGED_REFERENCES
         + extra
     )
 
@@ -85,6 +96,7 @@ class TestPlannedTagInContentSections:
             + MINIMAL_REQUIREMENTS
             + MINIMAL_SOLUTION
             + MINIMAL_FILE_STRUCTURE
+            + MANAGED_REFERENCES
         )
         result = _run_verify(tmp_path, content)
         assert result.returncode == 0, (
@@ -191,80 +203,50 @@ class TestIssuesSectionFormat:
 
 
 # ---------------------------------------------------------------------------
-# Check 12: References Update: flag validation
+# Check 12: managed References flag validation
 # ---------------------------------------------------------------------------
 
 class TestReferencesUpdateFlag:
-    """References entries Update: line must have value 'true' or 'false'."""
+    """Managed Read and Update values accept only case-insensitive yes or no."""
 
-    def test_no_update_flag_passes(self, tmp_path: Path) -> None:
-        """References entry without Update: line passes check 12."""
-        content = _build_minimal() + textwrap.dedent("""\
-            ## References
-            ### My Ref
-            Location: docs/ref.md
-            Summary: A plain reference without extension flag.
-        """)
+    @pytest.mark.parametrize(
+        ("read_value", "update_value"),
+        [("yes", "no"), ("YES", "NO"), ("Yes", "yEs")],
+    )
+    def test_yes_no_case_variants_pass(
+        self, tmp_path: Path, read_value: str, update_value: str
+    ) -> None:
+        """Case variants of yes and no pass check 12."""
+        content = _build_minimal().replace("Read: no", f"Read: {read_value}").replace(
+            "Update: yes", f"Update: {update_value}"
+        )
         result = _run_verify(tmp_path, content)
         assert result.returncode == 0, (
-            f"References entry without Update: should pass.\nSTDOUT: {result.stdout}"
+            f"Case-insensitive yes/no should pass.\nSTDOUT: {result.stdout}"
         )
 
-    def test_update_false_passes(self, tmp_path: Path) -> None:
-        """References entry with Update: false passes check 12."""
-        content = _build_minimal() + textwrap.dedent("""\
-            ## References
-            ### My Extension
-            Location: docs/ext.md
-            Summary: A read-only extension.
-            Update: false
-        """)
+    @pytest.mark.parametrize("legacy_value", ["true", "false", "True", "FALSE"])
+    def test_legacy_booleans_fail(self, tmp_path: Path, legacy_value: str) -> None:
+        """Legacy boolean values fail immediately."""
+        content = _build_minimal().replace("Update: yes", f"Update: {legacy_value}")
         result = _run_verify(tmp_path, content)
-        assert result.returncode == 0, (
-            f"References entry with 'Update: false' should pass.\nSTDOUT: {result.stdout}"
-        )
+        assert result.returncode == 1
+        assert "[FAIL] check_references_update_flag" in result.stdout
 
-    def test_update_true_passes(self, tmp_path: Path) -> None:
-        """References entry with Update: true passes check 12."""
-        content = _build_minimal() + textwrap.dedent("""\
-            ## References
-            ### My Writable Extension
-            Location: docs/ext.md
-            Summary: A writable extension.
-            Update: true
-        """)
+    def test_arbitrary_flag_value_fails(self, tmp_path: Path) -> None:
+        """Values outside yes/no fail check 12."""
+        content = _build_minimal().replace("Read: no", "Read: maybe")
         result = _run_verify(tmp_path, content)
-        assert result.returncode == 0, (
-            f"References entry with 'Update: true' should pass.\nSTDOUT: {result.stdout}"
-        )
+        assert result.returncode == 1
+        assert "[FAIL] check_references_update_flag" in result.stdout
 
-    def test_update_invalid_value_fails(self, tmp_path: Path) -> None:
-        """References entry with invalid Update: value fails check 12."""
-        content = _build_minimal() + textwrap.dedent("""\
-            ## References
-            ### My Extension
-            Location: docs/ext.md
-            Summary: An extension with invalid flag.
-            Update: yes
-        """)
+    @pytest.mark.parametrize("field", ["Read: no\n", "Update: yes\n"])
+    def test_missing_flag_fails(self, tmp_path: Path, field: str) -> None:
+        """Both Read and Update fields are required."""
+        content = _build_minimal().replace(field, "")
         result = _run_verify(tmp_path, content)
-        assert result.returncode == 1, (
-            f"References entry with 'Update: yes' should fail check 12.\nSTDOUT: {result.stdout}"
-        )
-
-    def test_update_uppercase_fails(self, tmp_path: Path) -> None:
-        """References entry with Update: True (capitalized) fails check 12."""
-        content = _build_minimal() + textwrap.dedent("""\
-            ## References
-            ### My Extension
-            Location: docs/ext.md
-            Summary: An extension with capitalized flag.
-            Update: True
-        """)
-        result = _run_verify(tmp_path, content)
-        assert result.returncode == 1, (
-            f"References entry with 'Update: True' (capital T) should fail check 12.\nSTDOUT: {result.stdout}"
-        )
+        assert result.returncode == 1
+        assert "[FAIL] check_references_format" in result.stdout
 
 
 # ---------------------------------------------------------------------------

@@ -232,6 +232,37 @@ def _rotate_marker(brain_path: Path, old_marker: str, new_marker: str) -> None:
     new_path.write_text("", encoding="utf-8")
 
 
+def _validate_brain_archive_sources(brain_path: Path) -> None:
+    """Reject Python bytecode contamination before archive creation.
+
+    Args:
+        brain_path: Framework directory whose complete contents would be zipped.
+
+    Returns:
+        None when the framework tree contains no bytecode artifacts.
+
+    Raises:
+        ReleaseBookkeepingError: If any ``__pycache__`` directory or ``.pyc``
+            file exists below the framework directory.
+    """
+    offenders: list[str] = []
+    workspace_root = brain_path.parent
+    for candidate in brain_path.rglob("*"):
+        if candidate.is_dir() and candidate.name == "__pycache__":
+            offenders.append(candidate.relative_to(workspace_root).as_posix())
+        elif candidate.is_file() and candidate.name.endswith(".pyc"):
+            offenders.append(candidate.relative_to(workspace_root).as_posix())
+
+    if offenders:
+        sorted_offenders = sorted(offenders)
+        formatted_paths = "\n".join(f"- {path}" for path in sorted_offenders)
+        raise ReleaseBookkeepingError(
+            "Refusing to archive contaminated .aib_brain/. "
+            "Remove Python bytecode artifacts before packaging:\n"
+            f"{formatted_paths}"
+        )
+
+
 def _create_brain_zip(brain_path: Path, versions_dir: Path, version_marker: str) -> Path:
     """Create a versioned zip archive of brain_path in versions_dir.
 
@@ -241,6 +272,8 @@ def _create_brain_zip(brain_path: Path, versions_dir: Path, version_marker: str)
 
     Returns the path to the zip file (whether created or pre-existing).
     """
+    _validate_brain_archive_sources(brain_path)
+
     versions_dir.mkdir(parents=True, exist_ok=True)
     zip_path = versions_dir / f"aib_brain_{version_marker}.zip"
 

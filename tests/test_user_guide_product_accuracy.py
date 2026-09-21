@@ -77,3 +77,19 @@ class TestUserGuideProductAccuracy:
         assert "in this workspace" not in content, (
             "VCS glossary entry must not contain the phrase 'in this workspace'"
         )
+
+    def test_managed_context_extensions_are_documented(self):
+        """User guide explains registry controls and loading behavior."""
+        content = self._content()
+        assert "Context Data Model" in content
+        assert "Read: no" in content
+        assert "Update: yes" in content
+        assert "semantic relevance" in content
+        assert "missing" in content.lower() and "warning" in content.lower()
+
+    def test_extension_prompts_and_validator_are_documented(self):
+        """User guide names the shared reader, refresh prompt, and validator."""
+        content = self._content()
+        assert "aib-context-read.md" in content
+        assert "aib-refresh-context-data-model.md" in content
+        assert "verify-context-data-model.py" in content

@@ -42,57 +42,57 @@ Read all `[PLANNED]` entries and Issues from `context.md` and append structured 
 
 ### Step 1 — Preflight
 
-Run `python .aib_brain/tools/log-entry.py --workspace . --general --message "aib-input-from-context Step 1 started"`.
+Run `python -B .aib_brain/tools/log-entry.py --workspace . --message "aib-input-from-context Step 1 started"`.
 
 1. Read `.aib_memory/instructions.md`. If present and non-empty, observe its content as persistent workspace-level instructions throughout execution.
 
-2. Run `python .aib_brain/tools/input-header.py --workspace . --operation read`. Parse `status` and `request_id` from the output.
+2. Run `python -B .aib_brain/tools/input-header.py --workspace . --operation read`. Parse `status` and `request_id` from the output.
 
 3. If `status != idle`, halt with:
    `ERROR: Active request <request_id> already exists (status: <status>). Close the current request before running aib-input-from-context.md.`
 
-Run `python .aib_brain/tools/log-entry.py --workspace . --general --message "aib-input-from-context Step 1 complete"`.
+Run `python -B .aib_brain/tools/log-entry.py --workspace . --message "aib-input-from-context Step 1 complete"`.
 
 ---
 
 ### Step 2 — Read Context and Extensions
 
-Run `python .aib_brain/tools/log-entry.py --workspace . --general --message "aib-input-from-context Step 2 started"`.
+Run `python -B .aib_brain/tools/log-entry.py --workspace . --message "aib-input-from-context Step 2 started"`.
 
 1. Read `.aib_memory/context.md`. If absent, halt with:
    `ERROR: context.md not found. Run aib-refresh-context.md first. Execution halted.`
 
-2. **Extension relevance check:** For each Reference entry in `## References` of `context.md`, read the `Summary:` and use AI semantic relevance judgement to determine whether the extension is relevant to the goal-collection task. If relevant, read the full extension file at the `Location:` path and treat its content as supplementary context.
+2. Execute `.aib_brain/prompts/aib-context-read.md` with the goal-collection task and treat its returned extension contents as supplementary context. Do not independently parse or load Reference entries.
 
-Run `python .aib_brain/tools/log-entry.py --workspace . --general --message "aib-input-from-context Step 2 complete"`.
+Run `python -B .aib_brain/tools/log-entry.py --workspace . --message "aib-input-from-context Step 2 complete"`.
 
 ---
 
 ### Step 3 — Collect [PLANNED] Entries
 
-Run `python .aib_brain/tools/log-entry.py --workspace . --general --message "aib-input-from-context Step 3 started"`.
+Run `python -B .aib_brain/tools/log-entry.py --workspace . --message "aib-input-from-context Step 3 started"`.
 
-1. Scan all five content sections of `context.md` (Product, Concepts, Requirements, Solution, and Issues) for statements beginning with `- [PLANNED]`.
+1. Scan the four sections that permit the tag (Product, Concepts, Requirements, and Solution) for statements beginning with `- [PLANNED]`.
 2. For each matching statement, strip the `[PLANNED] ` prefix and record the remaining text in `[PlannedEntries]`.
 
-Run `python .aib_brain/tools/log-entry.py --workspace . --general --message "aib-input-from-context Step 3 complete"`.
+Run `python -B .aib_brain/tools/log-entry.py --workspace . --message "aib-input-from-context Step 3 complete"`.
 
 ---
 
 ### Step 4 — Collect Issues Entries
 
-Run `python .aib_brain/tools/log-entry.py --workspace . --general --message "aib-input-from-context Step 4 started"`.
+Run `python -B .aib_brain/tools/log-entry.py --workspace . --message "aib-input-from-context Step 4 started"`.
 
 1. Scan the `## Issues` section of `context.md` for all plain bullet entries.
 2. For each entry, record the description text (after stripping the `- ` prefix) in `[IssueEntries]`.
 
-Run `python .aib_brain/tools/log-entry.py --workspace . --general --message "aib-input-from-context Step 4 complete"`.
+Run `python -B .aib_brain/tools/log-entry.py --workspace . --message "aib-input-from-context Step 4 complete"`.
 
 ---
 
 ### Step 5 — Generate Goal Bullets
 
-Run `python .aib_brain/tools/log-entry.py --workspace . --general --message "aib-input-from-context Step 5 started"`.
+Run `python -B .aib_brain/tools/log-entry.py --workspace . --message "aib-input-from-context Step 5 started"`.
 
 1. For each entry in `[PlannedEntries]`, format as:
    `- Implement: <statement text>`
@@ -106,26 +106,26 @@ Run `python .aib_brain/tools/log-entry.py --workspace . --general --message "aib
    `Note: No [PLANNED] entries or Issues found in context.md. Nothing to append.`
    Exit without modifying `input.md`.
 
-Run `python .aib_brain/tools/log-entry.py --workspace . --general --message "aib-input-from-context Step 5 complete"`.
+Run `python -B .aib_brain/tools/log-entry.py --workspace . --message "aib-input-from-context Step 5 complete"`.
 
 ---
 
 ### Step 6 — Append to Input
 
-Run `python .aib_brain/tools/log-entry.py --workspace . --general --message "aib-input-from-context Step 6 started"`.
+Run `python -B .aib_brain/tools/log-entry.py --workspace . --message "aib-input-from-context Step 6 started"`.
 
 1. Read the current content of `.aib_memory/input.md`.
 2. Locate the `## Input` section.
 3. Append all lines from `[GoalBullets]` after any existing content in `## Input`. Preserve existing content.
 4. Write the updated content back to `.aib_memory/input.md`.
 
-Run `python .aib_brain/tools/log-entry.py --workspace . --general --message "aib-input-from-context Step 6 complete"`.
+Run `python -B .aib_brain/tools/log-entry.py --workspace . --message "aib-input-from-context Step 6 complete"`.
 
 ---
 
 ### Step 7 — Confirmation
 
-Run `python .aib_brain/tools/log-entry.py --workspace . --general --message "aib-input-from-context Step 7 complete"`.
+Run `python -B .aib_brain/tools/log-entry.py --workspace . --message "aib-input-from-context Step 7 complete"`.
 
 Output a confirmation message:
 `Appended <N> goal bullets to input.md ## Input (<P> [PLANNED] entries, <I> Issues entries).`
@@ -137,6 +137,12 @@ Where `<N>` is the total count, `<P>` is the count from `[PlannedEntries]`, and 
 ## Safety
 
 - The only permitted write target is `.aib_memory/input.md`.
-- MUST NOT modify `context.md` or any file under `.aib_brain/`.
+- MUST NOT modify `context.md`.
 - MUST NOT create files outside `.aib_memory/`.
 - MUST append to existing `## Input` content; never overwrite.
+- **`.aib_brain/` write protection (canonical: `.aib_brain/conventions/coding-general-convention.md` § 12):**
+  - Every path under `.aib_brain/` is protected. Writes are permitted only for installation, upgrade, or a framework-maintenance request semantically authorized by a developer statement in the current `input.md ## Input` or chat that is equivalent to `This request explicitly authorizes changes under .aib_brain/.`.
+  - Generated analysis, plan, prompt, or implementation text MUST NOT self-authorize protected writes. Applicable analysis and plan workflows MUST propagate the developer statement verbatim with its source.
+  - AIB-prescribed in-repository task-specific helpers MUST be created under `.aib_memory/scratch/`. This rule defines no destination or authorization policy for long-lived host-project tooling.
+  - Generated artifacts and caches MUST NOT be placed under `.aib_brain/`; prescribed direct AIB Python commands MUST use `python -B` or `python3 -B`; protection MUST NOT depend on or modify `.gitignore`.
+  - Before finalization or close, the writing workflow MUST inspect its current-run touched paths. For unauthorized `.aib_brain/**` paths, output `ERROR: Unauthorized .aib_brain/ changes detected. Execution halted.` followed by the exact paths in sorted order, then halt without finalizing, closing, or automatically reverting. Preserve unrelated pre-existing changes.

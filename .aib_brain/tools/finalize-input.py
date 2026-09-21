@@ -88,6 +88,34 @@ def _is_stub_equivalent(content: str) -> bool:
     return _strip_frontmatter(content) == _strip_frontmatter(_INPUT_SEED_TEMPLATE)
 
 
+def _clean_scratch_directory(workspace: Path) -> None:
+    """Remove finalized task helpers while preserving the scratch sentinel.
+
+    Args:
+        workspace: Workspace root containing the managed AIB memory directory.
+
+    Returns:
+        None. The scratch directory and its ``.gitkeep`` sentinel remain present.
+
+    Raises:
+        ValidationError: If scratch content cannot be removed or the sentinel
+            cannot be created.
+    """
+    scratch_dir = workspace / ".aib_memory" / "scratch"
+    try:
+        scratch_dir.mkdir(parents=True, exist_ok=True)
+        for item in scratch_dir.iterdir():
+            if item.name == ".gitkeep" and item.is_file():
+                continue
+            if item.is_dir() and not item.is_symlink():
+                shutil.rmtree(item)
+            else:
+                item.unlink()
+        (scratch_dir / ".gitkeep").touch(exist_ok=True)
+    except OSError as exc:
+        raise ValidationError(f"Failed to clean .aib_memory/scratch/: {exc}") from exc
+
+
 def main() -> None:
     """Entry point: archive input.md, move attachments, reset input.md.
 
@@ -99,6 +127,7 @@ def main() -> None:
        <request-folder>/<relative-path>, preserving subdirectory structure.
     4. Write the seed template to input.md, replacing "No active request" with
        the resolved request ID and title.
+    5. Remove all scratch content except the managed .gitkeep sentinel.
 
     Raises:
         SystemExit(1): On any ValidationError (missing workspace, missing register,
@@ -182,6 +211,10 @@ def main() -> None:
         reset_content = write_input_header(_INPUT_SEED_TEMPLATE, reset_header)
         write_text(input_file, reset_content)
         print(f"Reset input.md - active request: {request_id} - {title}")
+
+        # ---- Step 4: Sweep managed scratch content -------------------------
+        _clean_scratch_directory(workspace)
+        print("Cleaned .aib_memory/scratch/ (preserved .gitkeep).")
 
     except ValidationError as exc:
         print(f"ERROR: {exc}")

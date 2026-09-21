@@ -10,7 +10,7 @@ import re
 import sys
 from pathlib import Path
 
-from common import parse_input_header, read_text, write_input_header, write_text
+from common import configure_utf8_output, parse_input_header, read_text, write_input_header, write_text
 
 # Valid section names (must match context-convention.md)
 VALID_SECTIONS = {
@@ -55,6 +55,24 @@ TABLE_PATTERN = re.compile(r"^\|")
 
 # Type-letter prefix pattern (e.g., "- N: text" or "- R: text")
 TYPE_LETTER_PATTERN = re.compile(r"^- [A-Z]: ")
+
+# Canonical managed registry fields (Read and Update remain user-controlled).
+MANAGED_REFERENCE_FIXED_LINES = [
+    "### Context Data Model",
+    "Location: .aib_memory/context-data-model.md",
+    "Summary: Logical, physical, and analytical schemas, entities, and relationships discovered in the workspace.",
+    "Convention: .aib_brain/conventions/context-data-model-convention.md",
+    "Prompt: .aib_brain/prompts/aib-refresh-context-data-model.md",
+]
+
+REQUIRED_SECTION_ORDER = [
+    "Product",
+    "Concepts",
+    "Requirements",
+    "Solution",
+    "File Structure",
+    "References",
+]
 
 
 def _parse_args() -> argparse.Namespace:
@@ -141,7 +159,7 @@ def check_document_title(content: str) -> tuple[bool, str]:
 
 def check_all_h2_headings_valid(content: str) -> tuple[bool, str]:
     """
-    Verify every H2 heading is one of the 6 valid section names.
+    Verify H2 names, uniqueness, mandatory presence, and canonical order.
 
     Args:
         content: Full text of context.md.
@@ -150,17 +168,25 @@ def check_all_h2_headings_valid(content: str) -> tuple[bool, str]:
         Tuple of (passed, message).
     """
     lines = content.splitlines()
-    invalid_headings = []
+    headings = []
 
     for line in lines:
         stripped = line.strip()
         if H2_PATTERN.match(stripped):
             heading_text = stripped[3:].strip()
-            if heading_text not in VALID_SECTIONS:
-                invalid_headings.append(stripped)
+            headings.append(heading_text)
 
+    invalid_headings = [heading for heading in headings if heading not in VALID_SECTIONS]
     if invalid_headings:
         return False, f"Invalid H2 headings found: {invalid_headings[:5]}."
+
+    duplicates = sorted({heading for heading in headings if headings.count(heading) > 1})
+    if duplicates:
+        return False, f"Duplicate H2 headings found: {duplicates}."
+
+    expected = REQUIRED_SECTION_ORDER + (["Issues"] if "Issues" in headings else [])
+    if headings != expected:
+        return False, f"H2 headings must be ordered exactly as {expected}; found {headings}."
     return True, ""
 
 
@@ -331,10 +357,7 @@ def check_requirements_format(content: str) -> tuple[bool, str]:
 
 def check_references_format(content: str) -> tuple[bool, str]:
     """
-    Verify References section entries have required sub-structure, if the section exists.
-
-    Each entry must have a '###' sub-heading followed within 5 lines by 'Location:' and 'Summary:'.
-    If '## References' is absent, this check passes automatically.
+    Verify the exact managed References registry structure and fixed metadata.
 
     Args:
         content: Full text of context.md.
@@ -354,30 +377,24 @@ def check_references_format(content: str) -> tuple[bool, str]:
             ref_end = i
             break
 
-    # References section absent — check passes automatically
     if ref_start is None:
-        return True, ""
+        return False, "Mandatory section '## References' not found."
 
     if ref_end is None:
         ref_end = len(lines)
 
-    # Find all ### sub-headings in References section
-    invalid_entries = []
-    i = ref_start + 1
-    while i < ref_end:
-        stripped = lines[i].strip()
-        if H3_PATTERN.match(stripped):
-            # Check that Location: and Summary: appear within 5 lines
-            window_end = min(i + 6, ref_end)
-            window = [lines[j].strip() for j in range(i + 1, window_end)]
-            has_location = any("Location:" in w for w in window)
-            has_summary = any("Summary:" in w for w in window)
-            if not has_location or not has_summary:
-                invalid_entries.append(f"Line {i + 1}: References entry '{stripped}' missing Location: or Summary:.")
-        i += 1
+    registry_lines = [line.strip() for line in lines[ref_start + 1:ref_end] if line.strip()]
+    if len(registry_lines) != 7:
+        return False, "References must contain exactly one seven-line managed entry."
 
-    if invalid_entries:
-        return False, f"Malformed References entries: {invalid_entries[:3]}."
+    if registry_lines[:5] != MANAGED_REFERENCE_FIXED_LINES:
+        return False, (
+            "Managed Context Data Model heading or fixed Location, Summary, Convention, "
+            "and Prompt metadata does not match the convention."
+        )
+
+    if not registry_lines[5].startswith("Read:") or not registry_lines[6].startswith("Update:"):
+        return False, "Managed entry must end with Read then Update fields in exact order."
     return True, ""
 
 
@@ -456,9 +473,7 @@ def check_issues_format(content: str) -> tuple[bool, str]:
 
 def check_references_update_flag(content: str) -> tuple[bool, str]:
     """
-    Verify all Update: lines in References entries have valid values (true or false).
-
-    If no Reference entry contains an Update: line, this check passes automatically.
+    Verify managed Read and Update fields use case-insensitive yes or no.
 
     Args:
         content: Full text of context.md.
@@ -478,23 +493,32 @@ def check_references_update_flag(content: str) -> tuple[bool, str]:
             ref_end = i
             break
 
-    # References section absent — check passes automatically
     if ref_start is None:
-        return True, ""
+        return False, "Mandatory section '## References' not found."
 
     if ref_end is None:
         ref_end = len(lines)
 
+    found_fields = {"Read": 0, "Update": 0}
     invalid_flags = []
     for i in range(ref_start + 1, ref_end):
         stripped = lines[i].strip()
-        if stripped.startswith("Update:"):
-            value = stripped[len("Update:"):].strip()
-            if value not in ("true", "false"):
-                invalid_flags.append(f"Line {i + 1}: invalid Update: value '{value}' (must be 'true' or 'false').")
+        for field in found_fields:
+            prefix = f"{field}:"
+            if stripped.startswith(prefix):
+                found_fields[field] += 1
+                value = stripped[len(prefix):].strip()
+                if value.lower() not in ("yes", "no"):
+                    invalid_flags.append(
+                        f"Line {i + 1}: invalid {field}: value '{value}' (must be 'yes' or 'no')."
+                    )
+
+    missing_or_duplicate = [field for field, count in found_fields.items() if count != 1]
+    if missing_or_duplicate:
+        return False, f"References must contain exactly one of each flag: {missing_or_duplicate}."
 
     if invalid_flags:
-        return False, f"Invalid References Update: flags: {invalid_flags[:5]}."
+        return False, f"Invalid References flags: {invalid_flags[:5]}."
     return True, ""
 
 
@@ -526,6 +550,7 @@ def main() -> int:
     Returns:
         0 on all checks passing, 1 on any failure.
     """
+    configure_utf8_output()
     args = _parse_args()
     workspace = Path(args.workspace)
 

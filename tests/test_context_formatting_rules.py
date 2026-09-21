@@ -215,19 +215,40 @@ class TestIssuesSectionConvention:
 
 
 class TestReferenceUpdateFlagConvention:
-    """context-convention.md must define the Update: flag for References entries."""
+    """context-convention.md must define the managed extension registry."""
 
     def test_update_flag_defined(self) -> None:
-        """Convention must define Update: false and Update: true flags."""
+        """Convention must define lowercase yes/no Read and Update defaults."""
         content = CONTEXT_CONVENTION.read_text(encoding="utf-8")
-        assert "Update: false" in content and "Update: true" in content, (
-            "context-convention.md must define 'Update: false' and 'Update: true' flag values."
-        )
+        assert "Read: no" in content
+        assert "Update: yes" in content
+        assert "case-insensitive" in content
+        assert "Legacy `true` and `false` values are invalid" in content
 
     def test_update_flag_distinguishes_extensions(self) -> None:
-        """Convention must state that the Update: flag distinguishes extensions from plain references."""
+        """Convention must prohibit bibliography and define the ownership boundary."""
         content = CONTEXT_CONVENTION.read_text(encoding="utf-8")
-        assert "extension" in content.lower(), (
-            "context-convention.md must describe the Update: flag as distinguishing "
-            "extension registrations from plain references."
-        )
+        assert "Bibliographic" in content
+        assert "Users MAY edit only the Read and Update values" in content
+
+    def test_managed_entry_fields_and_paths_defined(self) -> None:
+        """Canonical entry uses exact field order and portable workspace paths."""
+        content = CONTEXT_CONVENTION.read_text(encoding="utf-8")
+        expected = [
+            "### Context Data Model",
+            "Location: .aib_memory/context-data-model.md",
+            "Summary: Logical, physical, and analytical schemas, entities, and relationships discovered in the workspace.",
+            "Convention: .aib_brain/conventions/context-data-model-convention.md",
+            "Prompt: .aib_brain/prompts/aib-refresh-context-data-model.md",
+            "Read: no",
+            "Update: yes",
+        ]
+        positions = [content.index(line) for line in expected]
+        assert positions == sorted(positions)
+        assert "slash-separated and workspace-relative" in content
+
+    def test_references_is_mandatory_and_ordered(self) -> None:
+        """References must be mandatory and convention ordered."""
+        content = CONTEXT_CONVENTION.read_text(encoding="utf-8")
+        assert "`## References` MUST be present" in content
+        assert "convention-defined order" in content

@@ -213,8 +213,8 @@ class TestHardCodedActionList:
     def test_no_glob_discovery(self, tools_dir: Path):
         """SC-04: build_script_actions must not return auto-discovered scripts.
 
-        The list is hard-coded; verify-input and verify-context have been removed
-        so the list must now be empty — no entries at all.
+        The list is hard-coded; verify-input and verify-context remain excluded,
+        while the intentional clarification-context action remains available.
         """
         actions = build_script_actions(tools_dir)
         # verify_input and verify_context are no longer in the menu.
@@ -222,7 +222,7 @@ class TestHardCodedActionList:
         assert "verify_input" not in action_keys
         assert "verify_context" not in action_keys
         # Ensure no unintended auto-discovered scripts are present.
-        assert len(actions) == 0
+        assert [action["script"] for action in actions] == ["create-clarify-context.py"]
 
     def test_exclude_scripts_not_in_module(self):
         """SC-11: EXCLUDE_SCRIPTS must not exist in menu module."""

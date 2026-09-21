@@ -1,0 +1,49 @@
+- [20260813-102120-R-20260813-1001] [A] Analysis documents produced by aib-analyze.md must not contain an Industry knowledge sub-block or any external benchmarking / industry-literature findings; analyses stay workspace-scoped.
+- [20260813-102120-R-20260813-1001] [A] analysis-convention.md Research Results section must retain the workspace pattern-scan, AI Agent critique, Edge Cases, and Requirements Gate Evaluation sub-blocks in their existing order.
+- [20260813-102120-R-20260813-1001] [A] The regression test suite must not assert the phrase "best practices" in analysis-convention.md.
+- [20260813-102120-R-20260813-1001] [A] The Decision Register "NO: [external benchmarking | industry best practices | AI judgment as justification]" clause in analysis-convention.md §4.6 must remain byte-identical.
+- [20260813-102120-R-20260813-1001] [A] The "industry best practice" resolve-autonomously anti-pattern bullet in aib-analyze.md Appendix B §B.2 must remain byte-identical.
+- [20260813-102120-R-20260813-1001] [A] Historical analysis documents under .aib_memory/requests/**/analysis-*.md must not be retroactively modified.
+- [20260813-105450-R-20260813-1259] [A] .aib_memory/requirements.md and .aib_memory/adr.md are append-only histories maintained by a shared subroutine prompt invoked as the final documentation step of every implementation-oriented AIB run.
+- [20260813-105450-R-20260813-1259] [A] The subroutine .aib_brain/prompts/aib-update-adr-requirements.md is invoked by aib-implement.md, aib-modify.md, and aib-execute.md on every execution path, both plan-driven and direct.
+- [20260813-105450-R-20260813-1259] [A] Row schema in .aib_memory/adr.md and .aib_memory/requirements.md MUST be - [YYYYMMDD-HHMMSS-<request_id>] [<TAG>] <text> with a UTC timestamp.
+- [20260813-105450-R-20260813-1259] [A] Before appending, the subroutine normalizes the row text (whitespace-collapsed, case-insensitive) and skips candidates that match any existing row in the target file across all tags.
+- [20260813-105450-R-20260813-1259] [A] On I/O or write failure the subroutine retries the append once immediately; a second failure halts the calling prompt before finalize, move, and close.
+- [20260813-105450-R-20260813-1259] [A] .aib_memory/context.md MUST be modified only via python .aib_brain/tools/edit-context.py; direct edits are FORBIDDEN in aib-implement.md, aib-modify.md, and aib-execute.md.
+- [20260813-105450-R-20260813-1259] [A] aib-execute.md is REQUIRED to emit and execute an explicit edit-context.py invocation line for every context change entailed by the executed implementation and to halt on any non-zero return.
+- [20260813-105450-R-20260813-1259] [A] aib-modify.md remains non-context-writing during normal runs and does NOT emit edit-context.py invocations by default.
+- [20260813-105450-R-20260813-1259] [A] aib-implement.md receives a new Step 8.7 immediately after Step 8.6 and immediately before Step 9 that invokes the shared subroutine; existing steps remain byte-identical.
+- [20260813-105450-R-20260813-1259] [A] .aib_memory/adr.md and .aib_memory/requirements.md MUST NOT be registered as managed context extensions in context.md ## References.
+- [20260813-105450-R-20260813-1259] [A] .aib_brain/README.md and .aib_brain/user_guide.html receive short additions describing the new prompt, the new convention, and the ADR/requirements append lifecycle.
+- [20260813-105450-R-20260813-1259] [A] No new pytest tests are added and tests/ is not modified by this request.
+- [20260813-105450-R-20260813-1259] [A] verify-context.py, verify-input.py, and every other .aib_brain/tools/ script remain unchanged.
+- [20260813-105450-R-20260813-1259] [A] Historical [A]-tagged rows in .aib_memory/adr.md and .aib_memory/requirements.md MUST NOT be modified, retagged, or removed.
+- [20260813-105450-R-20260813-1259] [A] .aib_memory/context.md MUST receive one new ## Solution bullet describing the subroutine and two new .aib_memory/ lines under ## File Structure for adr.md and requirements.md.
+- [20260917-073949-R-20260917-1033] [E] MUST: aib-clarify.md reads .aib_memory/instructions.md before gathering context, executes and observes applicable directives throughout clarification when present and non-empty, and proceeds normally when absent or empty.
+- [20260917-073949-R-20260917-1033] [E] MUST NOT: Loading workspace instructions during clarification automatically invokes analysis or implementation workflows.
+- [20260917-073949-R-20260917-1033] [E] MUST: Clarification retains its prohibition on script execution and provides exact commands for the user to execute, using python -B or python3 -B for AIB tools.
+- [20260917-073949-R-20260917-1033] [E] MUST: aib-clarify.md directly creates .aib_memory/clarification_questions.md when recording its first question, including before an active request exists, and preserves existing history across rounds and subsequent executions until archival.
+- [20260917-073949-R-20260917-1033] [E] MUST: Clarification records every presented question with its identifier, complete wording, implementation-impact explanation, every offered option, recommended marker, and free-text alternative according to q-block-convention.md.
+- [20260917-073949-R-20260917-1033] [E] MUST NOT: Clarification infers or prefills user answers; unanswered questions remain explicitly unanswered.
+- [20260917-073949-R-20260917-1033] [E] MUST: Clarification records each received response with selected options and verbatim free-text explanations, preserves earlier answers on revision, and keeps questions, responses, and revisions unambiguously linked and ordered.
+- [20260917-073949-R-20260917-1033] [E] MUST NOT: Clarification duplicates previously recorded questions or response events merely because the workflow resumes or rereads context.
+- [20260917-073949-R-20260917-1033] [E] MUST: Clarification reports history persistence failures and stops the dependent workflow step until the history is saved successfully.
+- [20260917-073949-R-20260917-1033] [E] MUST: Clarification history survives request creation, analysis, input archival, and input reset.
+- [20260917-073949-R-20260917-1033] [E] MUST: The existing request-artifact archival workflow archives complete clarification history alongside the runtime log as clarification_questions_<request_id>.md and leaves .aib_memory/clarification_questions.md present and empty after success.
+- [20260917-073949-R-20260917-1033] [E] MUST: Clarification-history archival preserves existing archive bytes and follows the runtime log's durability, retry, and recovery behavior, retaining an active request and recoverable content on failure.
+- [20260917-073949-R-20260917-1033] [E] MUST: Requests with missing clarification history archive successfully, and repeated successful archival calls do not duplicate content during normal execution.
+- [20260917-073949-R-20260917-1033] [E] MUST: aib-clarify.md removes the separate Save questions and answers step and the input.md Clarification Questions transcript section, integrates recording into question presentation and answer reception, and renumbers affected workflow references.
+- [20260917-073949-R-20260917-1033] [E] MUST: Clarification retains a final copy-paste-ready proposal for replacing input.md ## Input using only headings at level 3 or below.
+- [20260917-073949-R-20260917-1033] [E] MUST: Relevant automated checks cover clarification-history archival integration and failures, and affected framework documentation describes the behavior.
+- [20260917-073949-R-20260917-1033] [E] MUST NOT: This clarification-history change introduces question logging for other prompts or migrates previously recorded clarification answers.
+- [20260917-081847-R-20260917-1114] [E] MUST: Reproduce the Windows CP1252 output failure for a Unicode input title and verify the screenshot diagnosis against input-header.py and the aib-analyze.md invocation.
+- [20260917-081847-R-20260917-1114] [E] MUST: Normal analysis header reads support Unicode titles without users manually setting environment variables, preserving the original title, existing key=value output, and valid request data.
+- [20260917-081847-R-20260917-1114] [E] MUST: Decode captured preflight subprocess output consistently and retain error handling for actual parsing or validation failures.
+- [20260917-081847-R-20260917-1114] [E] MUST: Regression coverage includes POS→NSR, other non-CP1252 characters, ASCII titles, CP1252 and UTF-8 environments, redirected or captured output, and analysis proceeding beyond the header-read step.
+- [20260917-095204-R-20260917-1251] [E] MUST: Clarify the distinction between neutral analysis alternatives and recommended questionnaire options through wording and cross-references in analysis-convention.md, preserving existing behavior.
+- [20260917-095204-R-20260917-1251] [E] MUST: Alternatives for unresolved ask Decision Points remain neutral in the analysis document and do not identify a preferred option.
+- [20260917-095204-R-20260917-1251] [E] MUST NOT: A Q-block recommendation constitutes a user answer, resolves its associated Decision Point, or changes the neutral alternatives in the analysis Decision Register.
+- [20260917-095204-R-20260917-1251] [E] MUST: Preserve q-block-convention.md applicability to both analysis questionnaires and clarification questions.
+- [20260917-095204-R-20260917-1251] [E] MUST: Preserve existing question formats, identifiers, unchecked options, free-text alternatives, answer handling, and clarification-history rules.
+- [20260917-095204-R-20260917-1251] [E] MUST: Keep q-block-convention.md authoritative for Q-block formatting and analysis-convention.md authoritative for analysis-document content.
+- [20260917-095204-R-20260917-1251] [E] MUST NOT: This wording clarification changes the recommendation policy, decision-resolution classifications, workflow execution, validators, or question-generation behavior.

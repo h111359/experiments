@@ -49,9 +49,23 @@ Example:
 Content is a human-readable indented directory tree. Bullet-statement format is NOT enforced in this section.
 
 ### References
-Each entry is a `###` sub-heading followed by a `Location:` line and a `Summary:` line. Bullet-statement format is NOT enforced in this section.
+`## References` is the mandatory AIB-managed context extension registry. It MUST contain every extension defined by this convention, in convention-defined order. Bibliographic, unknown, duplicate, and user-defined entries are prohibited.
 
-An existing Reference entry MAY include an optional fourth line in the format `Update: false` (read-only extension) or `Update: true` (writable extension) after the `Summary:` line. Entries without an `Update:` line remain valid bibliographic references. The `Update:` flag line distinguishes extension registrations from plain references.
+Each managed entry is a `###` sub-heading followed by `Location:`, `Summary:`, `Convention:`, `Prompt:`, `Read:`, and `Update:` lines in that exact order. Registry paths MUST be slash-separated and workspace-relative.
+
+AIB owns each entry heading, Location, Summary, Convention, Prompt, and its order. Users MAY edit only the Read and Update values. Both flags accept case-insensitive `yes` or `no`; any managed rewrite MUST normalize them to lowercase. Legacy `true` and `false` values are invalid. Context refresh and migration MUST restore drifted AIB-managed fields while preserving valid Read and Update choices.
+
+The initial and currently only managed entry is:
+
+```text
+### Context Data Model
+Location: .aib_memory/context-data-model.md
+Summary: Logical, physical, and analytical schemas, entities, and relationships discovered in the workspace.
+Convention: .aib_brain/conventions/context-data-model-convention.md
+Prompt: .aib_brain/prompts/aib-refresh-context-data-model.md
+Read: no
+Update: yes
+```
 
 ### Issues
 Content is a plain bullet list where each entry matches `- <description>`. No sub-headings, status fields, or structured fields are permitted. Lifecycle rule: an Issues entry MUST be removed when the issue is resolved or no longer applicable.
@@ -64,21 +78,21 @@ Bullet-statement format IS enforced in this section: each line must match `- <te
 - `## Requirements` MUST be present.
 - `## Solution` MUST be present.
 - `## File Structure` MUST be present.
-- `## References` is optional; if absent, the file is still valid.
+- `## References` MUST be present and contain every convention-defined managed extension entry.
 - `## Issues` is optional; if absent, the file is still valid.
 
 Each section uses the atomic statement format defined in context-convention.md, with the exception of `## File Structure` (indented directory tree) and `## References` (sub-heading entries):
 
-### Product`
+### Product
 plain-bullet statements describing AIB's purpose, stakeholders, and product boundaries. Format: `- <text>`. Each statement is a self-contained fact about what the product is, who uses it, and what its scope boundaries are.
 
-### Concepts`
+### Concepts
 plain-bullet statements covering domain knowledge, key terms, and general facts about the problem space. Format: `- <text>`.
 
-### Requirements`
+### Requirements
 modality-prefixed statements for product directives, constraints, and behavioral rules. Format: `- [MUST|MUST NOT|OPTIONAL]: <text>`. These are the normative rules the product follows.
 
-### Solution`
+### Solution
 Plain-bullet statements documenting architectural decisions and implementation approaches. Format: `- <text>`. These explain how the product works technically.
 
 ### Files Section
@@ -95,12 +109,7 @@ scripts/
 
 ### References Section
 #### Format
-Use `###` sub-heading for each reference, followed by `Location:` and `Summary:` lines. Example:
-```
-### Context Data Models
-Location: /context/context-data-models.md
-Summary: Defines the data model as extension for context.md, including section names, statement types, and file structure representation.
-```
+Use only the convention-defined managed entries and field order from the References statement-format rule. New extension types MUST first be added to this convention, including fixed heading, paths, Summary, default flags, and deterministic position.
 
 
 ### Inclusion Rules
@@ -135,7 +144,7 @@ Aggressively remove historical context, old iterations, resolved questions, and 
 2. NO HTML tags.
 3. NO images.
 4. External refs as plain text only; no hyperlinks (no `https?://` URLs).
-5. Heading hierarchy: `# Product Context` exactly once (H1); H2 limited to the 7 valid section names; H3 permitted inside `## References` only; H4+ forbidden (heading depth MUST NOT exceed H3).
+5. Heading hierarchy: `# Product Context` exactly once (H1); H2 limited to the 7 valid section names and ordered Product, Concepts, Requirements, Solution, File Structure, References, then optional Issues; H3 permitted inside `## References` only; H4+ forbidden (heading depth MUST NOT exceed H3).
 6. Statements in `## Product`, `## Concepts`, `## Solution`, `## Requirements` MUST NOT use bold, italic, or backticks (inline code); plain text only.
 7. Requirements statements MUST use modality prefix `MUST`, `MUST NOT`, or `OPTIONAL`.
 8. No Markdown tables.
@@ -145,17 +154,17 @@ Aggressively remove historical context, old iterations, resolved questions, and 
 `verify-context.py` MUST implement the following 12 checks. The file passes iff all 12 checks pass:
 
 1. Document starts with `# Product Context`.
-2. All H2 headings are one of the 7 valid section names.
+2. All H2 headings are unique, use only the 7 valid names, and appear in required order; Product, Concepts, Requirements, Solution, File Structure, and References are present, with optional Issues last.
 3. `## Product` section is present and non-empty (at least one non-blank line after the heading).
 4. `## Requirements` section is present.
 5. `## Solution` section is present.
 6. `## File Structure` section is present.
-7. Every bullet line in `## Product`, `## Concepts`, and `## Solution` matches `- <text>` or `- [PLANNED] <text>` and does NOT contain a type-letter prefix or plain modality prefix. Every bullet line in `## Requirements` matches `- [MUST|MUST NOT|OPTIONAL]: <text>` or `- [PLANNED] [MUST|MUST NOT|OPTIONAL]: <text>`.
+7. Every non-blank content line in `## Product`, `## Concepts`, and `## Solution` matches `- <text>` or `- [PLANNED] <text>` and does NOT contain a type-letter prefix or plain modality prefix.
 8. Every bullet line in `## Requirements` matches `- [MUST|MUST NOT|OPTIONAL]: <text>` or `- [PLANNED] [MUST|MUST NOT|OPTIONAL]: <text>`.
-9. `## References` entries, if any, each have a `###` sub-heading followed by `Location:` and `Summary:` lines within 5 lines.
+9. `## References` contains exactly the convention-defined managed entries in convention-defined order; every entry contains heading, Location, Summary, Convention, Prompt, Read, and Update in exact order; fixed fields and slash-separated workspace-relative paths match this convention; no bibliographic or unknown entries exist.
 10. No line in the document contains an HTML tag, a Markdown table row (line starting with `|`), or a bare URL (`https?://`).
 11. If a `## Issues` section is present, all entries in it are plain bullets matching `- <description>` where `<description>` is non-empty.
-12. Every `Update:` line in a `## References` entry (if any) must have value exactly `false` or `true` (i.e., `Update: false` or `Update: true`).
+12. Every `Read:` and `Update:` value is case-insensitive `yes` or `no`; legacy booleans and other values are invalid.
 
 ## Relationship to Other Conventions
 Governs only `.aib_memory/context.md`. Does NOT govern `.aib_brain` framework files. `aib-refresh-context.md` MUST reference this convention as sole structural authority for context.md.

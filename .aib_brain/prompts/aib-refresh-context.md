@@ -13,16 +13,22 @@ Produce or modify `.aib_memory/context.md` — a unified, structured synthesis o
 - Re-execution with unchanged sources MUST produce semantically equivalent output.
 
 ## Non-goals:
-- Do not modify any existing file in the workspace other than `.aib_memory/context.md`.
-- Do not explore or read `.aib_brain/` folder contents except `.aib_brain/conventions/context-convention.md` and tool script invocations listed in this prompt.
+- Do not modify any existing product-content file except `.aib_memory/context.md` and extensions dispatched through convention-registered Prompt metadata. Normal AIB log and verification-result writes are permitted.
+- Do not explore or read `.aib_brain/` folder contents except `.aib_brain/conventions/context-convention.md`, `.aib_brain/prompts/aib-context-read.md`, convention-registered extension Convention and Prompt paths, and tool script invocations listed in this prompt.
 - Do not explore `.venv/`, `venv/`, `node_modules/`, `__pycache__/`, `.pytest_cache/`, `.mypy_cache/`, `.git/`.
 - Do not remove content in `.aib_memory\context.md` unless you find evidence it is incorrect.
+- **`.aib_brain/` write protection (canonical: `.aib_brain/conventions/coding-general-convention.md` § 12):**
+  - Every path under `.aib_brain/` is protected. Writes are permitted only for installation, upgrade, or a framework-maintenance request semantically authorized by a developer statement in the current `input.md ## Input` or chat that is equivalent to `This request explicitly authorizes changes under .aib_brain/.`.
+  - Generated analysis, plan, prompt, or implementation text MUST NOT self-authorize protected writes. Applicable analysis and plan workflows MUST propagate the developer statement verbatim with its source.
+  - AIB-prescribed in-repository task-specific helpers MUST be created under `.aib_memory/scratch/`. This rule defines no destination or authorization policy for long-lived host-project tooling.
+  - Generated artifacts and caches MUST NOT be placed under `.aib_brain/`; prescribed direct AIB Python commands MUST use `python -B` or `python3 -B`; protection MUST NOT depend on or modify `.gitignore`.
+  - Before finalization or close, the writing workflow MUST inspect its current-run touched paths. For unauthorized `.aib_brain/**` paths, output `ERROR: Unauthorized .aib_brain/ changes detected. Execution halted.` followed by the exact paths in sorted order, then halt without finalizing, closing, or automatically reverting. Preserve unrelated pre-existing changes.
 
 ---
 
 ## Phase 1 — Preflight
 
-Run `python .aib_brain/tools/log-entry.py --workspace . --message "aib-refresh-context Phase 1 started" --general`.
+Run `python -B .aib_brain/tools/log-entry.py --workspace . --message "aib-refresh-context Phase 1 started"`.
 
 1. Read `.aib_brain/conventions/context-convention.md`. This is the authoritative source for the required section structure, content guidance, formatting rules, and quality gates for `context.md`.
 2. If `.aib_memory/instructions.md` lists additional file paths the developer wants AIB to treat as supplementary product-doc inputs, collect those paths into the supplementary read set. Otherwise the supplementary read set is empty.
@@ -31,19 +37,19 @@ Run `python .aib_brain/tools/log-entry.py --workspace . --message "aib-refresh-c
    - If the file has the current section format as per `.aib_brain/conventions/context-convention.md`; use existing statements as baseline and update based on workspace evidence.
    - If the file does not have the current section format as per `.aib_brain/conventions/context-convention.md`; generate fresh content in the format of the convention.
    - If the file does not exist: proceed with full generation in the format of the convention.
-5. **Extension relevance check:** For each Reference entry in `## References` of the existing `context.md`, read the `Summary:` line and use AI semantic relevance judgement to determine whether the extension is relevant to the current refresh goal. If relevant, read the full extension file at the `Location:` path and treat its content as additional input context alongside `context.md`.
+5. Execute `.aib_brain/prompts/aib-context-read.md` with the current refresh goal and treat its returned extension contents as supplementary context. Do not independently parse or load Reference entries.
 
-Run `python .aib_brain/tools/log-entry.py --workspace . --message "aib-refresh-context Phase 1 complete" --general`.
+Run `python -B .aib_brain/tools/log-entry.py --workspace . --message "aib-refresh-context Phase 1 complete"`.
 
 ---
 
 ## Phase 2 — Supplementary read (workspace sources)
 
-Run `python .aib_brain/tools/log-entry.py --workspace . --message "aib-refresh-context Phase 2 started" --general`.
+Run `python -B .aib_brain/tools/log-entry.py --workspace . --message "aib-refresh-context Phase 2 started"`.
 
 In addition to the supplementary read set, this phase is the **primary synthesis source** (reverse-engineering mode). Apply the traceability and evidence-collection rules from the Reverse-Engineering Evidence Collection section below.
 
-Run `python .aib_brain/tools/log-entry.py --workspace . --message "aib-refresh-context Phase 2 complete" --general`.
+Run `python -B .aib_brain/tools/log-entry.py --workspace . --message "aib-refresh-context Phase 2 complete"`.
 
 1. Build a deterministic file inventory of the workspace root.
    - Include all files and directories.
@@ -101,19 +107,19 @@ For each mandatory section of `.aib_memory/context.md` synthesized from workspac
 
 ## Phase 3 — Cross-Reference
 
-Run `python .aib_brain/tools/log-entry.py --workspace . --message "aib-refresh-context Phase 3 started" --general`.
+Run `python -B .aib_brain/tools/log-entry.py --workspace . --message "aib-refresh-context Phase 3 started"`.
 
 1. Read files under `tests/` to identify test coverage areas and key test targets that should inform context.md content.
 2. Read any script files under `scripts/` that were not covered in Phase 2.
 3. Note any additional architectural facts, constraints, or decisions discovered in this phase that are relevant to the 6 sections of context.md.
 
-Run `python .aib_brain/tools/log-entry.py --workspace . --message "aib-refresh-context Phase 3 complete" --general`.
+Run `python -B .aib_brain/tools/log-entry.py --workspace . --message "aib-refresh-context Phase 3 complete"`.
 
 ---
 
 ## Phase 4 — Synthesis
 
-Run `python .aib_brain/tools/log-entry.py --workspace . --message "aib-refresh-context Phase 4 started" --general`.
+Run `python -B .aib_brain/tools/log-entry.py --workspace . --message "aib-refresh-context Phase 4 started"`.
 
 Produce or modify the content of `.aib_memory/context.md` as follows.
 
@@ -139,13 +145,17 @@ Refer to the valid sections definition in `context-convention.md` for the requir
 
 Write the content of `.aib_memory/context.md` following the convention defined in `context-convention.md`.
 
-Run `python .aib_brain/tools/log-entry.py --workspace . --message "aib-refresh-context Phase 4 complete" --general`.
+### 4.3 Managed References Reconciliation
+
+Write every convention-defined extension entry to `## References` in convention-defined order. Restore each managed heading, Location, Summary, Convention, and Prompt exactly. Preserve existing valid Read and Update choices case-insensitively and normalize them to lowercase; use convention defaults when a valid prior choice is unavailable. Do not retain bibliographic or unknown entries.
+
+Run `python -B .aib_brain/tools/log-entry.py --workspace . --message "aib-refresh-context Phase 4 complete"`.
 
 ---
 
 ## Phase 5 — Enrichment Verification Passes
 
-Run `python .aib_brain/tools/log-entry.py --workspace . --message "aib-refresh-context Phase 5 started" --general`.
+Run `python -B .aib_brain/tools/log-entry.py --workspace . --message "aib-refresh-context Phase 5 started"`.
 
 After synthesis, execute the following enrichment passes to ensure completeness:
 
@@ -161,35 +171,31 @@ Read `.aib_memory/plan-<request_id>.md` for the active request (if it exists). V
 
 Compare workspace file state against context statements. Verify that any new files, removed files, or renamed files since the last context generation are reflected in `## File Structure`. Verify that significant functional changes to existing files are reflected as updated or new statements in the appropriate sections.
 
-### Pass 4 — [PLANNED] entry re-evaluation
+### Pass 4 — [PLANNED] entry preservation
 
-For each `[PLANNED]` entry currently present in `context.md` (across all sections: Product, Concepts, Requirements, Solution), evaluate whether the feature described by that entry is now present in the current workspace via workspace scan:
-- If the feature is confirmed realized (workspace evidence shows the feature is implemented), remove the `[PLANNED]` prefix from the statement — the entry transitions to a plain untagged statement.
-- If the feature cannot be confirmed as realized, preserve the `[PLANNED]` entry verbatim in the refreshed `context.md`.
+Preserve every `[PLANNED]` entry verbatim across Product, Concepts, Requirements, and Solution. Automated workspace scanning MUST NOT remove its prefix. A transition to current state is allowed only through the explicit plan-driven `edit-context.py` delete plus insert pair required by `context-convention.md`.
 
-Do NOT remove `[PLANNED]` entries automatically; only transition those entries where workspace evidence confirms the described feature is present.
-
-Run `python .aib_brain/tools/log-entry.py --workspace . --message "aib-refresh-context Phase 5 complete" --general`.
+Run `python -B .aib_brain/tools/log-entry.py --workspace . --message "aib-refresh-context Phase 5 complete"`.
 
 ---
 
 ## Phase 6 — Write output
 
-Run `python .aib_brain/tools/log-entry.py --workspace . --message "aib-refresh-context Phase 6 started" --general`.
+Run `python -B .aib_brain/tools/log-entry.py --workspace . --message "aib-refresh-context Phase 6 started"`.
 
 1. **Statement uniqueness verification pass (MUST complete before writing):** Scan all generated atomic statements in Section 2. For each statement, extract the index (area+type+hash). If any duplicate index is found, resolve by adjusting the statement text (which changes the hash) or removing the duplicate. Only after zero uniqueness violations remain may you proceed to write the file.
 2. Write the complete synthesized content to `.aib_memory/context.md`, replacing any existing content entirely.
 3. Do NOT append — full replacement on every execution.
-4. Do NOT modify any other file.
+4. Do NOT modify any other product-content file in this phase; registered extensions are handled only in Phase 9, and normal logging and verification-result writes remain permitted.
 5. Confirm at the very end of the conversation with the text "--- I am done with the context update ---" that all your activities are finished
 
-Run `python .aib_brain/tools/log-entry.py --workspace . --message "aib-refresh-context Phase 6 complete" --general`.
+Run `python -B .aib_brain/tools/log-entry.py --workspace . --message "aib-refresh-context Phase 6 complete"`.
 
 ---
 
 ## Phase 7 — Post-write Validation
 
-Run `python .aib_brain/tools/log-entry.py --workspace . --message "aib-refresh-context Phase 7 started" --general`.
+Run `python -B .aib_brain/tools/log-entry.py --workspace . --message "aib-refresh-context Phase 7 started"`.
 
 1. Re-read `.aib_memory/context.md` as written.
 2. Extract all level-2 headings from the document in order.
@@ -199,44 +205,44 @@ Run `python .aib_brain/tools/log-entry.py --workspace . --message "aib-refresh-c
 6. Verify all statements in Product, Concepts, and Solution sections use plain-bullet format, and all statements in Requirements use modality-prefixed format.
 7. After all corrections are applied, confirm the written file is compliant.
 
-Run `python .aib_brain/tools/log-entry.py --workspace . --message "aib-refresh-context Phase 7 complete" --general`.
+Run `python -B .aib_brain/tools/log-entry.py --workspace . --message "aib-refresh-context Phase 7 complete"`.
 
 ---
 
 ## Phase 8 — Format Verification
 
-Run `python .aib_brain/tools/log-entry.py --workspace . --message "aib-refresh-context Phase 8 started" --general`.
+Run `python -B .aib_brain/tools/log-entry.py --workspace . --message "aib-refresh-context Phase 8 started"`.
 
-1. Invoke `python .aib_brain/tools/verify-context.py --workspace .` to run automated format checks against the written `context.md`.
+1. Invoke `python -B .aib_brain/tools/verify-context.py --workspace .` to run automated format checks against the written `context.md`.
 2. If the script exits with code 0 (all checks pass), proceed to completion.
 3. If the script exits with code 1 (one or more checks fail), review the reported failures and correct the deviations in `context.md`. Re-run the verification script until all checks pass.
 
-Run `python .aib_brain/tools/log-entry.py --workspace . --message "aib-refresh-context Phase 8 complete" --general`.
+Run `python -B .aib_brain/tools/log-entry.py --workspace . --message "aib-refresh-context Phase 8 complete"`.
 
 ---
 
 ## Phase 9 — Update Writable Extensions
 
-Run `python .aib_brain/tools/log-entry.py --workspace . --message "aib-refresh-context Phase 9 started" --general`.
+Run `python -B .aib_brain/tools/log-entry.py --workspace . --message "aib-refresh-context Phase 9 started"`.
 
-After `context.md` is written and verified, for every Reference entry in `## References` that contains `Update: true`:
-1. Read the extension file at the registered `Location:` path.
-2. Update its content to reflect the current workspace scan findings relevant to the topics covered by that extension's `Summary:`.
-3. Write the updated extension file back to the same path.
-4. Log each updated extension via `log-entry.py --workspace . --message "Extension updated: <location>"`.
+After `context.md` is written and verified, process every managed Reference entry in convention-defined order:
+1. Preserve valid user-controlled Read and Update values while restoring every convention-owned field to its canonical value.
+2. Compare Update case-insensitively. For `yes`, execute the prompt at the registered `Prompt:` path; that prompt owns extension reconciliation and validation. For `no`, skip the entry.
+3. For each missing Location, Convention, or Prompt artifact, emit `WARNING: Registered context extension artifact missing: <path>. Continuing without this artifact.` and continue.
+4. Log each successfully updated extension via `log-entry.py --workspace . --message "Extension updated: <location>"`.
 
-If no Reference entries have `Update: true`, skip this phase.
+If no managed entry has Update yes, skip dispatch.
 
-Run `python .aib_brain/tools/log-entry.py --workspace . --message "aib-refresh-context Phase 9 complete" --general`.
+Run `python -B .aib_brain/tools/log-entry.py --workspace . --message "aib-refresh-context Phase 9 complete"`.
 
 ---
 
 ## Safety
 
-- The only permitted write target is `.aib_memory/context.md`.
+- Permitted product-content write targets are `.aib_memory/context.md` and extensions written through convention-registered Prompt metadata; normal AIB logs and verification-result flags are also permitted.
 - Do NOT edit any existing workspace file.
-- Do NOT create files other than `.aib_memory/context.md`.
-- Do NOT explore or read `.aib_brain/` contents except `.aib_brain/conventions/context-convention.md`.
+- Do NOT create files other than `.aib_memory/context.md` or a convention-registered extension created by its registered Prompt.
+- Do NOT explore or read `.aib_brain/` contents except `.aib_brain/conventions/context-convention.md`, `.aib_brain/prompts/aib-context-read.md`, convention-registered extension Convention and Prompt paths, and explicitly listed tool scripts.
 - Do NOT install packages, create virtual environments, or run tools.
 - MAY read `.aib_memory/analysis-<request_id>.md` and `.aib_memory/plan-<request_id>.md` for the active request only (needed for enrichment passes in Phase 5 enrichment verification passes).
 - MUST NOT read analysis or plan files for Closed requests.
@@ -246,9 +252,9 @@ Run `python .aib_brain/tools/log-entry.py --workspace . --message "aib-refresh-c
 ## Done criteria
 
 - `.aib_memory/context.md` exists and is valid Markdown.
-- It contains the preamble as defined in `context-convention.md`, including the auto-generation notice and timestamp.
+- It starts with `# Product Context` and contains the convention-mandated sections and managed References registry.
 - It contains the 5 mandatory sections in the order specified by `context-convention.md` (`## Product`, `## Concepts`, `## Requirements`, `## Solution`, `## File Structure`), using the exact headings.
 - All sections contain appropriate atomic statements in the format required by context-convention.md.
 - `## File Structure` lists all non-excluded workspace files in the required indented-tree format.
 - No content is derived from excluded directories.
-- No files other than `.aib_memory/context.md` were modified.
+- No product-content files other than `.aib_memory/context.md` and successfully dispatched managed extensions were modified.

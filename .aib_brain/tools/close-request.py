@@ -3,12 +3,14 @@
 close-request.py: Close the active request and reset input.md YAML header to idle.
 Part of the AIB tool scripts.
 Responsibilities: invoke move-request-artifacts before resetting (safety net),
-verify the target request is active, reset input.md YAML header to idle state.
+verify the target request is active, reset input.md YAML header to idle state;
+fail closed when runtime-log or clarification-history archival reports an error.
 """
 
 from __future__ import annotations
 
 import importlib.util
+import sys
 from pathlib import Path
 
 from common import (
@@ -23,11 +25,11 @@ from common import (
 )
 
 
-def _load_move_artifacts():
-    """Dynamically load move_artifacts from move-request-artifacts.py.
+def _load_move_module():
+    """Dynamically load move-request-artifacts.py as a module.
 
     Returns:
-        The move_artifacts callable from the move script.
+        The imported move-request-artifacts module.
 
     Raises:
         ImportError: If the script cannot be found or loaded.
@@ -38,7 +40,7 @@ def _load_move_artifacts():
     spec = importlib.util.spec_from_file_location("move_request_artifacts", script_path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-    return module.move_artifacts
+    return module
 
 
 def main() -> None:
@@ -71,12 +73,19 @@ def main() -> None:
         active_request_id = header["state"]["request_id"]
         active_title = header["state"]["title"]
 
-        # Move active-request artifacts from .aib_memory/ root to the request subfolder.
-        # Safety-net call; if aib-implement.md already ran the move, this is a no-op.
+        # Move active-request artifacts and archive both shared audit streams.
+        # Audit archival failure is fatal; other move failures remain warn-and-continue
+        # to preserve prior behaviour for plan/analysis moves.
+        move_module = _load_move_module()
         try:
-            move_artifacts = _load_move_artifacts()
-            move_artifacts(workspace)
+            move_module.move_artifacts(workspace)
+        except move_module.SharedArchiveError as exc:
+            # Fail closed: leave input.md untouched so the request remains active
+            # and the audit trail stays attributable to the current request ID.
+            print(f"ERROR: {exc.label}: {exc}", file=sys.stderr)
+            raise SystemExit(2)
         except Exception as exc:  # noqa: BLE001
+            # Warn-and-continue only for ordinary artifact-move failures (plan/analysis).
             print(f"WARNING: move-request-artifacts encountered an error and was skipped: {exc}")
 
         # Safety-net: warn (non-blocking) when attachments/ is non-empty at close time.

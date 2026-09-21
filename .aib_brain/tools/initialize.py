@@ -29,6 +29,22 @@ from common import (
 # Default value written to default_questions_number in a freshly seeded aib-setup.yaml.
 _DEFAULT_QUESTIONS_NUMBER: int = 5
 
+_CONTEXT_DATA_MODEL_EMPTY = (
+    "# Context Data Model\n\n"
+    "No data models are currently documented.\n"
+)
+
+_MANAGED_REFERENCES = (
+    "## References\n\n"
+    "### Context Data Model\n"
+    "Location: .aib_memory/context-data-model.md\n"
+    "Summary: Logical, physical, and analytical schemas, entities, and relationships discovered in the workspace.\n"
+    "Convention: .aib_brain/conventions/context-data-model-convention.md\n"
+    "Prompt: .aib_brain/prompts/aib-refresh-context-data-model.md\n"
+    "Read: no\n"
+    "Update: yes\n"
+)
+
 
 def _build_input_seed(minimum_questions: int) -> str:
     """Return the input.md seed content with *minimum_questions* substituted.
@@ -106,6 +122,15 @@ def _seed_memory(workspace: Path, brain_dir: Path, memory_root: Path, force: boo
     """
     (memory_root / "requests").mkdir(parents=True, exist_ok=True)
 
+    # Scratch is the only AIB-managed repository location for short-lived helpers.
+    # Idempotent seeding preserves any content already present during normal setup.
+    scratch_dir = memory_root / "scratch"
+    scratch_dir.mkdir(parents=True, exist_ok=True)
+    scratch_gitkeep = scratch_dir / ".gitkeep"
+    if not scratch_gitkeep.exists():
+        scratch_gitkeep.touch()
+        print("Created scratch directory.")
+
     # Create the attachments staging folder used by aib-analyze.md as an
     # enriched input channel. A .gitkeep placeholder ensures the empty directory
     # is committed to VCS and available immediately after a fresh clone.
@@ -120,7 +145,13 @@ def _seed_memory(workspace: Path, brain_dir: Path, memory_root: Path, force: boo
     if context_file.exists():
         print("context.md already exists — skipping overwrite.")
     else:
-        write_text(context_file, "# Context\n\nThis file is managed by the `aib-refresh-context.md` prompt. Run it to populate workspace context.\n")
+        write_text(context_file, _generate_initial_context())
+
+    data_model_file = memory_root / "context-data-model.md"
+    if data_model_file.exists():
+        print("context-data-model.md already exists — skipping overwrite.")
+    else:
+        write_text(data_model_file, _CONTEXT_DATA_MODEL_EMPTY)
 
     input_file = memory_root / "input.md"
     if input_file.exists():
@@ -207,17 +238,49 @@ def _generate_context_placeholder() -> str:
         "- Migration in progress — solution statements to be populated after running "
         "aib-modify.md with migration instructions.\n\n"
         "## File Structure\n\n"
-        "Migration in progress — file structure to be populated after running aib-modify.md "
-        "with migration instructions.\n"
+        ".aib_memory/\n"
+        "  scratch/ — managed task-specific helpers swept during input finalization\n"
+        "Migration in progress — remaining file structure to be populated after running "
+        "aib-modify.md with migration instructions.\n\n"
+        + _MANAGED_REFERENCES
+    )
+
+
+def _generate_initial_context() -> str:
+    """Return a valid fresh-workspace context with the managed registry.
+
+    Returns:
+        A minimal context document that passes verify-context.py and directs the
+        developer to run the context refresh prompt.
+    """
+    return (
+        "# Product Context\n\n"
+        "## Product\n\n"
+        "- Workspace context awaits discovery through aib-refresh-context.md.\n\n"
+        "## Concepts\n\n"
+        "- Context extensions provide convention-managed supplementary workspace knowledge.\n\n"
+        "## Requirements\n\n"
+        "- MUST: Run aib-refresh-context.md to populate current workspace context before analysis.\n\n"
+        "## Solution\n\n"
+        "- AIB initializes context.md with a managed context extension registry.\n\n"
+        "## File Structure\n\n"
+        ".aib_memory/\n"
+        "  context.md — workspace product context\n"
+        "  context-data-model.md — managed data-model context extension\n"
+        "  scratch/ — managed task-specific helpers swept during input finalization\n\n"
+        + _MANAGED_REFERENCES
     )
 
 
 def _generate_migration_input(archive_path: Path, memory_root: Path) -> str:
-    """Generate a complete input.md string with migration instructions in ## Input.
+    """Generate a complete input.md string with a minimal migration activation paragraph.
 
-    Builds on the standard input.md seed template and injects structured migration
-    instructions targeting context.md reconstruction from the archived legacy state.
-    The developer opens this file and runs ``aib-modify.md`` to reconstruct context.md.
+    Builds on the standard input.md seed template and appends a single prose paragraph
+    to ``## Input`` directing execution of ``aib-context-migration.md`` with the
+    workspace-relative path to the archived legacy ``context.md``.
+
+    When ``context.md`` is absent from the archive, references ``aib-refresh-context.md``
+    instead so the developer can reconstruct context from the current workspace.
 
     Args:
         archive_path: Path to the timestamped archive folder containing the full
@@ -225,8 +288,8 @@ def _generate_migration_input(archive_path: Path, memory_root: Path) -> str:
         memory_root: Path to the new (post-upgrade) .aib_memory/ directory.
 
     Returns:
-        Full input.md content string with idle YAML header and migration instructions
-        under ## Input structured as Goal / Sources / Reconstruction Targets / Constraints.
+        Full input.md content string with idle YAML header and a single prose
+        activation paragraph under ## Input (no sub-headings).
     """
     # Read default_questions_number from the already-seeded aib-setup.yaml.
     default_q = get_setup_option(memory_root, "default_questions_number")
@@ -240,51 +303,24 @@ def _generate_migration_input(archive_path: Path, memory_root: Path) -> str:
     workspace_root = memory_root.parent
     relative_archive = archive_path.relative_to(workspace_root).as_posix()
 
-    # Determine the context.md source note based on presence in archive.
+    # Build a single prose paragraph based on whether the legacy context.md is present.
     if (archive_path / "context.md").is_file():
-        context_source_note = (
-            f"Primary source: `{relative_archive}/context.md` — "
-            "the full legacy context.md archived from the pre-upgrade memory."
+        migration_body = (
+            f"Execute `.aib_brain/prompts/aib-context-migration.md` to reconstruct "
+            f"`context.md` from the legacy archive. "
+            f"[legacy context]: `{relative_archive}/context.md`. The migration also "
+            "reconciles the managed Context Data Model registry and extension."
         )
     else:
-        context_source_note = (
-            f"Primary source: ABSENT — `context.md` was not found in the legacy archive. "
-            "Run `aib-refresh-context.md` instead of `aib-modify.md` to create context.md "
-            "from workspace inspection."
+        # context.md absent from archive: direct developer to refresh from workspace instead.
+        migration_body = (
+            f"`context.md` was not found in the legacy archive at `{relative_archive}/`. "
+            "Execute `.aib_brain/prompts/aib-refresh-context.md` to create `context.md` "
+            "from workspace inspection instead."
         )
 
-    migration_body = (
-        "### Goal\n\n"
-        f"Reconstruct the workspace's `.aib_memory/context.md` (and optionally other memory files) "
-        f"from the archived legacy `.aib_memory/` content located at `{relative_archive}/`. "
-        "The current `context.md` is a valid placeholder that must be replaced with the full "
-        "workspace context through semantic reconstruction. Run this as an `aib-modify.md` request.\n\n"
-        "### Sources\n\n"
-        f"- {context_source_note}\n"
-        f"- Optional source: `{relative_archive}/input.md` — archived legacy input.md; "
-        "may provide useful background; skip if absent or structurally incompatible.\n"
-        f"- Optional source: `{relative_archive}/aib-setup.yaml` — archived legacy setup; "
-        "reference only for `default_questions_number` value.\n"
-        "- Conventions to follow: `.aib_brain/conventions/context-convention.md`, "
-        "`.aib_brain/conventions/input-convention.md`, `.aib_brain/conventions/q-block-convention.md`.\n\n"
-        "### Reconstruction Targets\n\n"
-        "- context.md — reconstruct all six sections (Product, Concepts, Requirements, Solution, "
-        "File Structure, and optionally References) from the archived legacy context.md using "
-        "semantic interpretation. Conform to context-convention.md.\n"
-        "- aib-setup.yaml — already seeded correctly by the upgrade script. Verify that "
-        "`memory_version` matches the current brain version and `default_questions_number` "
-        "matches the archived value. Update only if discrepant.\n\n"
-        "### Constraints\n\n"
-        f"- Do NOT restore requests from the archive. Legacy requests are at "
-        f"`{relative_archive}/requests/` for reference only.\n"
-        "- Do NOT overwrite `instructions.md` — it was copied unchanged from the archive.\n"
-        "- If optional source files are absent or structurally incompatible, skip them without failure.\n"
-        f"- Legacy requests were archived and are not restored. Find them at "
-        f"`{relative_archive}/requests/` if needed.\n"
-    )
-
-    # Append migration instructions to the seed string (seed ends with "## Input\n\n").
-    return seed + migration_body
+    # Append the activation paragraph to the seed (seed ends with "## Input\n\n").
+    return seed + migration_body + "\n"
 
 
 def _run_upgrade(workspace: Path, brain_dir: Path, memory_root: Path) -> None:
@@ -366,10 +402,20 @@ def _run_upgrade(workspace: Path, brain_dir: Path, memory_root: Path) -> None:
     # Step 5 — Re-seed .aib_memory/ from brain templates.
     _seed_memory(workspace, brain_dir, memory_root, force=False)
 
-    # Step 6 — Restore instructions.md from archive (developer directives must not be lost).
+    # Step 6 — Restore instructions and scratch content from the archive.
     src_instructions = archive_path / "instructions.md"
     if src_instructions.exists():
         shutil.copy2(str(src_instructions), str(memory_root / "instructions.md"))
+
+    archived_scratch = archive_path / "scratch"
+    if archived_scratch.is_dir():
+        # Upgrade re-seeding recreates scratch first; merge the archived tree so no
+        # task-specific content is lost merely because the framework was upgraded.
+        shutil.copytree(
+            str(archived_scratch),
+            str(memory_root / "scratch"),
+            dirs_exist_ok=True,
+        )
 
     # Step 7 — Generate placeholder context.md and migration-ready input.md.
     write_text(memory_root / "context.md", _generate_context_placeholder())
@@ -378,7 +424,7 @@ def _run_upgrade(workspace: Path, brain_dir: Path, memory_root: Path) -> None:
     print("\nUpgrade summary:")
     print(f"  Brain version   : {brain_semver}")
     print(f"  Archive location: {archive_path}")
-    print(f"  Restored files  : instructions.md")
+    print(f"  Restored files  : instructions.md and scratch/")
     print(f"  Requests        : archived in {archive_path}")
     print("\n.aib_memory/ upgrade complete.")
     set_setup_option(memory_root, "memory_version_compatibility", "initialized-not-populated")

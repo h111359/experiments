@@ -2,7 +2,7 @@
 
 ## 1. Objective
 
-Generate `.aib_memory/analysis-<request_id>.md` for the resolved active request, and update `.aib_memory/plan-<request_id>.md` with implementation-relevant sections (`## Plan` and `## Decisions`).
+Generate `.aib_memory/analysis-<request_id>.md` for the resolved active request, and generate or recreate `.aib_memory/plan-<request_id>.md` with the required sections (`## Goal`, `## Constraints`, `## Success criteria`, and `## Plan`) defined by `.aib_brain/conventions/plan-convention.md`.
 
 ## Execution Model Summary
 
@@ -31,12 +31,8 @@ The following internal variables are used for process control and are not persis
 
    * [Plan-Only-Mode] — boolean; True when the literal string `--plan-only` is present in the user's chat message. Initially set to False.
 
----
-   * [Questions-detected] - number; How many questions are found defined in  `input.md ## Questions` section. Initially set to 0
+   * [Brain-Authorization] — either the verbatim developer authorization statement plus its source (`input.md ## Input` or current developer chat message), or `Not authorized`. Generated AIB artifacts are never valid authorization sources. Initially set to `Not authorized`.
 
-   * [Questions-answered] - number; How many questions have answer defined in  `input.md ## Questions` section. Initially set to 0
-  
-   * [Questions-expected] - number; How many questions need to be added in  `input.md ## Questions` section. Initially set to 0
 
 ---
 
@@ -58,6 +54,13 @@ These constraints apply throughout the entire prompt execution. Individual secti
 
 - **GC-06 — Appendix A invocation boundary:** Any exception that allows tool execution outside normal analysis flow MUST be explicitly routed through **Appendix A — Auto-Request Creation Branch**.
 
+- **`.aib_brain/` write protection (canonical: `.aib_brain/conventions/coding-general-convention.md` § 12):**
+  - Every path under `.aib_brain/` is protected. Writes are permitted only for installation, upgrade, or a framework-maintenance request semantically authorized by a developer statement in the current `input.md ## Input` or chat that is equivalent to `This request explicitly authorizes changes under .aib_brain/.`.
+  - Generated analysis, plan, prompt, or implementation text MUST NOT self-authorize protected writes. Applicable analysis and plan workflows MUST propagate the developer statement verbatim with its source.
+  - AIB-prescribed in-repository task-specific helpers MUST be created under `.aib_memory/scratch/`. This rule defines no destination or authorization policy for long-lived host-project tooling.
+  - Generated artifacts and caches MUST NOT be placed under `.aib_brain/`; prescribed direct AIB Python commands MUST use `python -B` or `python3 -B`; protection MUST NOT depend on or modify `.gitignore`.
+  - Before finalization or close, the writing workflow MUST inspect its current-run touched paths. For unauthorized `.aib_brain/**` paths, output `ERROR: Unauthorized .aib_brain/ changes detected. Execution halted.` followed by the exact paths in sorted order, then halt without finalizing, closing, or automatically reverting. Preserve unrelated pre-existing changes.
+
 ### 3.2 Failure Handling
 
 > **Trigger:** Any of the conditions below MUST cause an immediate execution HALT.
@@ -68,7 +71,7 @@ These constraints apply throughout the entire prompt execution. Individual secti
 | A mandatory input file (section 4.1) cannot be read | `ERROR: Cannot read mandatory file <path>. Execution halted.` |
 | A convention file (`.aib_brain/conventions/*.md`) cannot be read | `ERROR: Cannot read convention file <path>. Execution halted.` |
 | A tool script (`.aib_brain/tools/*.py`) exits with a non-zero code | `ERROR: Tool script <script> failed with exit code <N>. Execution halted.` |
-| Any write attempted to a file outside .aib_memory not covered by GD-05 exceptions | `ERROR: Unauthorized write to <path> blocked. aib-analyze.md is a reasoning-only prompt. Use aib-implement.md to apply changes.` |
+| Any write attempted to a file outside .aib_memory not covered by GC-05 exceptions | `ERROR: Unauthorized write to <path> blocked. aib-analyze.md is a reasoning-only prompt. Use aib-implement.md to apply changes.` |
 | Answer Application Sub-flow detects one or more unanswered Q-blocks | `Note: <N> of <M> questions in input.md are unanswered. Answer all questions before re-running analysis. Execution halted.` |
 | `verify-input.py` or `verify-context.py` exits with non-zero code at S01.1a | `ERROR: <file> verification failed. Fix the following issues before re-running analysis: <check list>` |
 
@@ -101,8 +104,8 @@ These constraints apply throughout the entire prompt execution. Individual secti
 | Artifact | Location | Description |
 | --- | --- | --- |
 | `analysis-<request_id>.md` | `.aib_memory/` root (active phase) | Full analysis document; set of mandatory sections |
-| `plan-<request_id>.md` (updated) | `.aib_memory/` root (active phase) | Updated with Plan and Decisions sections |
-| `input.md` (updated) | `.aib_memory/input.md` | Q-blocks written to `## Questions` (when applicable); reset to seed template at end of run **only when no Q-blocks were generated** — reset is deferred when Q-blocks are present so the developer can answer them |
+| `plan-<request_id>.md` (generated or recreated) | `.aib_memory/` root (active phase) | Contains the required Goal, Constraints, Success criteria, and Plan sections defined by `plan-convention.md` |
+| `input.md` (updated) | `.aib_memory/input.md` | The existing input is archived and reset to the seed template during S07. If questions are required, S08 then appends Q-blocks to `## Questions` so the developer can answer them. |
 
 ---
 
@@ -118,22 +121,23 @@ Inspect the user's chat message for the literal string `--plan-only`.
 
 ### S01. Step 1 — Preflight + State Resolution
 
-Run `python .aib_brain/tools/log-entry.py --workspace . --message "S01 Preflight started"`.
-If log-entry.py exits non-zero at this point, suppress the error and proceed (the active request may not yet be resolved at this stage).
+Run `python -B .aib_brain/tools/log-entry.py --workspace . --message "S01 Preflight started"`.
 
 S01.1. Read `.aib_memory/instructions.md`. If the file exists and is non-empty, treat its content as persistent workspace-level instructions that MUST be executed and observed throughout this prompt's execution. If the file is absent or empty, proceed normally.
 
 S01.1a. Verification pre-flight.
 
-Read `input_verification_enabled` and `context_verification_enabled` from `input.md` YAML header by running `python .aib_brain/tools/input-header.py --workspace . --operation read` and parsing its output.
+`input-header.py`, `verify-input.py`, and `verify-context.py` emit UTF-8 stdout and stderr, including on Windows and when redirected. When capturing these tools through a subprocess or shell wrapper, decode both streams as UTF-8 (for example, Python `subprocess.run(..., capture_output=True, encoding="utf-8")`). Parse the existing `key=value` header lines without replacing, escaping, or normalizing Unicode titles. No manual `PYTHONIOENCODING` setting is required; continue to apply section 3.2 to every non-zero tool exit.
 
-If `input_verification_enabled` is `true`: invoke `python .aib_brain/tools/verify-input.py --workspace .`. If the script exits with code 1, halt execution immediately. Output the literal message: `ERROR: input.md verification failed. Fix the following issues before re-running analysis:` followed by each failing check name and its corrective suggestion as returned by the script. MUST NOT write any output files.
+Read `input_verification_enabled` and `context_verification_enabled` from `input.md` YAML header by running `python -B .aib_brain/tools/input-header.py --workspace . --operation read` and parsing its output.
 
-If `context_verification_enabled` is `true`: invoke `python .aib_brain/tools/verify-context.py --workspace .`. If the script exits with code 1, halt execution immediately. Output the literal message: `ERROR: context.md verification failed. Fix the following issues before re-running analysis:` followed by each failing check name and its corrective suggestion as returned by the script. MUST NOT write any output files.
+If `input_verification_enabled` is `true`: invoke `python -B .aib_brain/tools/verify-input.py --workspace .`. If the script exits with code 1, halt execution immediately. Output the literal message: `ERROR: input.md verification failed. Fix the following issues before re-running analysis:` followed by each failing check name and its corrective suggestion as returned by the script. MUST NOT write any output files.
+
+If `context_verification_enabled` is `true`: invoke `python -B .aib_brain/tools/verify-context.py --workspace .`. If the script exits with code 1, halt execution immediately. Output the literal message: `ERROR: context.md verification failed. Fix the following issues before re-running analysis:` followed by each failing check name and its corrective suggestion as returned by the script. MUST NOT write any output files.
 
 If both enabled scripts exit with code 0, continue to S01.2.
 
-S01.2. Run `python .aib_brain/tools/input-header.py --workspace . --operation read` and parse its output. Capture `request_id`, `title`, `state`, and `minimum_questions` from the output lines. If `state == idle`, the active-request count is zero. Otherwise, the active-request count is one.
+S01.2. Run `python -B .aib_brain/tools/input-header.py --workspace . --operation read` and parse its output. Capture `request_id`, `title`, `state`, and `minimum_questions` from the output lines. If `state == idle`, the active-request count is zero. Otherwise, the active-request count is one.
 
 S01.3. Branch on the count:
 
@@ -143,24 +147,26 @@ S01.3. Branch on the count:
 
 S01.4. Use the `request_id` and `title` from the input.md YAML header as the resolved request. The resolved `<request_id>` MUST be used everywhere in this run.
 
-Run `python .aib_brain/tools/log-entry.py --workspace . --message "S01 Preflight complete: <request_id>"`.
+Run `python -B .aib_brain/tools/log-entry.py --workspace . --message "S01 Preflight complete: <request_id>"`.
 
 
 ### S02. Step 2 — Context Check
 
-Run `python .aib_brain/tools/log-entry.py --workspace . --message "S02 Context check started"`.
+Run `python -B .aib_brain/tools/log-entry.py --workspace . --message "S02 Context check started"`.
 
-S02.1. Check whether `.aib_memory/context.md` is absent or empty (contains only whitespace after trimming) or has less than 50 words.
+S02.1. Check whether `.aib_memory/context.md` is absent or empty (contains only whitespace after trimming or has less than 50 words).
 
 S02.2. If **absent or empty**: execute `.aib_brain/prompts/aib-refresh-context.md` to populate `context.md`. After execution completes, continue to step S03.
 
 S02.3. If **present and non-empty**: continue directly to step S03.
 
-Run `python .aib_brain/tools/log-entry.py --workspace . --message "S02 Context check complete"`.
+S02.4. After current `context.md` has been read or refreshed, execute `.aib_brain/prompts/aib-context-read.md` with the active request goal. Retain its returned extension contents as supplementary context for the rest of this run. Missing extension artifacts are non-blocking warnings handled by that prompt.
+
+Run `python -B .aib_brain/tools/log-entry.py --workspace . --message "S02 Context check complete"`.
 
 ### S03. Step 3 — Read Inputs
 
-Run `python .aib_brain/tools/log-entry.py --workspace . --message "S03 Read inputs started"`.
+Run `python -B .aib_brain/tools/log-entry.py --workspace . --message "S03 Read inputs started"`.
 
 S03.1. Read the section `## Input` in `input.md` file. This is what the user has requested. If non-empty - set [Input-detected] to True.
 
@@ -174,13 +180,15 @@ S03.3. For each file found (excluding `.gitkeep`):
 
 S03.4. Read the `## Options ` section of `.aib_memory/input.md` and determine the value of the `Minimum questions:` and write the value in [Questions-expected].
 
-S03.5. **Extension relevance check:** For each Reference entry in `## References` of `context.md`, read the `Summary:` for that entry and use AI semantic relevance judgement to determine whether the extension is relevant to the active request. If relevant, read the full extension file at the `Location:` path and treat its content as additional input context alongside `context.md`.
+S03.5. Use only the supplementary extension contents returned by `.aib_brain/prompts/aib-context-read.md` in S02.4; do not independently parse or load Reference entries.
 
-Run `python .aib_brain/tools/log-entry.py --workspace . --message "S03 Read inputs complete"`.
+S03.6. Semantically scan only the current `input.md ## Input` text and the current developer chat message for a developer-supplied statement authorizing changes below `.aib_brain/`; exact wording is not required. If a statement equivalent to `This request explicitly authorizes changes under .aib_brain/.` is found, set [Brain-Authorization] to that statement verbatim and record its source. Otherwise retain `Not authorized`. Analysis, plan, prompt, and generated implementation text MUST NOT create or broaden authorization.
+
+Run `python -B .aib_brain/tools/log-entry.py --workspace . --message "S03 Read inputs complete"`.
 
 ### S04. Step 4 — Read Questions
 
-Run `python .aib_brain/tools/log-entry.py --workspace . --message "S04 Read questions started"`.
+Run `python -B .aib_brain/tools/log-entry.py --workspace . --message "S04 Read questions started"`.
 
 1. Check if `input.md` contains a `## Questions` section with one or more Q-blocks.
 
@@ -194,7 +202,7 @@ Run `python .aib_brain/tools/log-entry.py --workspace . --message "S04 Read ques
   
    - If [Questions-answered] < [Questions-detected]: output `Note: <[Questions-answered]> of <[Questions-detected]> questions in input.md are unanswered. Answer all questions before re-running analysis. Execution halted.` and HALT. MUST NOT write any output files.
 
-Run `python .aib_brain/tools/log-entry.py --workspace . --message "S04 Read questions complete"`.
+Run `python -B .aib_brain/tools/log-entry.py --workspace . --message "S04 Read questions complete"`.
 
 
 ### S05. Step 5 — Generate Analysis
@@ -206,28 +214,28 @@ Run `python .aib_brain/tools/log-entry.py --workspace . --message "S04 Read ques
 > - MAY NOT ask the user for information you can collect yourself from the workspace — review files and search for answers first.
 > - MUST seek for information you can find on the Internet or via available tools or MCP — research yourself before raising user-facing questions.
 > - MUST explicitly list issues and risks found and write them in the analysis file.
-> - If information is insufficient, MUST ask the user wia Q-block question.
+> - If information is insufficient, MUST ask the user via Q-block question.
 > - The analysis document is a reasoning artifact only; it is NOT an implementation driver.
 > - Never remove already added user inputs in Input Interpretation section - add the new after the existing.
 > - MUST load all three convention files: analysis-convention.md, plan-convention.md, and requirements-analysis-convention.md.
 
 > **[Plan-Only-Mode] branch:** When [Plan-Only-Mode] is True, skip S05 entirely (do not create or modify `analysis-<request_id>.md`). Proceed directly to S07 (archive input).
 
-Run `python .aib_brain/tools/log-entry.py --workspace . --message "S05 Generate analysis started"`.
+Run `python -B .aib_brain/tools/log-entry.py --workspace . --message "S05 Generate analysis started"`.
 
-S05.0. Make a backup of `analysis-<request_id>.md`. The current analysis need to be kept for user audit so make a copy of it in the request folde under `.aib_memory\requests` adding timestamp to its name. Only AFTER the current state is copied, make changes of the `analysis-<request_id>.md` file.
+S05.0. Make a backup of `analysis-<request_id>.md`. The current analysis need to be kept for user audit so make a copy of it in the request folder under `.aib_memory\requests` adding timestamp to its name. Only AFTER the current state is copied, make changes of the `analysis-<request_id>.md` file.
 
 S05.1. If both [Input-detected] is False and [Questions-detected] is 0: output `Note: No new instructions found. Execution halted.` and HALT. MUST NOT write any output files.
 
 S05.2. If [Input-detected] is True:
 
-   S05.2.1. If `analysis-<request_id>.md` does not exists - generate it as per  `.aib_memory/input.md`, the files in `.aib_memory/attachments` and `.aib_memory/context.md` following `.aib_brain\conventions\analysis-convention.md ` 
+   S05.2.1. If `analysis-<request_id>.md` does not exist - generate it as per  `.aib_memory/input.md`, the files in `.aib_memory/attachments` and `.aib_memory/context.md` following `.aib_brain\conventions\analysis-convention.md ` 
 
    S05.2.2. If `analysis-<request_id>.md` exists - this means the user has added additional input instructions to be modified already existing analysis. Detect what should be changed in the analysis and change only the affected lines. You should follow `.aib_brain\conventions\analysis-convention.md ` and the structure of the analysis file should not be corrupted. Do not change lines where no need of change and the current content does not contradict to the new input.  
 
 S05.3. If [Questions-detected] is more than 0:
 
-   S05.3.1. If `analysis-<request_id>.md` does not exists - this probably means it was manually deleted. Output a note `[S05.3.1] questions detected but no analyis exists.This is unexpected state. Halting.`  and HALT. MUST NOT write any output files.  
+   S05.3.1. If `analysis-<request_id>.md` does not exist - this probably means it was manually deleted. Output a note `[S05.3.1] questions detected but no analysis exists.This is unexpected state. Halting.`  and HALT. MUST NOT write any output files.
 
    S05.3.2. If `analysis-<request_id>.md` exists - this means the user has answered to the questions and now the answers should be applied in the analysis. Detect the decision points in which the answers should be reflected in the analysis. Detect if in the other part of the analysis a change should be made accordingly the answers of the questions. Change only the affected lines. You should follow `.aib_brain\conventions\analysis-convention.md ` and the structure of the analysis file should not be corrupted. Do not change lines where no need of change and the current content does not contradict to the answers. 
 
@@ -235,18 +243,20 @@ S05.4. Ensure the **Decision Register** sub-heading is present in the analysis d
 
 S05.5. Ensure the **Requirements Gate Evaluation** sub-heading is present as the final sub-section of `## Research Results`. Evaluate the analysis just produced against every item in requirements-analysis-convention.md. Render rule: when every category is PASS, emit a single summary line — `Requirements Gate: 8/8 PASS — all categories satisfied.` — with no table. When any category is non-PASS, emit the full eight-row Markdown table. If any mandatory item cannot be satisfied by a reasonable documented assumption, add a new Decision Point in the analysis and tag it with `ask` in the Decision Points section.
 
-S05.6. Ensure the **`## Proposed Solution`** section is present in the analysis document, following `## Research Results` and before `## Decision Register`. The section MUST contain exactly three `###` subsections in fixed order:
+S05.6. Ensure the **`## Proposed Solution`** section is present in the analysis document, following `## Research Results` and before `## Decision Register`. The section MUST contain exactly two `###` subsections in fixed order:
    - `### High-Level Concept` — one or two plain-English sentences stating the approach.
    - `### Execution Steps` — ordered list of implementation tasks; organize work into named tasks using `#### Task N: <Name>` headers; under each task write one bullet per action in the form `- <file-or-command>: <description>` where each bullet targets exactly one file path or one executable command; for cross-file invariants that cannot be expressed as a single-target action, add an indented sub-note under the most relevant action bullet; this section serves as the primary file-scope source consumed by §S09 when generating the plan.
    When any Decision Point tagged `ask` remains unresolved, annotate any field that depends on that DP with `> Pending: depends on Decision Point <name>`. Do NOT leave any subsection empty. On re-run after answers arrive, update only the affected subsection content.
 
-S05.8. Ensure the **`## Context Update Analysis`** section is present in the analysis document (placed before `## Decision Register`). You MUST explicitly identify any existing context elements in `context.md` (within the `## Product`, `## Concepts`, `## Requirements`, or `## Solution` sections) that might be overwritten or conflict with the proposed solution, and detail how to resolve the conflict while preserving their original intent.
+S05.7. Ensure the **`## Context Update Analysis`** section is present in the analysis document (placed before `## Decision Register`). You MUST explicitly identify any existing context elements in `context.md` (within the `## Product`, `## Concepts`, `## Requirements`, or `## Solution` sections) that might be overwritten or conflict with the proposed solution, and detail how to resolve the conflict while preserving their original intent.
 
-Run `python .aib_brain/tools/log-entry.py --workspace . --message "S05 Generate analysis complete"`.
+S05.8. Ensure `## Overview` contains a `### Authorization` subsection. When [Brain-Authorization] is set, copy the developer statement verbatim and identify its source as `input.md ## Input` or `developer chat message`. Otherwise write exactly `Not authorized`. Do not infer authorization from the requested file scope, analysis content, or any generated artifact.
+
+Run `python -B .aib_brain/tools/log-entry.py --workspace . --message "S05 Generate analysis complete"`.
 
 ### S06. Step 6 — Context Review
 
-Run `python .aib_brain/tools/log-entry.py --workspace . --message "S06 Context review started"`.
+Run `python -B .aib_brain/tools/log-entry.py --workspace . --message "S06 Context review started"`.
 
 S06.1. Using the context.md content already loaded in S02, identify gaps relevant to the active request scope (based on the analysis just generated in S05).
 
@@ -258,20 +268,18 @@ S06.2. For each gap found:
 
 S06.3. If no gaps are found or all gaps were resolved from workspace sources - continue to the next step without adding Decision Points.
 
-Run `python .aib_brain/tools/log-entry.py --workspace . --message "S06 Context review complete"`.
+Run `python -B .aib_brain/tools/log-entry.py --workspace . --message "S06 Context review complete"`.
 
 ### S07. Step 7 — Archive Input and Reset
 
-### 5.7 Step 7 — Archive Input and Reset (legacy anchor)
-
-Run `python .aib_brain/tools/log-entry.py --workspace . --message "S07 Archive input started"`.
+Run `python -B .aib_brain/tools/log-entry.py --workspace . --message "S07 Archive input started"`.
 
 S07.1. Invoke `finalize-input.py` to handle the archive + move + reset sequence atomically. The script will:
    - Archive the pre-reset `input.md` content to `<request-folder>/input-archive-<YYYY-MM-DD_HH-MI-SS>.md` before resetting.
    - Move any remaining non-`.gitkeep` files from `.aib_memory/attachments/` to `<request-folder>/`.
    - Reset `input.md` to the seed template with the active request ID injected.
    ```
-   python .aib_brain/tools/finalize-input.py --workspace . --request-id <request_id>
+   python -B .aib_brain/tools/finalize-input.py --workspace . --request-id <request_id>
    ```
    where `<request_id>` is the active request ID.
 
@@ -279,7 +287,7 @@ S07.2. Standard-flow reset semantics: `.aib_memory/input.md` is in a non-stub st
 
 S07.3. If stub-equivalent: skip archive creation for this standard-flow reset.
 
-Run `python .aib_brain/tools/log-entry.py --workspace . --message "S07 Archive input complete"`.
+Run `python -B .aib_brain/tools/log-entry.py --workspace . --message "S07 Archive input complete"`.
 
 ### S08. Step 8 — Q-block Generation
 
@@ -290,21 +298,21 @@ Run `python .aib_brain/tools/log-entry.py --workspace . --message "S07 Archive i
 
 > **[Plan-Only-Mode] branch:** When [Plan-Only-Mode] is True, skip S08 entirely (do not generate Q-blocks, do not update input.md state to `questions_generated`). Proceed directly to S09.
 
-Run `python .aib_brain/tools/log-entry.py --workspace . --message "S08 Q-block generation started"`.
+Run `python -B .aib_brain/tools/log-entry.py --workspace . --message "S08 Q-block generation started"`.
 
 S08.1. If [Questions-expected] is more than the decision points marked as `ask` - change the tag of the most critical decision points marked as `resolve-autonomously` to `ask`; clear any pre-chosen alternative from those DPs before reclassifying them.
 
 S08.2. For every Decision Point tagged `ask`, generate one Q-block following the instructions in `.aib_brain/conventions/q-block-convention.md`. Q-blocks MUST reference the alternative by name from the Decision Register section when applicable. Write Q-blocks to a `## Questions` section appended to `input.md`.
 
-S08.3. Run `python .aib_brain/tools/input-header.py --workspace . --operation write --state questions_generated` to update the YAML header state. HALT.
+S08.3. Run `python -B .aib_brain/tools/input-header.py --workspace . --operation write --state questions_generated` to update the YAML header state. HALT.
 
 S08.4. If no Decision Point tagged `ask` are found, do NOT write a `## Questions` section. Continue with the next step.
 
-Run `python .aib_brain/tools/log-entry.py --workspace . --message "S08 Questions generated: <N>"` (where `<N>` is the number of Q-blocks generated; use 0 if none).
+Run `python -B .aib_brain/tools/log-entry.py --workspace . --message "S08 Questions generated: <N>"` (where `<N>` is the number of Q-blocks generated; use 0 if none).
 
 ### S09. Step 9 — Plan Generation
 
-Run `python .aib_brain/tools/log-entry.py --workspace . --message "S09 Plan generation started"`.
+Run `python -B .aib_brain/tools/log-entry.py --workspace . --message "S09 Plan generation started"`.
 
 > **[Plan-Only-Mode] instructions:** When [Plan-Only-Mode] is True:
 > - First check if `analysis-<request_id>.md` exists.
@@ -323,15 +331,17 @@ S09.3. Requirements:
    - MUST: Each plan task MUST map to one or more actions from `### Execution Steps` in the analysis; the exact file path and action description from `### Execution Steps` MUST be reflected in the corresponding plan task procedure step.
    - MUST: Include a mandatory context update task (typically as the final or near-final task in the WBS) that specifies the exact `edit-context.py` invocations with literal `--operation`, `--area`, `--type` (only for Requirements inserts), and `--text` arguments for every statement to be inserted or deleted in the `## Product`, `## Concepts`, `## Requirements`, or `## Solution` sections. The implement agent MUST be able to run these commands verbatim without reading `context.md` first. The exact current text of any statement to be deleted MUST be embedded in the plan task procedure steps. During this step, read `.aib_memory/context.md` to identify the exact text of statements that need to change, then embed those exact texts into the plan task procedure steps. You MUST base these `edit-context.py` invocations directly on the conflict resolutions and intent preservation defined in the `## Context Update Analysis` section of the analysis document. Note: `--type` accepts only MUST, MUST NOT, or OPTIONAL and is only required for Requirements inserts; do not include `--type` for Product, Concepts, or Solution inserts.
 
-Run `python .aib_brain/tools/log-entry.py --workspace . --message "S09 Plan generated: plan-<request_id>.md"`.
+S09.4. In the generated plan `## Constraints`, propagate [Brain-Authorization] verbatim with the same user source when it is set; otherwise record `Authorization: Not authorized`. The analysis and plan MUST NOT self-authorize protected work, and protected file paths in the proposed scope are not evidence of authorization.
+
+Run `python -B .aib_brain/tools/log-entry.py --workspace . --message "S09 Plan generated: plan-<request_id>.md"`.
 
 ### S10. Step 10 - Completion Confirmation
 
-Run `python .aib_brain/tools/log-entry.py --workspace . --message "S10 Analysis complete: <request_id>"`.
+Run `python -B .aib_brain/tools/log-entry.py --workspace . --message "S10 Analysis complete: <request_id>"`.
 
 S10.1. Confirm at the very end of the conversation (this should be the very last message to the user after all other generated response) with the text "--- I am done with the analysis of `<request_id>` ---".
 
-S10.2. Do not add additional text after "--- I am done with the analysis of `<request_id>` ---" line. MUST: If needed to be written somenting in the output chat - do it before this line.
+S10.2. Do not add additional text after "--- I am done with the analysis of `<request_id>` ---" line. MUST: If needed to be written someting in the output chat - do it before this line.
 
 ---
 

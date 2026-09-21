@@ -338,14 +338,6 @@ class TestAnalysisConventionSectionStructure:
             "this section has been removed."
         )
 
-    def test_best_practices_present(self) -> None:
-        """Best-practices content must appear in analysis-convention.md (within Research Results)."""
-        content = ANALYSIS_CONVENTION.read_text(encoding="utf-8")
-        assert "best practices" in content.lower(), (
-            "analysis-convention.md must reference best-practices guidance "
-            "(now covered within Research Results, not as a standalone section)."
-        )
-
     def test_decision_register_present(self) -> None:
         """Decision Register must appear in analysis-convention.md."""
         content = ANALYSIS_CONVENTION.read_text(encoding="utf-8")

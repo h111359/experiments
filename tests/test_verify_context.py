@@ -16,7 +16,7 @@ import pytest
 WORKSPACE_ROOT = Path(__file__).resolve().parent.parent
 SCRIPT_PATH = WORKSPACE_ROOT / ".aib_brain" / "tools" / "verify-context.py"
 
-# Minimal well-formed context.md content for baseline tests (6-section format)
+# Minimal well-formed context.md content with the managed References registry.
 VALID_CONTEXT = """\
 # Product Context
 
@@ -44,6 +44,16 @@ VALID_CONTEXT = """\
   context.md — product context
 tests/
   test_verify_context.py — verification tests
+
+## References
+
+### Context Data Model
+Location: .aib_memory/context-data-model.md
+Summary: Logical, physical, and analytical schemas, entities, and relationships discovered in the workspace.
+Convention: .aib_brain/conventions/context-data-model-convention.md
+Prompt: .aib_brain/prompts/aib-refresh-context-data-model.md
+Read: no
+Update: yes
 """
 
 
@@ -61,6 +71,7 @@ def _run_verify(workspace: Path) -> subprocess.CompletedProcess:
         [sys.executable, str(SCRIPT_PATH), "--workspace", str(workspace)],
         capture_output=True,
         text=True,
+        encoding="utf-8",
     )
 
 
@@ -106,6 +117,53 @@ class TestVerifyContextMissingSections:
         result = _run_verify(tmp_path)
         assert result.returncode == 1
         assert "[FAIL] check_product_section_present_and_non_empty" in result.stdout
+
+    def test_missing_references_section(self, tmp_path: Path) -> None:
+        """Missing mandatory managed registry should cause failure."""
+        content = VALID_CONTEXT.split("## References", 1)[0]
+        _write_context(tmp_path, content)
+        result = _run_verify(tmp_path)
+        assert result.returncode == 1
+        assert "[FAIL] check_all_h2_headings_valid" in result.stdout
+        assert "[FAIL] check_references_format" in result.stdout
+
+
+class TestVerifyManagedReferences:
+    """Managed registry structure and fixed values must be exact."""
+
+    def test_unmanaged_entry_fails(self, tmp_path: Path) -> None:
+        """Bibliographic or unknown H3 entries are prohibited."""
+        content = VALID_CONTEXT.replace(
+            "### Context Data Model",
+            "### Bibliography\nLocation: docs/ref.md\nSummary: Unsupported reference.\n\n### Context Data Model",
+        )
+        _write_context(tmp_path, content)
+        result = _run_verify(tmp_path)
+        assert result.returncode == 1
+        assert "[FAIL] check_references_format" in result.stdout
+
+    @pytest.mark.parametrize(
+        "old,new",
+        [
+            ("Location: .aib_memory/context-data-model.md", "Location: .aib_memory\\context-data-model.md"),
+            ("Convention: .aib_brain/conventions/context-data-model-convention.md", "Convention: conventions/model.md"),
+            ("Prompt: .aib_brain/prompts/aib-refresh-context-data-model.md", "Prompt: prompts/refresh.md"),
+        ],
+    )
+    def test_wrong_managed_path_fails(self, tmp_path: Path, old: str, new: str) -> None:
+        """Fixed paths must match slash-separated canonical values."""
+        _write_context(tmp_path, VALID_CONTEXT.replace(old, new))
+        result = _run_verify(tmp_path)
+        assert result.returncode == 1
+        assert "[FAIL] check_references_format" in result.stdout
+
+    def test_wrong_field_order_fails(self, tmp_path: Path) -> None:
+        """Read must appear immediately before Update."""
+        content = VALID_CONTEXT.replace("Read: no\nUpdate: yes", "Update: yes\nRead: no")
+        _write_context(tmp_path, content)
+        result = _run_verify(tmp_path)
+        assert result.returncode == 1
+        assert "[FAIL] check_references_format" in result.stdout
 
 
 class TestVerifyContextRequirementsFormat:

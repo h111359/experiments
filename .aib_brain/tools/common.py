@@ -39,6 +39,24 @@ class ValidationError(RuntimeError):
     """Raised on deterministic validation failures."""
 
 
+def configure_utf8_output() -> None:
+    """Set CLI stdout/stderr to UTF-8 without changing request data or stdin.
+
+    Returns:
+        None. Reconfigures byte-backed standard streams in place; text-only
+        streams such as StringIO already accept Unicode and are left intact.
+
+    Raises:
+        OSError: If a stream cannot be flushed or reconfigured.
+    """
+    # Windows pipes and redirected files can default to a legacy codec even
+    # though AIB reads its input files as UTF-8. Keep the output contract fixed.
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if callable(reconfigure):
+            reconfigure(encoding="utf-8")
+
+
 def parse_args(description: str) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=description)
     parser.add_argument("--workspace", default=".", help="Workspace root path")

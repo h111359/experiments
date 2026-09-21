@@ -19,6 +19,10 @@ from common import artifact_name, get_semver, get_setup_option, set_setup_option
 # Auto-refresh interval used by choose_action() when no key is pressed.
 _REFRESH_TIMEOUT_S: float = 3.0
 
+# Child tools inherit a bytecode-disabled copy without mutating the host process environment.
+_CHILD_ENV: dict[str, str] = os.environ.copy()
+_CHILD_ENV["PYTHONDONTWRITEBYTECODE"] = "1"
+
 # Hard-coded list of developer-facing menu actions.  Only scripts that are
 # genuinely useful to the developer from the menu surface are included here.
 # close-request.py is conditionally injected by filter_visible_actions when
@@ -150,6 +154,7 @@ def _run_and_tee(
 
     proc = subprocess.Popen(
         command,
+        env=_CHILD_ENV,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         stdin=None if inherit_stdin else subprocess.DEVNULL,
@@ -298,13 +303,27 @@ def filter_visible_actions(
 
 
 def ensure_memory_initialized_if_missing(workspace: Path, python_exe: str, tools_dir: Path) -> None:
+    """Initialize AIB memory with a bytecode-disabled child when it is absent.
+
+    Args:
+        workspace: Workspace root that may need an AIB memory directory.
+        python_exe: Python interpreter used for the initialization child.
+        tools_dir: Directory containing the initialization tool.
+
+    Returns:
+        None. The function returns immediately when memory already exists.
+
+    Raises:
+        SystemExit: If automatic initialization fails.
+    """
     memory_root = workspace / ".aib_memory"
     if memory_root.exists():
         return
 
     init_script = (tools_dir / "initialize.py").resolve()
     result = subprocess.run(
-        [python_exe, str(init_script), "--workspace", str(workspace)],
+        [python_exe, "-B", str(init_script), "--workspace", str(workspace)],
+        env=_CHILD_ENV,
         text=True,
         capture_output=True,
     )
@@ -487,8 +506,19 @@ def collect_parameters(action: dict[str, Any], workspace_default: str) -> dict[s
 
 
 def build_command(python_exe: str, tools_dir: Path, action: dict[str, Any], values: dict[str, str]) -> list[str]:
+    """Build a bytecode-disabled Python command for a menu action.
+
+    Args:
+        python_exe: Python interpreter used to launch the action.
+        tools_dir: Directory containing the action script.
+        action: Menu action metadata, including script and parameter definitions.
+        values: Resolved parameter values keyed by parameter name.
+
+    Returns:
+        Command arguments with ``-B`` immediately after the interpreter.
+    """
     script_name = str(action.get("script", "")).strip()
-    command = [python_exe, str((tools_dir / script_name).resolve())]
+    command = [python_exe, "-B", str((tools_dir / script_name).resolve())]
 
     for param in action.get("parameters", []):
         name = str(param.get("name", "")).strip()
@@ -794,8 +824,9 @@ def check_version_compatibility(workspace: Path, python_exe: str, tools_dir: Pat
         if choice == "1":
             init_script = (tools_dir / "initialize.py").resolve()
             result = subprocess.run(
-                [python_exe, str(init_script), "--workspace", str(workspace), "--upgrade"],
+                [python_exe, "-B", str(init_script), "--workspace", str(workspace), "--upgrade"],
                 # Inherit stdin/stdout so the upgrade output is visible.
+                env=_CHILD_ENV,
                 stdin=None,
                 text=True,
             )

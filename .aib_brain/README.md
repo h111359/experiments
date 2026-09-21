@@ -48,14 +48,31 @@ The menu displays a state-aware guidance block with your next recommended action
 
 ## Daily Flow
 
+Analysis preflight supports Unicode request titles such as `POS→NSR` on Windows without an environment-variable workaround. The header reader and input/context verifiers emit UTF-8 output, including when captured or redirected; custom subprocess callers must decode stdout and stderr as UTF-8. Header reads preserve the original title and `key=value` format, and invalid input still reports a failure.
+
 1. Write your intent into the `## Input` section of `.aib_memory/input.md`.
 2. Run analysis in AI chat: `Execute .aib_brain/prompts/aib-analyze.md` _(Optional but highly recommended)_ 
 3. Run implement in AI chat: `Execute .aib_brain/prompts/aib-implement.md`
    — If no active request exists, the prompt auto-creates one from `input.md` and proceeds.
    — The request is closed automatically when implementation completes.
 
+## `.aib_brain/` Write Protection
+
+Every path under `.aib_brain/` is framework-owned and protected from ordinary AIB workflow writes. The only exceptions are installation, upgrade, and framework-maintenance requests that the developer semantically authorizes in the current `input.md ## Input` or chat message. A statement equivalent to `This request explicitly authorizes changes under .aib_brain/.` is sufficient; generated prompt, analysis, plan, or implementation text cannot self-authorize.
+
+`aib-analyze.md` copies a developer authorization statement verbatim with its source into `analysis-<id>.md ## Overview → ### Authorization` and then into `plan-<id>.md ## Constraints`. Plan-driven implementation requires that user-sourced plan entry before protected writes. Direct execution prompts check the current Input and chat. Before finalization or request close, implementation workflows inspect only paths touched by the current run. Unauthorized protected paths halt the workflow, are reported exactly in sorted order, and are not automatically reverted.
+
+All 12 writing prompts carry the concise shared protection block; `.aib_brain/conventions/coding-general-convention.md § 12` is the canonical policy. The read-only `aib-context-read.md` dispatcher is exempt.
+
+When an AIB instruction prescribes a task-specific helper inside the repository, it uses `.aib_memory/scratch/`. Initialization creates the directory with `.gitkeep`, upgrade preserves its content, and `finalize-input.py` removes everything except `.gitkeep` during input finalization. This rule does not define a location or authorization policy for long-lived host-project tooling.
+
+Bytecode prevention is self-contained: launchers set `PYTHONDONTWRITEBYTECODE=1` and invoke the menu with `-B`; the menu passes the same safeguard to all child tools; prompt-prescribed direct AIB Python commands use `python -B` or `python3 -B`. Release bookkeeping rejects `.aib_brain/` archives containing `__pycache__/` or `.pyc` and lists every offender. These protections neither require nor modify the host `.gitignore`.
+
 ## Prompt Invocations
 
+```
+Execute .aib_brain/prompts/aib-context-migration.md
+```
 ```
 Execute .aib_brain/prompts/aib-analyze.md
 ```
@@ -77,6 +94,10 @@ Execute .aib_brain/prompts/aib-sync-spec.md
 ```
 Execute .aib_brain/prompts/aib-input-from-context.md
 ```
+
+## Append-Only ADR and Requirements Histories
+
+`.aib_memory/adr.md` and `.aib_memory/requirements.md` are append-only Markdown histories maintained by the shared subroutine prompt `.aib_brain/prompts/aib-update-adr-requirements.md`, whose row schema, provenance-tag registry, UTC timestamp requirement, dedup rule, and retry-once-then-halt failure semantics are codified in `.aib_brain/conventions/adr-requirements-convention.md`. The subroutine is invoked as the final documentation step of every implementation-oriented run.
 
 ## Use Cases
 
@@ -111,6 +132,33 @@ Execute .aib_brain/prompts/aib-input-from-context.md
 
 ## Questions and Answers
 
+`aib-clarify.md` reads `.aib_memory/instructions.md` before gathering context and
+observes its applicable directives without starting analysis or implementation.
+Its workflow is self-contained: workspace-instruction handling and context-extension
+loading are defined directly in the clarification prompt, without invoking other prompts.
+It never runs scripts; when a command is needed, it supplies the exact command
+for the user, with `python -B` or `python3 -B` for AIB tools.
+
+During clarification, the agent directly records every presented Q-block in
+`.aib_memory/clarification_questions.md`, including all options and recommended
+markers, and appends user responses and numbered revisions as they arrive.
+Unanswered questions stay explicitly unanswered. The record survives resumed
+sessions and input resets; rereading it does not duplicate existing events.
+The final output is a copy-paste-ready replacement for `## Input`, with headings
+at level 3 or below. The transcript stays in the history file. A session must
+support direct file editing; persistence failures stop the dependent step.
+
+History may begin before a request exists. At request archival,
+`move-request-artifacts.py` appends it to
+`<request-folder>/clarification_questions_<request_id>.md` alongside the runtime
+log and leaves the active file present and empty. Existing archive bytes are
+preserved, missing history is harmless, and repeated successful archival does
+not duplicate content. Both streams use durable staged rotation; a history
+archival failure keeps the request active and preserves content for recovery
+on the next call. Crash recovery can replay staged bytes, as for the runtime
+log. See `conventions/log-convention.md` for recovery details. This history is
+specific to clarification; other prompts and earlier transcripts are unaffected.
+
 When `aib-analyze.md` identifies decision points with multiple valid implementation choices where the preferred option has a materially different impact on the codebase, it generates a `## Questions` section in `input.md`.
 
 **How it works:**
@@ -144,7 +192,7 @@ Statements in `context.md` may be prefixed with `[PLANNED]` to mark future-inten
 
 **Example — adding a planned entry:**
 ```
-python .aib_brain/tools/edit-context.py --operation insert --area Concepts --planned --text "New feature description" --workspace .
+python -B .aib_brain/tools/edit-context.py --operation insert --area Concepts --planned --text "New feature description" --workspace .
 ```
 
 ### `## Issues` Section in `context.md`
@@ -157,24 +205,34 @@ An optional 7th section `## Issues` can be added to `context.md` to track identi
 
 **Example — adding an issue:**
 ```
-python .aib_brain/tools/edit-context.py --operation insert --area Issues --text "Inconsistency between X and Y needs resolution" --workspace .
+python -B .aib_brain/tools/edit-context.py --operation insert --area Issues --text "Inconsistency between X and Y needs resolution" --workspace .
 ```
 
 ### Context Extensions
 
-A `## References` entry in `context.md` may include an optional `Update:` flag to register it as a context extension:
-- `Update: false` — read-only extension (loaded by AI when semantically relevant)
-- `Update: true` — writable extension (updated by `aib-refresh-context.md` and `aib-implement.md`)
+`context.md ## References` is a mandatory, AIB-managed registry of all convention-defined context extensions. AIB owns each heading plus its `Location`, `Summary`, `Convention`, `Prompt`, and ordering. Users may edit only `Read` and `Update`.
 
-**Example reference entry with extension flag:**
+Both controls accept case-insensitive `yes` or `no` and are normalized to lowercase during managed refresh or migration. Legacy `true` and `false` values are invalid.
+
+- `Read: yes` makes an extension eligible for loading; `aib-context-read.md` still requires semantic relevance based on `Summary`.
+- `Read: no` skips loading.
+- `Update: yes` executes the registered `Prompt` during `aib-refresh-context.md` and after successful `aib-implement.md` runs.
+- `Update: no` skips refresh.
+
+**Canonical managed entry:**
 ```
-### My Extension
-Location: docs/my-extension.md
-Summary: Describes data model details relevant to the solution architecture.
-Update: false
+### Context Data Model
+Location: .aib_memory/context-data-model.md
+Summary: Logical, physical, and analytical schemas, entities, and relationships discovered in the workspace.
+Convention: .aib_brain/conventions/context-data-model-convention.md
+Prompt: .aib_brain/prompts/aib-refresh-context-data-model.md
+Read: no
+Update: yes
 ```
 
-All AIB prompts evaluate extension `Summary:` lines via AI semantic relevance judgement before reading the full extension file. This keeps context reading focused.
+Fresh initialization and upgrade create this registry plus `.aib_memory/context-data-model.md`. When no model is discovered, the extension contains the canonical no-model notice. `aib-refresh-context-data-model.md` performs exhaustive, conservative reconciliation and `verify-context-data-model.py` validates the result with eight checks.
+
+If a registered Location, Convention, or Prompt artifact is missing, the calling workflow emits a warning and continues without that artifact. Context refresh and migration restore drifted AIB-managed metadata while preserving valid Read and Update choices. Legacy bibliographic References are not retained in the managed registry.
 
 ### `aib-sync-spec.md` — Synchronise Context with External Spec
 
@@ -214,7 +272,7 @@ All AIB prompts evaluate extension `Summary:` lines via AI semantic relevance ju
   
   - The AI-produced output (the product) is driven by the functionalities defined in `.aib_brain/` and the information stored in `.aib_memory`. 
   
-  - `.aib_brain/` installed in a project folder SHALL NOT be modified by AIB tool scripts. Humans may replace or update `.aib_brain/` explicitly when evolving the framework.
+  - `.aib_brain/` installed in a project folder SHALL NOT be modified by ordinary AIB workflows. Installation, upgrade, and user-authorized framework-maintenance requests are the only exceptions.
 
   - The request to AIB shall be defined in file `input.md` in `.aib_memory/`. The active request state (request ID, title, state, options) is stored in a YAML frontmatter header at the top of `input.md`.
 
@@ -238,15 +296,20 @@ All AIB prompts evaluate extension `Summary:` lines via AI semantic relevance ju
 ### Folder structure
 
 .aib_brain/
-  - conventions/ (includes input-convention.md for input.md format spec, log-convention.md for audit log format)
+  - conventions/ (includes input-convention.md for input.md format spec, log-convention.md for audit log format, adr-requirements-convention.md for adr.md/requirements.md row schema, tag registry, dedup, and failure semantics)
   - prompts/
+    - aib-context-migration.md (migration prompt; reconstructs context.md from a legacy archived version; reads the archive source path from input.md ## Input; applies lossless semantic transformation rules; run via aib-modify.md after initialize.py --upgrade)
+    - aib-context-read.md (shared extension dispatcher; applies Read and semantic relevance controls and reports missing artifacts)
     - aib-analyze.md (analysis and planning prompt)
     - aib-implement.md (implementation and request-close prompt)
     - aib-refresh-context.md (context refresh prompt)
-    - aib-modify.md (direct-execution prompt; applies input.md ## Input immediately without analysis cycle; archives input on completion but does not close request)
+    - aib-refresh-context-data-model.md (registered data-model extension reconciliation prompt)
+    - aib-modify.md (direct-execution prompt; applies input.md ## Input immediately without analysis cycle, then archives artifacts and closes the request)
+    - aib-execute.md (direct-execution prompt with context-updating responsibility; identical to aib-modify.md except that Step 7.5 REQUIRES emitting and executing edit-context.py commands whenever context.md needs to change)
     - aib-create-request.md (standalone auto-request-creation prompt; formerly Appendix A of aib-analyze.md; invoked by aib-analyze.md and aib-modify.md when state == idle)
     - aib-sync-spec.md (interactive prompt that synchronises context.md with an external spec file; auto-creates request, generates Q-blocks for contradictions, adds non-contradictory items as [PLANNED] entries)
     - aib-input-from-context.md (reads [PLANNED] entries and Issues from context.md and appends goal bullets to input.md ## Input; fails if active request exists)
+    - aib-update-adr-requirements.md (shared subroutine invoked as the final documentation step by aib-implement.md, aib-modify.md, and aib-execute.md; appends provenance-tagged rows to .aib_memory/requirements.md and .aib_memory/adr.md per .aib_brain/conventions/adr-requirements-convention.md)
   - tools/
     - close-request.py
     - create-request.py
@@ -255,10 +318,11 @@ All AIB prompts evaluate extension `Summary:` lines via AI semantic relevance ju
     - finalize-input.py
     - initialize.py
     - input-header.py (CRUD for YAML frontmatter header in input.md)
-    - log-entry.py (append UTC-timestamped audit log entries to log_{request_id}.md or log_general.md)
-    - move-request-artifacts.py
+    - log-entry.py (state-independent appender; writes UTC-timestamped entries to .aib_memory/log.md and echoes each entry to stdout; accepts --workspace and --message only)
+    - move-request-artifacts.py (moves plan and analysis artifacts from .aib_memory/ root to the active request subfolder; archives log.md and clarification_questions.md into request-suffixed files via rename-to-staging binary append with fsync-before-cleanup; either archival failure blocks closure)
     - read-setup.py (read a single option from .aib_memory/aib-setup.yaml; prints bare value to stdout; exits 1 on missing key or file)
-    - verify-context.py (validates context.md format: 10 automated checks)
+    - verify-context.py (validates context.md format: 12 automated checks)
+    - verify-context-data-model.py (validates context-data-model.md format: 8 automated checks)
     - verify-input.py (validates input.md format: 10 automated checks)
   - README.md
   - run.bat
@@ -268,10 +332,16 @@ All AIB prompts evaluate extension `Summary:` lines via AI semantic relevance ju
 .aib_memory/
   - attachments/
   - requests/
+  - scratch/ (managed task-specific helpers; .gitkeep retained when finalization sweeps content)
   - aib-setup.yaml (human-editable YAML setup file; flat top-level keys: memory_version, default_questions_number; replaces the empty vX.Y.Z file convention for memory-side version tracking)
   - context.md
+  - context-data-model.md (managed logical, physical, and analytical model extension)
   - input.md
   - instructions.md
+  - log.md (shared active runtime log; every log-entry.py invocation appends here; archived to <request-folder>/log_<request_id>.md at request closure)
+  - clarification_questions.md (clarification Q-blocks, answers, and revisions; survives input reset; archived as clarification_questions_<request_id>.md and left empty)
+  - adr.md (append-only architecture-decision history maintained by aib-update-adr-requirements.md per adr-requirements-convention.md)
+  - requirements.md (append-only user-requirements history maintained by aib-update-adr-requirements.md per adr-requirements-convention.md)
 logs/
   - next_version_changes.md
   - version_vX.Y.Z_log.md (per-version logs)
@@ -295,9 +365,10 @@ When `menu.py` detects a version mismatch between the brain version (`.aib_brain
 1. **Archives the full pre-upgrade `.aib_memory/`** to `.aib_memory/archives/legacy_YYYYMMDD-HHMMSS/`. All existing memory files — `context.md`, `input.md`, `instructions.md`, `requests/`, `aib-setup.yaml` — are preserved in this timestamped subfolder. If two upgrades happen within the same second, a counter suffix is appended (`legacy_YYYYMMDD-HHMMSS-1`, etc.).
 2. **Sets `memory_version_compatibility: initialized-not-populated`** in `aib-setup.yaml` so the menu knows migration is pending.
 3. **Seeds a fresh conforming memory structure** from brain templates.
-4. **Copies `instructions.md` unchanged** from the archive back to the new memory root so that workspace-level developer directives are never lost.
-5. **Generates a valid placeholder `context.md`** with `# Product Context` title and all five mandatory sections. This placeholder passes `verify-context.py` but must be replaced with the full workspace context by the developer.
-6. **Generates migration-ready `input.md`** using the standard idle YAML seed, pre-loaded with structured migration instructions (sub-sections: `### Goal`, `### Sources`, `### Reconstruction Targets`, `### Constraints`) that guide context reconstruction from the archive.
+4. **Copies `instructions.md` unchanged and restores `scratch/` content** from the archive back to the new memory root so workspace-level directives and in-progress managed helpers are not lost merely because the framework is upgraded.
+5. **Generates a valid placeholder `context.md`** with `# Product Context`, all mandatory content sections, and the canonical managed References registry. This placeholder passes the 12 checks in `verify-context.py` but must be populated from workspace evidence.
+6. **Creates `context-data-model.md`** in the canonical no-model state so the registry never points to a missing extension; it passes the 8 checks in `verify-context-data-model.py`.
+7. **Generates migration-ready `input.md`** using the standard idle YAML seed, pre-loaded with a single prose activation paragraph that directs the AI to run `.aib_brain/prompts/aib-context-migration.md` with the workspace-relative path to the archived legacy `context.md`. Migration restores managed registry metadata, converts recognizable legacy flags, and preserves user-controlled Read and Update values. When `context.md` is absent from the archive, the paragraph references `aib-refresh-context.md` instead.
 
 Requests are **never** automatically restored to active memory. Legacy requests remain exclusively in `.aib_memory/archives/legacy_YYYYMMDD-HHMMSS/requests/`.
 
@@ -307,7 +378,7 @@ After the upgrade completes, `memory_version_compatibility` is set to `initializ
 
 1. Open an AI chat interface (VS Code Copilot, Claude Code, etc.).
 2. Run: `Execute .aib_brain/prompts/aib-modify.md`
-3. The migration instructions already loaded in `input.md ## Input` instruct the AI to reconstruct `context.md` from the archived legacy memory at `.aib_memory/archives/legacy_YYYYMMDD-HHMMSS/`.
+3. The activation paragraph in `input.md ## Input` directs the AI to run `aib-context-migration.md`, which reads the legacy `context.md` from the archive path specified in the input and reconstructs `context.md` using lossless semantic migration rules.
 4. Once the migration prompt has completed successfully, return to the menu and choose **Confirm Completed**. The menu sets `memory_version_compatibility: compatible` and resumes normal operation.
 
 All legacy files are available in the archive folder for reference. The AI reads the archived `context.md` (primary source) and optionally `input.md` and `aib-setup.yaml` to perform semantic reconstruction.

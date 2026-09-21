@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <!--
   user_guide.html: Self-contained onboarding manual for the AI Builder (AIB) framework.
   Component: AIB Onboarding Manual — covers installation, configuration, basic usage,
@@ -465,6 +465,7 @@
       <span class="nav-section-label">Using AIB</span>
       <a href="#first-request">Your First Request</a>
       <a href="#prompt-reference">Prompt Reference</a>
+      <a href="#adr-requirements">ADR &amp; Requirements Histories</a>
 
       <span class="nav-section-label">Help</span>
       <a href="#troubleshooting">Troubleshooting</a>
@@ -539,15 +540,41 @@
         untouched. These folders are equivalent to a "brain" and a "memory" for the AI agent, and they are managed separately.
       </p>
       <p>
-        <strong>Brain</strong> is provided by AIB and should not be edited. It is product agnostic and contains the framework's prompts, tools, 
-        and conventions. 
+        <strong>Brain</strong> is provided by AIB and protected from ordinary workflow edits. It is product agnostic and contains the framework's prompts, tools,
+        and conventions. Installation, upgrade, and explicitly authorized framework maintenance are the only write exceptions.
       </p>
       <p>
         <strong>Memory</strong> is workspace-specific and is editable by the user. Here the communication between the human and the AI agent happens. 
         It contains the workspace's product context, the developer's intent, and the persistent instructions for the AI agent.
         The memory is created and managed by AIB, but the user can edit some parts following the AIB rules. 
-        Memory contains the input.md, context.md, instructions.md, and aib-setup.yaml files.
+        Memory contains the input.md, context.md, context-data-model.md, instructions.md, and aib-setup.yaml files.
       </p>
+
+      <!--
+        Framework Write Protection
+        Design intent: Make the protected framework boundary and safe authorization path
+        visible at the point where users first learn the brain/memory distinction.
+        Target: All viewports; the existing callout and list styles remain responsive.
+      -->
+      <h3><code>.aib_brain/</code> write protection</h3>
+      <p>
+        Ordinary AIB workflows do not create, edit, move, or delete paths under
+        <code>.aib_brain/</code>. The only exceptions are installation, upgrade, and an explicitly
+        authorized framework-maintenance request. Authorization is semantic: put a statement such as
+        <code>This request explicitly authorizes changes under .aib_brain/.</code> in the current
+        <code>input.md ## Input</code> or developer chat message. AIB-generated analysis, plans, prompts,
+        and implementation notes cannot authorize themselves.
+      </p>
+      <ul>
+        <li>Analysis copies the authorization statement verbatim with its source into <code>### Authorization</code>; the plan carries the same statement and source in <code>## Constraints</code>.</li>
+        <li>Before closing, implementation workflows inspect only paths touched during the current run. Unauthorized framework changes halt and report every exact path in sorted order without automatically reverting it.</li>
+        <li>AIB-prescribed in-repository task helpers belong in <code>.aib_memory/scratch/</code>. Initialization creates it, upgrade preserves it, and input finalization removes all content except <code>.gitkeep</code>.</li>
+        <li>Launchers, prompt commands, and menu child tools disable Python bytecode without changing <code>.gitignore</code>. Release packaging rejects <code>__pycache__/</code> and <code>.pyc</code> below <code>.aib_brain/</code>.</li>
+      </ul>
+      <div class="callout">
+        <strong>Framework maintenance:</strong> State the authorization in Input or chat before the
+        analysis/implementation workflow starts. Naming protected files only in a generated plan is not authorization.
+      </div>
       <p>
         <strong>input.md</strong> is the main communication file between AIB and the user. It have multiple purposes:
         <ul>
@@ -563,6 +590,33 @@
         It is automatically generated and updated by AIB after each request so no need to edit it manually. 
         The user still can edit it directly observing the expected format.
       </p>
+      <h3>Managed context extensions</h3>
+      <p>
+        The mandatory <code>context.md ## References</code> section is an AIB-managed registry
+        of supplementary context files. The initial <strong>Context Data Model</strong> entry points
+        to <code>.aib_memory/context-data-model.md</code> and records its convention and refresh prompt.
+        AIB owns the entry heading, location, summary, convention, prompt, and ordering. You may edit
+        only the <code>Read</code> and <code>Update</code> values.
+      </p>
+      <pre><code>### Context Data Model
+Location: .aib_memory/context-data-model.md
+Summary: Logical, physical, and analytical schemas, entities, and relationships discovered in the workspace.
+Convention: .aib_brain/conventions/context-data-model-convention.md
+Prompt: .aib_brain/prompts/aib-refresh-context-data-model.md
+Read: no
+Update: yes</code></pre>
+      <ul>
+        <li><code>Read: yes</code> makes the extension eligible for loading; <code>aib-context-read.md</code> also checks semantic relevance before loading it.</li>
+        <li><code>Read: no</code> leaves the extension unloaded.</li>
+        <li><code>Update: yes</code> executes the registered refresh prompt during context refresh and after successful implementation.</li>
+        <li><code>Update: no</code> leaves extension content unchanged.</li>
+      </ul>
+      <p>
+        Values are case-insensitive <code>yes</code> or <code>no</code> and are normalized to lowercase;
+        legacy boolean values are invalid. If a registered artifact is missing, AIB shows a warning
+        and continues without that artifact. Fresh initialization and upgrade seed a valid no-model
+        extension, which is checked by <code>verify-context-data-model.py</code>.
+      </p>
       <p>
         <strong>instructions.md</strong> is the file where the user can write specific for the workspace instructions for AIB. 
         It is a human-editable file. The instructions are read and followed by AIB during its operations.
@@ -575,7 +629,7 @@
       </p>
 
       <pre class="folder-tree">.aib_brain/      &larr; Framework assets (prompts, tools, conventions)
-                     Provided and maintained by AIB; you do not edit these.
+                     Protected; write only for install, upgrade, or authorized maintenance.
 
 .aib_memory/     &larr; Workspace-specific artifacts (your requests, context, config)
                      Created and managed per workspace; you configure and use these.</pre>
@@ -633,8 +687,7 @@
 
       <h3>Step 2 &mdash; Extract into your workspace</h3>
       <p>
-        Extract the zip archive so that the <code>.aib_brain/</code> folder appears at the root of
-        your workspace (the same folder that contains your project files).
+        Extract the zip archive.
       </p>
 
       <div class="platform-tabs" id="install-tabs">
@@ -654,7 +707,7 @@
         <div class="platform-tab-panel active" role="tabpanel"
              id="install-windows" aria-labelledby="tab-install-windows">
           <p>Open PowerShell at your workspace root and run:</p>
-          <pre><code>Expand-Archive -Path "versions\aib_brain_v1.5.2.zip" -DestinationPath "."</code></pre>
+          <pre><code>Expand-Archive -Path "aib_brain_v1.5.2.zip" -DestinationPath "."</code></pre>
           <p>
             Replace <code>v1.5.2</code> with the version you downloaded. After extraction,
             confirm that a <code>.aib_brain\</code> folder now exists in your workspace root.
@@ -665,13 +718,18 @@
         <div class="platform-tab-panel" role="tabpanel"
              id="install-linux" aria-labelledby="tab-install-linux">
           <p>Open a terminal at your workspace root and run:</p>
-          <pre><code>unzip versions/aib_brain_v1.5.2.zip -d .</code></pre>
+          <pre><code>unzip aib_brain_v1.5.2.zip -d .</code></pre>
           <p>
             Replace <code>v1.5.2</code> with the version you downloaded. After extraction,
             confirm that a <code>.aib_brain/</code> folder now exists in your workspace root.
           </p>
         </div>
       </div><!-- end platform-tabs -->
+
+      <p>
+        The <code>.aib_brain/</code> folder must appears at the root of
+        your workspace (the same folder that contains your project files).
+      </p>
 
       <h3>Step 3 &mdash; Run the launcher</h3>
       <p>
@@ -717,23 +775,60 @@
 
       <h3>What was created?</h3>
       <p>After the first launcher run, your workspace will contain:</p>
-      <pre class="folder-tree">.aib_brain/              &larr; Framework assets (extracted from zip)
+      <pre class="folder-tree">
+.aib_brain/              &larr; Framework assets (extracted from zip)
   conventions/           &larr; Document structure rules
   prompts/               &larr; Prompt files you invoke in your AI chat
   tools/                 &larr; Python tool scripts
-  user_guide.html        &larr; This manual (browser-viewable)
+  README.md              &larr; Quick-start overview and workspace guide
+  user_guide.html        &larr; Self-contained interactive user guide (browser-viewable)
   run.bat / run.sh       &larr; Launchers
+  v.X.Y.Z                &larr; Version indentifier 
 
 .aib_memory/             &larr; Created on first launcher run
+  archives/              &larr; Archived memory versions (auto-managed)
+  attachments/           &larr; Optional files attached to current request
+  requests/              &larr; Completed request records (auto-managed)
   aib-setup.yaml         &larr; Your configuration file
   context.md             &larr; Workspace product context (auto-generated)
+  context-data-model.md  &larr; Managed data-model context extension
   input.md               &larr; Where you write your requests
-  instructions.md        &larr; Your persistent workspace directives</pre>
+  instructions.md        &larr; Your persistent workspace directives
+  log.md                 &larr; Shared runtime log; archived per request on close
+  clarification_questions.md &larr; Clarification questions, answers, and revisions
+  scratch/               &larr; Managed temporary helpers; finalization keeps only .gitkeep</pre>
+
+      <!--
+        Runtime log callout: user-facing explanation of the shared active log
+        and its close-time archival lifecycle. Placed immediately after the
+        workspace tree so users encounter it in the same visual scan.
+      -->
+      <div class="callout">
+        <strong>Runtime log:</strong>
+        Every AIB tool invocation appends a UTC-timestamped line to
+        <code>.aib_memory/log.md</code>. This shared active log stays present
+        across idle and active workspace states. When you close a request,
+        AIB archives the complete <code>log.md</code> stream into
+        <code>.aib_memory/requests/&lt;request-folder&gt;/log_&lt;request_id&gt;.md</code>
+        and leaves <code>log.md</code> empty for the next request. Legacy
+        <code>log_general.md</code> files and any prior root-level
+        <code>log_&lt;request_id&gt;.md</code> files from older AIB versions
+        are preserved verbatim and left untouched.
+      </div>
+
 
       <div class="callout">
-        <strong>Upgrading?</strong> If you are extracting a new version of AIB over an existing
-        workspace, run the launcher after extraction. If the brain version does not match your
-        memory version, AIB will offer an automatic upgrade with safe migration steps.
+        <strong>Upgrading?</strong> 
+        If you want to upgrade by extracting a new version of AIB over an existing
+        workspace, repeat the Step 1 (Obtain the archive) with the new version file. 
+        Then remove the current .aib_brain/ folder. 
+        DO NOT remove .aib_memory/ folder (otherwise you will lose your workspace memory). 
+        Run the launcher after extraction. If the brain version does not match your
+        memory version, AIB will offer an automatic upgrade with migration steps where 
+        the current memory will be archived and a new memory folder will be created. Existing
+        <code>scratch/</code> content is restored into the reseeded memory during this upgrade.
+        After that the input.md file will be populated with a special prompt which will
+        transfer the old memory into the new one. After that you can continue using AIB normally.
       </div>
     </section><!-- end Installation -->
 
@@ -800,7 +895,7 @@
       <h4>When to use it</h4>
       <p>
         Use <code>instructions.md</code> to capture any rule or preference that should apply
-        to all AIB runs in this workspace. For example:
+        to all AIB runs across the workspace. For example:
       </p>
       <ul>
         <li>Coding style or naming conventions specific to this project.</li>
@@ -871,7 +966,15 @@
             Open <code>.aib_memory/input.md</code> in your editor. Locate the
             <code>## Input</code> section and write a clear, bounded description of the change
             you want AIB to help you implement. Be specific: describe the goal, any constraints,
-            and the files or areas of the codebase involved.
+            and the files or areas of the codebase involved.<br><br>
+            Optionally (but highly recommendable): Generate a file with the context information 
+            using "Create Clarify Context" from the menu and attach
+            the generated .aib_mamory/context-compilation-<timestamp>.md and your input.md file in 
+            a subscription based (no token limit) AI chat interface and just write "Go". 
+            In the chat answer all the questions and provide any additional information needed. 
+            When AI decides enough information is gathered, or you decide to stop - ask the input to be 
+            generated and copy the proposed text in your input.ms replacing your initial entry.
+
           </div>
         </li>
         <li>
@@ -891,9 +994,9 @@
             After analysis completes, find the generated files in <code>.aib_memory/</code>:
             <ul>
               <li><code>analysis-&lt;id&gt;.md</code> &mdash; AIB's research and reasoning.</li>
-              <li><code>plan-&lt;id&gt;.md</code> &mdash; The step-by-step implementation plan.</li>
+              <li><code>plan-&lt;id&gt;.md</code> &mdash; The implementation plan (missing before all Q-blocks are resolved).</li>
             </ul>
-            Read both files. Adjust the plan if needed before proceeding.
+
           </div>
         </li>
         <li>
@@ -911,6 +1014,7 @@
             If you answered Q-blocks in the previous step, run analysis again:
             <pre><code>Execute .aib_brain/prompts/aib-analyze.md</code></pre>
             AIB applies your answers to the plan and clears the questions section.
+            Read both analysis and plan files. Adjust the plan if needed before proceeding.
           </div>
         </li>
         <li>
@@ -924,17 +1028,22 @@
         </li>
         <li>
           <div>
-            <strong>Confirm the request is closed.</strong><br>
+            <strong>Verify.</strong><br>
             After implementation completes, run the launcher again to confirm the workspace
             is back to <code>idle</code> state. The closed request artifacts are preserved in
-            <code>.aib_memory/requests/&lt;request-folder&gt;/</code> for audit traceability.
+            <code>.aib_memory/requests/&lt;request-folder&gt;/</code> for audit traceability.<br>
+            <br>
+            Inspect the resulting code and documentation changes in your editor. Run tests, build, or otherwise.<br>
+            <br>
+            AIB is not taking care for versioning, git commits or pushing to remote repositories. 
+            You should do that manually after verifying the changes.
+
           </div>
         </li>
         <li>
           <div>
             <strong>Start the next request.</strong><br>
-            Write your next request into <code>.aib_memory/input.md ## Input</code> and repeat
-            from step 4.
+            You are ready to start your next request. Repeat from step 3.
           </div>
         </li>
       </ol>
@@ -946,6 +1055,16 @@
         <pre><code>Execute .aib_brain/prompts/aib-implement.md</code></pre>
         AIB will auto-create a request from your input and implement it directly.
       </div>
+
+      <div class="callout">
+        <strong>Straight-forward modification:</strong> If your request is simple, well-understood 
+        changes where a full analysis cycle is unnecessary, write your intent in
+        <code>input.md</code> and run:
+        <pre><code>Execute .aib_brain/prompts/aib-modify.md</code></pre>
+        AIB will execute the request directly without an analysis or plan cycle. 
+        Use this for simple, well-understood changes where a full analysis cycle is unnecessary.
+      </div>
+
     </section><!-- end Your First Request -->
 
     <!-- ============================================================
@@ -970,6 +1089,32 @@
             <code>analysis-&lt;id&gt;.md</code> and <code>plan-&lt;id&gt;.md</code>, and writes
             clarifying Q-blocks to <code>input.md</code> when decision points exist. Use this
             before implementation for any non-trivial change.
+          </p>
+        </div>
+      </div>
+
+      <!-- aib-context-read.md -->
+      <div class="prompt-card">
+        <div class="prompt-card-header">Context Read &mdash; select relevant registered extensions</div>
+        <div class="prompt-card-body">
+          <p>
+            <code>aib-context-read.md</code> is invoked automatically by every AIB prompt that reads
+            current <code>context.md</code>. It applies the Read control first, then semantic relevance,
+            and emits a non-blocking warning when a registered artifact is missing.
+          </p>
+        </div>
+      </div>
+
+      <!-- aib-refresh-context-data-model.md -->
+      <div class="prompt-card">
+        <div class="prompt-card-header">Refresh Context Data Model &mdash; reconcile model details</div>
+        <div class="prompt-card-body">
+          <pre><code>Execute .aib_brain/prompts/aib-refresh-context-data-model.md</code></pre>
+          <p>
+            Refreshes <code>.aib_memory/context-data-model.md</code> only when its managed registry
+            entry has <code>Update: yes</code>. It scans workspace evidence, preserves models declared
+            in <code>context.md</code> when evidence conflicts, removes models only after exhaustive
+            absence, and runs <code>verify-context-data-model.py</code> before completion.
           </p>
         </div>
       </div>
@@ -1008,18 +1153,35 @@
           <p>
             Rebuilds <code>.aib_memory/context.md</code> from the current workspace state.
             No active request is required. Run this after significant structural changes to
-            your workspace to keep AIB's product understanding up to date.
+            your workspace to keep AIB's product understanding up to date. 
+            Can be invoked at any time, but may take a while on large workspaces and is token intensive.
           </p>
         </div>
       </div>
 
-      <!-- aib-sync-spec.md -->
+
+      <!-- aib-context-migration.md -->
       <div class="prompt-card">
-        <div class="prompt-card-header">Sync Spec &mdash; align context with an external specification</div>
+        <div class="prompt-card-header">Context Migration &mdash; reconstruct context.md from a legacy archive</div>
+        <div class="prompt-card-body">
+          <pre><code>Execute .aib_brain/prompts/aib-context-migration.md with [legacy context] = put here the relative path to the legacy context to be migrated</code></pre>
+          <p>
+            Dedicated migration prompt invoked usually via <code>aib-modify.md</code> after
+            <code>initialize.py --upgrade</code> seeds a migration-ready <code>input.md</code>.
+            Reads the legacy archive path [legacy context] from the prompt invoking it, applies lossless
+            semantic transformation rules and section mapping to reconstruct
+            <code>context.md</code>, restores the managed extension registry and no-model artifact,
+            and runs both <code>verify-context.py</code> and <code>verify-context-data-model.py</code>
+            before completing.
+          </p>
+        </div>
+      </div>      <!-- aib-sync-spec.md -->
+      <div class="prompt-card">
+        <div class="prompt-card-header">Sync Spec &mdash; align context with an external specification (add knowledge in context.md)</div>
         <div class="prompt-card-body">
           <pre><code>Execute .aib_brain/prompts/aib-sync-spec.md</code></pre>
           <p>
-            Reads an external specification file (path provided in <code>input.md ## Input</code>),
+            Experimental.Reads an external specification file (path provided in <code>input.md ## Input</code>),
             generates Q-blocks for any contradictions with <code>context.md</code>, and adds
             non-contradictory items as new context entries or <code>[PLANNED]</code> tags.
           </p>
@@ -1032,10 +1194,46 @@
         <div class="prompt-card-body">
           <pre><code>Execute .aib_brain/prompts/aib-input-from-context.md</code></pre>
           <p>
-            Reads all <code>[PLANNED]</code> entries and <code>## Issues</code> from
+            Experimental. Reads all <code>[PLANNED]</code> entries and <code>## Issues</code> from
             <code>context.md</code> and appends structured goal bullets to
-            <code>input.md ## Input</code>. Useful for turning your context backlog into a
+            <code>input.md ## Input</code>. [PLANNED] entries are such entries which have been identified as 
+            actions or goals for the future not implemented yet. Useful for turning your context backlog into a
             ready-to-analyze request. Requires no active request.
+          </p>
+        </div>
+      </div>
+
+      <!-- aib-execute.md -->
+      <div class="prompt-card">
+        <div class="prompt-card-header">Execute &mdash; direct execution with context updates</div>
+        <div class="prompt-card-body">
+          <pre><code>Execute .aib_brain/prompts/aib-execute.md</code></pre>
+          <p>
+            Direct-execution variant of <code>aib-modify.md</code> that is REQUIRED to emit and execute
+            <code>python -B .aib_brain/tools/edit-context.py ...</code> commands whenever the executed
+            implementation entails a change to <code>context.md</code>. Direct edits to
+            <code>context.md</code> remain forbidden; every context change goes through
+            <code>edit-context.py</code>. After the implementation, invokes the shared
+            <code>aib-update-adr-requirements.md</code> subroutine (provenance tag <code>[E]</code>)
+            to append rows to <code>.aib_memory/adr.md</code> and <code>.aib_memory/requirements.md</code>,
+            then archives, moves, and closes the request.
+          </p>
+        </div>
+      </div>
+
+      <!-- aib-update-adr-requirements.md -->
+      <div class="prompt-card">
+        <div class="prompt-card-header">Update ADR &amp; Requirements &mdash; shared append subroutine</div>
+        <div class="prompt-card-body">
+          <pre><code>Execute .aib_brain/prompts/aib-update-adr-requirements.md</code></pre>
+          <p>
+            Shared subroutine invoked as the final documentation step by <code>aib-implement.md</code>
+            (tag <code>[A]</code>): Active entry (tag <code>[D]</code>): Deprecated entry. Appends UTC-timestamped, provenance-tagged
+            rows to <code>.aib_memory/requirements.md</code> (user requirements) and
+            <code>.aib_memory/adr.md</code> (architecture decisions), applying the row schema, dedup rule,
+            and retry-once-then-halt failure semantics codified in
+            <code>.aib_brain/conventions/adr-requirements-convention.md</code>. Not intended to be invoked
+            directly by users.
           </p>
         </div>
       </div>
@@ -1046,14 +1244,89 @@
         <div class="prompt-card-body">
           <pre><code>Execute .aib_brain/prompts/aib-clarify.md</code></pre>
           <p>
-            Performs a context-aware clarification pass on the active request. Before invoking
-            this prompt, use the AIB menu to run <strong>Create Clarify Context</strong>, then
-            attach both <code>.aib_memory/input.md</code> and the generated
-            <code>context-compilation-&lt;timestamp&gt;.md</code> file to your chat session.
+            Refines your request before analysis. It first reads
+            <code>.aib_memory/instructions.md</code> and follows applicable workspace
+            directives; a missing or empty file is fine. Loading these instructions
+            does not start analysis or implementation. The clarification workflow
+            defines instruction handling and context-extension loading itself,
+            without invoking other prompts. The prompt never runs scripts:
+            it gives you exact commands when needed, using <code>python -B</code> or
+            <code>python3 -B</code> for AIB tools.
+          </p>
+          <p>
+            Use a session that can edit workspace files directly. Each question,
+            implementation-impact explanation, offered option, and recommended marker
+            is saved in <code>.aib_memory/clarification_questions.md</code> when
+            presented. Your answers and later revisions are appended when received;
+            earlier answers remain visible and unanswered questions stay unanswered.
+            If saving fails or file editing is unavailable, clarification stops the
+            dependent step and reports the problem. A context compilation can provide
+            supplemental context but does not replace access to this history file.
+          </p>
+          <p>
+            History can begin before a request exists and survives request creation,
+            resumed sessions, analysis, and input resets. Request archival saves it as
+            <code>clarification_questions_&lt;request_id&gt;.md</code> in the request
+            folder alongside the runtime log, then leaves the active history file
+            present and empty. Existing archive content is preserved, and repeated
+            successful archival adds no duplicates. If archival fails, the request
+            stays active and recoverable content is retained for retry; interrupted
+            writes may replay staged content, as with runtime-log recovery.
+          </p>
+          <p>
+            Once clarification is complete, copy the proposed replacement into
+            <code>input.md</code> under <code>## Input</code>. Its headings start at
+            level 3. The question-and-answer transcript stays in the history file;
+            other prompts do not record their questions there, and older transcripts
+            are not migrated.
           </p>
         </div>
       </div>
     </section><!-- end Prompt Reference -->
+
+    <!-- ============================================================
+         Section: ADR & Requirements Histories
+         ============================================================ -->
+    <section class="manual-section" id="adr-requirements" aria-labelledby="h-adr-requirements">
+      <h2 id="h-adr-requirements">ADR &amp; Requirements Histories</h2>
+
+      <p>
+        <code>.aib_memory/adr.md</code> and <code>.aib_memory/requirements.md</code> are two append-only
+        Markdown files that record, respectively, the architecture / design decisions AIB has made and
+        the user requirements it has observed across the request lifecycle. They are maintained by the
+        shared subroutine prompt <code>.aib_brain/prompts/aib-update-adr-requirements.md</code>, invoked
+        as the final documentation step of every implementation-oriented run:
+        <code>aib-implement.md</code>, <code>aib-modify.md</code>, and <code>aib-execute.md</code>.
+      </p>
+
+      <h3>Row schema</h3>
+      <pre><code>- [YYYYMMDD-HHMMSS-&lt;request_id&gt;] [&lt;TAG&gt;] &lt;text&gt;</code></pre>
+      <p>
+        The <code>YYYYMMDD-HHMMSS</code> timestamp MUST be captured in UTC. <code>&lt;TAG&gt;</code>
+        is a provenance marker identifying the caller prompt:
+      </p>
+      <ul>
+        <li><code>[A]</code> &mdash; active entry.</li>
+        <li><code>[D]</code> &mdash; deprecated entry.</li>
+      </ul>
+
+      <h3>Deduplication and failure semantics</h3>
+      <p>
+        Before appending a candidate row, the subroutine normalizes its <code>&lt;text&gt;</code>
+        portion (whitespace-collapsed, case-insensitive) and compares against every existing row in
+        the target file (any tag). Matching candidates are skipped. On an I/O or write failure, the
+        subroutine retries the append once immediately; on a second failure it halts the calling
+        prompt and does NOT proceed to finalize / move / close. The full normative schema, tag
+        registry, timestamp, dedup rule, and failure semantics live in
+        <code>.aib_brain/conventions/adr-requirements-convention.md</code>.
+      </p>
+
+      <p>
+        Both files are strictly append-only: historical rows &mdash; including legacy
+        <code>[A]</code>-tagged rows &mdash; are preserved byte-identically and MUST NOT be modified
+        or removed.
+      </p>
+    </section><!-- end ADR & Requirements Histories -->
 
     <!-- ============================================================
          Section: Troubleshooting
@@ -1117,13 +1390,27 @@ sh .aib_brain/run.sh      (Linux/macOS)</code></pre>
         </li>
       </ul>
 
+      <h3>Use Unicode request titles on Windows</h3>
+      <p>
+        Titles such as <code>POS→NSR</code>, non-Latin text, and emoji are preserved during
+        analysis preflight. Run analysis normally; no manual <code>PYTHONIOENCODING</code>
+        setting is needed. Header reads and input/context verification use UTF-8 output,
+        including when saved to a file or captured. If a custom script captures these tools,
+        configure it to decode both output streams as UTF-8. Parsing and validation errors
+        still stop the workflow and should be corrected using the reported checks.
+      </p>
+
       <h3>Check context.md if AIB misunderstands the workspace</h3>
       <p>
         AIB uses <code>.aib_memory/context.md</code> as its primary product knowledge document.
         If AI responses seem out-of-date or incorrect about your workspace structure, run:
       </p>
       <pre><code>Execute .aib_brain/prompts/aib-refresh-context.md</code></pre>
-      <p>This rebuilds <code>context.md</code> from the current workspace state.</p>
+      <p>
+        This rebuilds <code>context.md</code> from the current workspace state and executes each
+        registered extension prompt whose Update value is yes. A missing extension artifact is
+        reported as a warning so the core context workflow can continue.
+      </p>
 
       <h3>Avoid manually editing tool-managed state</h3>
       <p>
@@ -1156,6 +1443,7 @@ sh .aib_brain/run.sh      (Linux/macOS)</code></pre>
         Describe one coherent unit of work per request in <code>input.md ## Input</code>.
         Include the goal, any constraints, and the files or areas of the codebase involved.
         Vague or open-ended requests lead to imprecise plans and unexpected implementation choices.
+        Use .aib_brain/prompts/aib-clarify.md to refine your request before analysis if needed.
       </p>
 
       <h3>Prefer analysis before implementation for non-trivial changes</h3>
@@ -1210,6 +1498,25 @@ sh .aib_brain/run.sh      (Linux/macOS)</code></pre>
         concerns.
       </p>
 
+
+    </section><!-- end Best Practices -->
+
+<!-- ============================================================
+         Section: AIB new versions
+         ============================================================ -->
+    <section class="manual-section" id="best-practices" aria-labelledby="h-best-practices">
+      <h2 id="h-best-practices">AIB new versions logs</h2>
+
+      <p>
+        Find information about new versions of AIB in the respective version notes in folder <code>logs/</code> in AIB repo.
+      </p>
+
+      <h3>Glossary</h3>
+      <ul>
+        <li><span class="glossary-term">CI</span> &mdash; Continuous integration automates validation and release tasks.</li>
+        <li><span class="glossary-term">VCS</span> &mdash; Version control system tracks file history and collaboration.</li>
+      </ul>
+
       <!-- ============================================================
            Page Footer
            ============================================================ -->
@@ -1220,6 +1527,7 @@ sh .aib_brain/run.sh      (Linux/macOS)</code></pre>
         </p>
       </footer>
     </section><!-- end Best Practices -->
+
 
   </main><!-- end .main-content -->
 

@@ -53,14 +53,6 @@ def _make_request(workspace: Path, req_id: str, state: str = "analysis_ready") -
     hdr["state"]["title"] = "Test Request"
     hdr["state"]["status"] = state
     write_text(input_path, write_input_header(base_content, hdr))
-
-    # Write a minimal plan.md stub
-    plan_md = (
-        "## Goal\n\n"
-        "## Constraints\n\n"
-        "## Success criteria\n"
-    )
-    write_text(folder / "plan.md", plan_md)
     return folder
 
 
@@ -161,3 +153,59 @@ class TestCloseRequest:
         captured = capsys.readouterr()
         assert "WARNING" in captured.out
         assert "attachments" in captured.out
+
+
+class TestCloseRequestSharedLog:
+    """close-request.py MUST fail closed on shared-log archive errors and archive on success."""
+
+    def test_success_archives_log_and_resets_state(self, workspace_dir: Path) -> None:
+        """When log archival succeeds, close-request.py resets state to idle and archive reflects the stream."""
+        req_id = "R-20260301-1000"
+        folder = _make_request(workspace_dir, req_id)
+        aib_memory = workspace_dir / ".aib_memory"
+        payload = "20260301-090000: entry-a\n20260301-090015: entry-b\n"
+        (aib_memory / "log.md").write_text(payload, encoding="utf-8")
+
+        rc = _run_close_request(workspace_dir)
+        assert rc == 0
+
+        from common import parse_input_header, read_text  # noqa: PLC0415
+        header = parse_input_header(read_text(workspace_dir / ".aib_memory" / "input.md"))
+        assert header["state"]["status"] == "idle"
+
+        archive = folder / f"log_{req_id}.md"
+        assert archive.exists()
+        assert archive.read_text(encoding="utf-8") == payload
+
+        active = aib_memory / "log.md"
+        assert active.exists() and active.read_bytes() == b""
+
+    def test_log_archive_failure_keeps_request_active(
+        self, workspace_dir: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """When move-request-artifacts reports a LogArchiveError, state remains active and no artifacts move."""
+        req_id = "R-20260301-1001"
+        folder = _make_request(workspace_dir, req_id)
+        aib_memory = workspace_dir / ".aib_memory"
+        # Provide plan and analysis at root; they MUST NOT be moved when log archival fails.
+        write_text(aib_memory / f"plan-{req_id}.md", "## Goal\nBlocker.\n")
+        write_text(aib_memory / f"analysis-{req_id}.md", "# Analysis\n")
+
+        # Force a LogArchiveError by placing a directory at the active-log path so
+        # _require_regular_file rejects the operation before any archival occurs.
+        (aib_memory / "log.md").mkdir()
+
+        rc = _run_close_request(workspace_dir)
+        assert rc != 0
+
+        # State must remain active (not idle).
+        from common import parse_input_header, read_text  # noqa: PLC0415
+        header = parse_input_header(read_text(workspace_dir / ".aib_memory" / "input.md"))
+        assert header["state"]["status"] != "idle"
+        assert header["state"]["request_id"] == req_id
+
+        # Plan and analysis at root must remain untouched (no partial artifact moves).
+        assert (aib_memory / f"plan-{req_id}.md").exists()
+        assert (aib_memory / f"analysis-{req_id}.md").exists()
+        assert not (folder / f"plan-{req_id}.md").exists()
+        assert not (folder / f"analysis-{req_id}.md").exists()

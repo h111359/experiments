@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.util
+import os
 import sys
 from pathlib import Path
 
@@ -196,3 +197,218 @@ class TestCloseRequestArtifactPlacement:
         # Request state must be idle (closed)
         header = parse_input_header(read_text(workspace_dir / ".aib_memory" / "input.md"))
         assert header["state"]["status"] == "idle"
+
+
+# ---------------------------------------------------------------------------
+# Shared-log archival transaction (move-request-artifacts.py)
+# ---------------------------------------------------------------------------
+
+
+ACTIVE_LOG_NAME = "log.md"
+
+
+def _archive_log_path(folder: Path, req_id: str) -> Path:
+    """Return the per-request archive file path used by the shared-log rotation."""
+    return folder / f"log_{req_id}.md"
+
+
+def _try_create_symlink(link_path: Path, target: Path) -> bool:
+    """Attempt to create a symlink; return False on OSes/permissions that reject it."""
+    try:
+        os.symlink(target, link_path)
+        return True
+    except (OSError, NotImplementedError):
+        return False
+
+
+class TestSharedLogArchival:
+    """move-request-artifacts.py archives .aib_memory/log.md into the request subfolder."""
+
+    def test_archive_byte_equal_when_no_prior_archive(self, workspace_dir: Path) -> None:
+        """Non-empty active log with no prior archive lands byte-equal at the archive path."""
+        req_id = "R-20260201-1000"
+        folder = _make_active_request(workspace_dir, req_id)
+        aib_memory = workspace_dir / ".aib_memory"
+        payload = b"20260201-100000: first\n20260201-100005: second\n"
+        (aib_memory / ACTIVE_LOG_NAME).write_bytes(payload)
+
+        rc = _run_move_artifacts(workspace_dir)
+        assert rc == 0
+
+        archive = _archive_log_path(folder, req_id)
+        assert archive.exists()
+        assert archive.read_bytes() == payload
+        active = aib_memory / ACTIVE_LOG_NAME
+        assert active.exists() and active.read_bytes() == b""
+
+    def test_archive_appends_with_newline_separator_when_missing(self, workspace_dir: Path) -> None:
+        """Non-empty prior archive without trailing newline gets exactly one \\n separator."""
+        req_id = "R-20260201-1001"
+        folder = _make_active_request(workspace_dir, req_id)
+        aib_memory = workspace_dir / ".aib_memory"
+        archive = _archive_log_path(folder, req_id)
+        # Archive without a trailing newline.
+        archive.write_bytes(b"20260201-090000: prior")
+        (aib_memory / ACTIVE_LOG_NAME).write_bytes(b"20260201-100000: new\n")
+
+        rc = _run_move_artifacts(workspace_dir)
+        assert rc == 0
+
+        assert archive.read_bytes() == b"20260201-090000: prior\n20260201-100000: new\n"
+
+    def test_archive_does_not_add_separator_when_trailing_newline_present(
+        self, workspace_dir: Path
+    ) -> None:
+        """Archive already ending in \\n receives snapshot without an additional separator."""
+        req_id = "R-20260201-1002"
+        folder = _make_active_request(workspace_dir, req_id)
+        aib_memory = workspace_dir / ".aib_memory"
+        archive = _archive_log_path(folder, req_id)
+        archive.write_bytes(b"20260201-090000: prior\n")
+        (aib_memory / ACTIVE_LOG_NAME).write_bytes(b"20260201-100000: new\n")
+
+        rc = _run_move_artifacts(workspace_dir)
+        assert rc == 0
+
+        assert archive.read_bytes() == b"20260201-090000: prior\n20260201-100000: new\n"
+
+    def test_absent_root_log_creates_empty_archive(self, workspace_dir: Path) -> None:
+        """When .aib_memory/log.md is absent and no prior archive exists, create empty archive."""
+        req_id = "R-20260201-1003"
+        folder = _make_active_request(workspace_dir, req_id)
+        aib_memory = workspace_dir / ".aib_memory"
+        assert not (aib_memory / ACTIVE_LOG_NAME).exists()
+
+        rc = _run_move_artifacts(workspace_dir)
+        assert rc == 0
+
+        archive = _archive_log_path(folder, req_id)
+        assert archive.exists()
+        assert archive.read_bytes() == b""
+
+    def test_empty_root_log_leaves_archive_empty_and_resets_active(
+        self, workspace_dir: Path
+    ) -> None:
+        """Empty root log is a no-op for archive contents but still leaves an empty active log."""
+        req_id = "R-20260201-1004"
+        folder = _make_active_request(workspace_dir, req_id)
+        aib_memory = workspace_dir / ".aib_memory"
+        (aib_memory / ACTIVE_LOG_NAME).write_bytes(b"")
+
+        rc = _run_move_artifacts(workspace_dir)
+        assert rc == 0
+
+        archive = _archive_log_path(folder, req_id)
+        assert archive.exists() and archive.read_bytes() == b""
+        active = aib_memory / ACTIVE_LOG_NAME
+        assert active.exists() and active.read_bytes() == b""
+
+    def test_double_invocation_is_idempotent(self, workspace_dir: Path) -> None:
+        """Two consecutive move_artifacts calls produce the same final state as one."""
+        req_id = "R-20260201-1005"
+        folder = _make_active_request(workspace_dir, req_id)
+        aib_memory = workspace_dir / ".aib_memory"
+        (aib_memory / ACTIVE_LOG_NAME).write_text("20260201-100000: first\n", encoding="utf-8")
+
+        rc1 = _run_move_artifacts(workspace_dir)
+        assert rc1 == 0
+        archive_after_first = _archive_log_path(folder, req_id).read_bytes()
+
+        rc2 = _run_move_artifacts(workspace_dir)
+        assert rc2 == 0
+        archive_after_second = _archive_log_path(folder, req_id).read_bytes()
+
+        assert archive_after_first == archive_after_second
+        active = aib_memory / ACTIVE_LOG_NAME
+        assert active.exists() and active.read_bytes() == b""
+
+    def test_leftover_staging_file_is_drained(self, workspace_dir: Path) -> None:
+        """A staging file from a simulated aborted prior run is drained into the archive."""
+        req_id = "R-20260201-1006"
+        folder = _make_active_request(workspace_dir, req_id)
+        aib_memory = workspace_dir / ".aib_memory"
+        # Simulate an aborted prior run: staging file is present, root log absent.
+        staging = aib_memory / f"log-staging-{req_id}.md"
+        staging.write_text("20260201-080000: pre-crash entry\n", encoding="utf-8")
+
+        rc = _run_move_artifacts(workspace_dir)
+        assert rc == 0
+
+        archive = _archive_log_path(folder, req_id)
+        assert archive.exists()
+        assert "pre-crash entry" in archive.read_text(encoding="utf-8")
+        assert not staging.exists(), "Staging file must be removed after successful drain"
+
+    def test_directory_at_active_log_path_blocks_operation(self, workspace_dir: Path) -> None:
+        """A directory at .aib_memory/log.md blocks the archival transaction."""
+        req_id = "R-20260201-1007"
+        folder = _make_active_request(workspace_dir, req_id)
+        aib_memory = workspace_dir / ".aib_memory"
+        (aib_memory / ACTIVE_LOG_NAME).mkdir()
+
+        rc = _run_move_artifacts(workspace_dir)
+        assert rc != 0
+        # No archive should be produced when the active-log path type is invalid.
+        assert not _archive_log_path(folder, req_id).exists()
+
+    def test_directory_at_archive_path_blocks_operation(self, workspace_dir: Path) -> None:
+        """A directory at the archive path blocks the archival transaction."""
+        req_id = "R-20260201-1008"
+        folder = _make_active_request(workspace_dir, req_id)
+        aib_memory = workspace_dir / ".aib_memory"
+        (aib_memory / ACTIVE_LOG_NAME).write_text("20260201-100000: active\n", encoding="utf-8")
+        _archive_log_path(folder, req_id).mkdir()
+
+        rc = _run_move_artifacts(workspace_dir)
+        assert rc != 0
+        # Active log must remain untouched when archival is refused.
+        assert (aib_memory / ACTIVE_LOG_NAME).read_text(encoding="utf-8") == "20260201-100000: active\n"
+
+    def test_symlink_at_active_log_blocks_operation(self, workspace_dir: Path) -> None:
+        """A symlink at .aib_memory/log.md blocks the archival transaction; skip on OSes that reject symlink creation."""
+        req_id = "R-20260201-1009"
+        folder = _make_active_request(workspace_dir, req_id)
+        aib_memory = workspace_dir / ".aib_memory"
+        target = aib_memory / "log-target.txt"
+        target.write_text("target\n", encoding="utf-8")
+        link = aib_memory / ACTIVE_LOG_NAME
+        if not _try_create_symlink(link, target):
+            pytest.skip("Symlink creation not permitted on this platform")
+
+        rc = _run_move_artifacts(workspace_dir)
+        assert rc != 0
+        # Target file and the symlink itself remain untouched.
+        assert target.read_text(encoding="utf-8") == "target\n"
+        assert link.is_symlink()
+
+    def test_symlink_at_archive_path_blocks_operation(self, workspace_dir: Path) -> None:
+        """A symlink at the archive path blocks the archival transaction."""
+        req_id = "R-20260201-1010"
+        folder = _make_active_request(workspace_dir, req_id)
+        aib_memory = workspace_dir / ".aib_memory"
+        (aib_memory / ACTIVE_LOG_NAME).write_text("20260201-100000: active\n", encoding="utf-8")
+        target = folder / "other-target.txt"
+        target.write_text("target\n", encoding="utf-8")
+        link = _archive_log_path(folder, req_id)
+        if not _try_create_symlink(link, target):
+            pytest.skip("Symlink creation not permitted on this platform")
+
+        rc = _run_move_artifacts(workspace_dir)
+        assert rc != 0
+        # Active log remains untouched when archival is refused.
+        assert (aib_memory / ACTIVE_LOG_NAME).read_text(encoding="utf-8") == "20260201-100000: active\n"
+
+    def test_legacy_log_general_preserved_verbatim(self, workspace_dir: Path) -> None:
+        """A pre-existing .aib_memory/log_general.md file must not be touched by archival."""
+        req_id = "R-20260201-1011"
+        _make_active_request(workspace_dir, req_id)
+        aib_memory = workspace_dir / ".aib_memory"
+        legacy = aib_memory / "log_general.md"
+        legacy.write_text("legacy-general\n", encoding="utf-8")
+        (aib_memory / ACTIVE_LOG_NAME).write_text("20260201-100000: active\n", encoding="utf-8")
+
+        rc = _run_move_artifacts(workspace_dir)
+        assert rc == 0
+
+        assert legacy.exists()
+        assert legacy.read_text(encoding="utf-8") == "legacy-general\n"

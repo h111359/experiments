@@ -2,7 +2,7 @@
 """input-header.py: CRUD operations on the YAML frontmatter header of .aib_memory/input.md.
 
 Operations:
-  read    Print all header fields as key=value lines to stdout.
+  read    Print all header fields as UTF-8 key=value lines to stdout.
   write   Update one or more header fields. Unspecified fields are preserved.
   reset   Reset header to idle state (request_id: ~, title: ~, state: idle, minimum_questions: 5).
 """
@@ -15,9 +15,9 @@ from pathlib import Path
 
 from common import (
     ValidationError,
+    configure_utf8_output,
     ensure_workspace,
     parse_input_header,
-    read_input_header,
     read_text,
     write_input_header,
     write_text,
@@ -85,6 +85,7 @@ def _parse_args() -> argparse.Namespace:
 
 def main() -> None:
     """Entry point: perform the requested CRUD operation on the input.md YAML header."""
+    configure_utf8_output()
     args = _parse_args()
     workspace = Path(args.workspace).resolve()
 

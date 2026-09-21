@@ -11,7 +11,7 @@ import re
 import sys
 from pathlib import Path
 
-from common import parse_input_header, read_text, write_input_header, write_text
+from common import configure_utf8_output, parse_input_header, read_text, write_input_header, write_text
 
 # Required top-level YAML group keys (the two nested blocks).
 REQUIRED_YAML_KEYS = (
@@ -608,6 +608,7 @@ def main() -> int:
     Returns:
         0 on all checks passing, 1 on any failure.
     """
+    configure_utf8_output()
     args = _parse_args()
     workspace = Path(args.workspace)
 

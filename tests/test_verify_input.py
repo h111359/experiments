@@ -78,6 +78,7 @@ def _run_verify(workspace: Path) -> subprocess.CompletedProcess:
         [sys.executable, str(SCRIPT_PATH), "--workspace", str(workspace)],
         capture_output=True,
         text=True,
+        encoding="utf-8",
     )
 
 

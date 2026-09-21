@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.util
+import subprocess
 import sys
 import tempfile
 from pathlib import Path
@@ -11,6 +12,9 @@ import pytest
 
 WORKSPACE_ROOT = Path(__file__).resolve().parent.parent
 TOOLS_DIR = WORKSPACE_ROOT / ".aib_brain" / "tools"
+VERIFY_CONTEXT = TOOLS_DIR / "verify-context.py"
+VERIFY_DATA_MODEL = TOOLS_DIR / "verify-context-data-model.py"
+EMPTY_DATA_MODEL = "# Context Data Model\n\nNo data models are currently documented.\n"
 
 
 # ---------------------------------------------------------------------------
@@ -193,7 +197,7 @@ class TestUpgrade:
             assert rc != 0
 
     def test_upgrade_creates_migration_input(self):
-        """After upgrade, input.md contains migration instructions and idle YAML header."""
+        """After upgrade, input.md contains the activation directive and idle YAML header."""
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             _make_brain_with_semver(root, "v1.2.8")
@@ -201,15 +205,15 @@ class TestUpgrade:
             _run_initialize(root, upgrade=True)
             input_content = (root / ".aib_memory" / "input.md").read_text(encoding="utf-8")
             assert "status: idle" in input_content
-            assert "### Goal" in input_content
-            # ## Input section must be non-empty (contains migration instructions).
+            assert "aib-context-migration.md" in input_content
+            # ## Input section must be non-empty (contains activation directive).
             input_section_idx = input_content.find("## Input")
             assert input_section_idx != -1
             after_input = input_content[input_section_idx + len("## Input"):].strip()
             assert after_input, "## Input section must be non-empty after upgrade"
 
     def test_upgrade_creates_valid_context_placeholder(self):
-        """After upgrade, context.md begins with '# Product Context' and has all 5 sections."""
+        """After upgrade, context.md contains mandatory sections and managed References."""
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             _make_brain_with_semver(root, "v1.2.8")
@@ -222,7 +226,40 @@ class TestUpgrade:
             assert "## Requirements" in context_content
             assert "## Solution" in context_content
             assert "## File Structure" in context_content
+            assert "## References" in context_content
+            assert "### Context Data Model" in context_content
+            assert "Read: no" in context_content
+            assert "Update: yes" in context_content
             assert "- MUST:" in context_content
+
+    def test_upgrade_seeds_valid_empty_data_model(self):
+        """Upgrade creates the canonical data-model extension and both validators pass."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _make_brain_with_semver(root, "v1.2.8")
+            _run_initialize(root)
+            _run_initialize(root, upgrade=True)
+            data_model = root / ".aib_memory" / "context-data-model.md"
+            assert data_model.read_text(encoding="utf-8") == EMPTY_DATA_MODEL
+            context_result = subprocess.run(
+                [sys.executable, str(VERIFY_CONTEXT), "--workspace", str(root)],
+                capture_output=True,
+                text=True,
+            )
+            model_result = subprocess.run(
+                [
+                    sys.executable,
+                    str(VERIFY_DATA_MODEL),
+                    "--workspace",
+                    str(root),
+                    "--path",
+                    ".aib_memory/context-data-model.md",
+                ],
+                capture_output=True,
+                text=True,
+            )
+            assert context_result.returncode == 0, context_result.stdout
+            assert model_result.returncode == 0, model_result.stdout
 
     def test_upgrade_does_not_restore_requests(self):
         """After upgrade, requests/ in active memory is empty; legacy requests stay in archive."""
@@ -317,6 +354,42 @@ class TestInitialize:
             assert "status: idle" in content
             assert "request_id: ~" in content
             assert "## Input" in content
+
+    def test_fresh_init_seeds_managed_context_and_data_model(self):
+        """Fresh initialization creates a valid registry and canonical empty extension."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _make_brain_only_workspace(root)
+            assert _run_initialize(root) == 0
+            context = (root / ".aib_memory" / "context.md").read_text(encoding="utf-8")
+            assert context.startswith("# Product Context")
+            assert "Location: .aib_memory/context-data-model.md" in context
+            assert "Convention: .aib_brain/conventions/context-data-model-convention.md" in context
+            assert "Prompt: .aib_brain/prompts/aib-refresh-context-data-model.md" in context
+            assert "Read: no" in context
+            assert "Update: yes" in context
+            assert (root / ".aib_memory" / "context-data-model.md").read_text(
+                encoding="utf-8"
+            ) == EMPTY_DATA_MODEL
+
+    def test_rerun_preserves_user_flags_and_extension_content(self):
+        """Idempotent initialization does not overwrite registry controls or extension content."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _make_brain_only_workspace(root)
+            _run_initialize(root)
+            context_path = root / ".aib_memory" / "context.md"
+            model_path = root / ".aib_memory" / "context-data-model.md"
+            context_path.write_text(
+                context_path.read_text(encoding="utf-8").replace("Read: no", "Read: yes"),
+                encoding="utf-8",
+            )
+            model_path.write_text("# Context Data Model\n\nCustom preserved content.\n", encoding="utf-8")
+            _run_initialize(root)
+            assert "Read: yes" in context_path.read_text(encoding="utf-8")
+            assert model_path.read_text(encoding="utf-8") == (
+                "# Context Data Model\n\nCustom preserved content.\n"
+            )
 
     def test_input_md_has_no_threshold_row(self):
         """Seeded input.md must not include a Question threshold row (removed in R-20260508-0036)."""
